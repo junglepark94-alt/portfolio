@@ -702,7 +702,16 @@ ul { list-style: none; }
 }
 
 /* ── YouTube Card ───────────────────────────── */
-#modalYoutube { margin-top: 1.25rem; }
+#modalYoutubeList { margin-top: 1.25rem; }
+.yt-item { margin-bottom: 1rem; }
+.yt-item:last-child { margin-bottom: 0; }
+.yt-item-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 0.35rem;
+  letter-spacing: 0.01em;
+}
 .yt-card {
   display: block;
   border: 1px solid var(--border);

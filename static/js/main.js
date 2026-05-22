@@ -110,10 +110,11 @@ if (modal) {
       `<a href="${lk.url}" class="pc-link" target="_blank" rel="noopener">${lk.label} →</a>`
     ).join('');
 
-    // YouTube 카드
-    ytWrap.style.display = 'none';
-    const ytLink_ = links.find(lk => extractYtId(lk.url));
-    if (ytLink_) loadYoutube(ytLink_.url, extractYtId(ytLink_.url));
+    // YouTube 카드들
+    ytListEl.innerHTML = '';
+    links.filter(lk => extractYtId(lk.url)).forEach(lk => {
+      ytListEl.appendChild(createYtCard(lk.label, lk.url, extractYtId(lk.url)));
+    });
 
     modal.classList.add('active');
     modal.setAttribute('aria-hidden', 'false');
@@ -168,13 +169,7 @@ if (modal) {
   });
 
   // ── YouTube 카드 ────────────────────────────
-  const ytWrap   = document.getElementById('modalYoutube');
-  const ytLink   = document.getElementById('modalYoutubeLink');
-  const ytThumb  = document.getElementById('modalYoutubeThumb');
-  const ytTitle  = document.getElementById('modalYoutubeTitle');
-  const ytViews  = document.getElementById('modalYoutubeViews');
-  const ytLikes  = document.getElementById('modalYoutubeLikes');
-  const ytCmnts  = document.getElementById('modalYoutubeComments');
+  const ytListEl = document.getElementById('modalYoutubeList');
 
   function extractYtId(url) {
     const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
@@ -186,24 +181,36 @@ if (modal) {
     if (n >= 1000)  return (n / 1000).toFixed(1) + 'k';
     return n.toLocaleString();
   }
-  function loadYoutube(videoUrl, videoId) {
-    ytWrap.style.display = 'none';
-    ytLink.href = videoUrl;
-    ytThumb.src = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
-    ytTitle.textContent = '로딩 중…';
-    ytViews.textContent = ytLikes.textContent = ytCmnts.textContent = '';
-    ytWrap.style.display = '';
+  function createYtCard(label, videoUrl, videoId) {
+    const item = document.createElement('div');
+    item.className = 'yt-item';
+    item.innerHTML = (label ? `<div class="yt-item-label">${label}</div>` : '')
+      + `<a href="${videoUrl}" class="yt-card" target="_blank" rel="noopener">
+           <div class="yt-thumb-wrap">
+             <img src="https://img.youtube.com/vi/${videoId}/hqdefault.jpg" alt="" />
+             <span class="yt-play">▶</span>
+           </div>
+           <div class="yt-info">
+             <div class="yt-title">로딩 중…</div>
+             <div class="yt-stats">
+               <span class="yt-views"></span>
+               <span class="yt-likes"></span>
+               <span class="yt-comments"></span>
+             </div>
+           </div>
+         </a>`;
     fetch(`/api/youtube?v=${videoId}`)
       .then(r => r.json())
       .then(d => {
-        if (d.error) return;
-        if (d.thumbnail) ytThumb.src = d.thumbnail;
-        ytTitle.textContent  = d.title || '';
-        ytViews.textContent  = d.viewCount  ? '▶ ' + fmtNum(d.viewCount)  + ' 회' : '';
-        ytLikes.textContent  = d.likeCount  ? '👍 ' + fmtNum(d.likeCount)         : '';
-        ytCmnts.textContent  = d.commentCount ? '💬 ' + fmtNum(d.commentCount)    : '';
+        if (d.error) { item.querySelector('.yt-title').textContent = ''; return; }
+        if (d.thumbnail) item.querySelector('.yt-thumb-wrap img').src = d.thumbnail;
+        item.querySelector('.yt-title').textContent = d.title || '';
+        item.querySelector('.yt-views').textContent   = d.viewCount    ? '▶ ' + fmtNum(d.viewCount)    + ' 회' : '';
+        item.querySelector('.yt-likes').textContent   = d.likeCount    ? '👍 ' + fmtNum(d.likeCount)            : '';
+        item.querySelector('.yt-comments').textContent = d.commentCount ? '💬 ' + fmtNum(d.commentCount)       : '';
       })
-      .catch(() => { ytTitle.textContent = ''; });
+      .catch(() => { item.querySelector('.yt-title').textContent = ''; });
+    return item;
   }
 
   modalClose.addEventListener('click', closeModal);
