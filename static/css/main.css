@@ -215,6 +215,7 @@ ul { list-style: none; }
   max-width: 720px;
   white-space: pre-line;
   line-height: 1.9;
+  word-break: keep-all;
 }
 .about-summary-grid {
   display: grid;
