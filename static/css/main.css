@@ -211,9 +211,10 @@ ul { list-style: none; }
 /* ── About ──────────────────────────────────── */
 .about-intro p {
   color: var(--text-2);
-  margin-bottom: 1rem;
   font-size: 1rem;
   max-width: 720px;
+  white-space: pre-line;
+  line-height: 1.9;
 }
 .about-summary-grid {
   display: grid;

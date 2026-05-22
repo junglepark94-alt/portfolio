@@ -33,9 +33,7 @@
 
     <!-- 소개 본문 -->
     <div class="about-intro reveal">
-      {% for line in profile.about_text.split('\n') if line.strip() %}
-      <p>{{ line }}</p>
-      {% endfor %}
+      <p>{{ profile.about_text }}</p>
     </div>
 
     <!-- 학력 / 수상내역 -->
