@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}{{ profile.name }} — Portfolio{% endblock %}
+
+{% block content %}
+
+<!-- ── HERO ─────────────────────────────────────────── -->
+<section class="hero" id="hero">
+  <div class="hero-inner">
+    <div class="hero-eyebrow">{{ profile.role }}</div>
+    <h1 class="hero-name">안녕하세요,<br/><span class="accent">{{ profile.name }}</span>입니다.</h1>
+    <p class="hero-sub">{{ profile.tagline | replace('\n', '<br/>') | safe }}</p>
+    <div class="hero-cta">
+      <a href="#projects" class="btn btn-primary">프로젝트 보기</a>
+      <a href="#contact" class="btn btn-ghost">연락하기</a>
+    </div>
+  </div>
+  <div class="hero-line"></div>
+</section>
+
+<!-- ── ABOUT ────────────────────────────────────────── -->
+<section class="section" id="about">
+  <div class="container">
+    <div class="section-label">About</div>
+    <div class="about-grid">
+      <div class="about-text">
+        <h2>경력 요약</h2>
+        {% for line in profile.about_text.split('\n') if line.strip() %}
+        <p>{{ line }}</p>
+        {% endfor %}
+      </div>
+      <div class="about-skills">
+        <h3>핵심 역량</h3>
+        <ul class="skill-list">
+          {% for s in profile.skill_list %}
+          <li><span class="skill-tag">{{ s }}</span></li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── EXPERIENCE ────────────────────────────────────── -->
+{% if profile.experience %}
+<section class="section section-alt" id="experience">
+  <div class="container">
+    <div class="section-label">Experience</div>
+    <h2>경력 사항</h2>
+    <div class="timeline">
+      {% for exp in profile.experience %}
+      <div class="timeline-item">
+        <div class="timeline-meta">
+          <span class="tl-company">{{ exp.company }}</span>
+          <span class="tl-period">{{ exp.period }}</span>
+        </div>
+        <div class="tl-role">{{ exp.role }}</div>
+        <ul class="tl-desc">
+          {% for b in exp.bullets %}
+          <li>{{ b }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<!-- ── PROJECTS ───────────────────────────────────────── -->
+<section class="section" id="projects">
+  <div class="container">
+    <div class="section-label">Projects</div>
+    <h2>주요 프로젝트</h2>
+    <div class="projects-grid">
+      {% for p in projects %}
+      <article class="project-card">
+        <div class="pc-header">
+          <h3 class="pc-title">{{ p.title }}</h3>
+          {% if p.period %}<span class="pc-period">{{ p.period }}</span>{% endif %}
+        </div>
+        <p class="pc-desc">{{ p.description }}</p>
+        <div class="pc-tags">
+          {% for t in p.tech_list %}
+          <span class="tag">{{ t }}</span>
+          {% endfor %}
+        </div>
+        <div class="pc-links">
+          {% if p.github_url %}<a href="{{ p.github_url }}" class="pc-link" target="_blank" rel="noopener">GitHub →</a>{% endif %}
+          {% if p.demo_url %}<a href="{{ p.demo_url }}" class="pc-link" target="_blank" rel="noopener">Demo →</a>{% endif %}
+        </div>
+      </article>
+      {% else %}
+      <p class="no-projects">등록된 프로젝트가 없습니다.</p>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- ── CONTACT ───────────────────────────────────────── -->
+<section class="section section-alt" id="contact">
+  <div class="container">
+    <div class="section-label">Contact</div>
+    <h2>연락처</h2>
+    <p class="contact-sub">새로운 기회나 협업 제안을 언제든 환영합니다.</p>
+    <div class="contact-grid">
+      {% if profile.email %}
+      <a href="mailto:{{ profile.email }}" class="contact-card">
+        <span class="cc-icon">✉</span>
+        <span class="cc-label">이메일</span>
+        <span class="cc-value">{{ profile.email }}</span>
+      </a>
+      {% endif %}
+      {% if profile.linkedin_url %}
+      <a href="{{ profile.linkedin_url }}" class="contact-card" target="_blank" rel="noopener">
+        <span class="cc-icon">in</span>
+        <span class="cc-label">LinkedIn</span>
+        <span class="cc-value">{{ profile.linkedin_url | replace('https://', '') }}</span>
+      </a>
+      {% endif %}
+      {% if profile.github_url %}
+      <a href="{{ profile.github_url }}" class="contact-card" target="_blank" rel="noopener">
+        <span class="cc-icon">⌥</span>
+        <span class="cc-label">GitHub</span>
+        <span class="cc-value">{{ profile.github_url | replace('https://', '') }}</span>
+      </a>
+      {% endif %}
+      {% if profile.blog_url %}
+      <a href="{{ profile.blog_url }}" class="contact-card" target="_blank" rel="noopener">
+        <span class="cc-icon">✍</span>
+        <span class="cc-label">Blog</span>
+        <span class="cc-value">{{ profile.blog_url | replace('https://', '') }}</span>
+      </a>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+{% endblock %}

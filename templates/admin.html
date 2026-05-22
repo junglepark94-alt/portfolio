@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard{% endblock %}
+{% block content %}
+<div class="container admin-page">
+
+  <div class="admin-topbar">
+    <h2>관리자 대시보드</h2>
+    <a href="{{ url_for('logout') }}" class="btn btn-ghost btn-sm-text">로그아웃</a>
+  </div>
+
+  <!-- 프로필 카드 -->
+  <div class="admin-section-card">
+    <div class="asc-header">
+      <div>
+        <div class="asc-label">프로필</div>
+        <div class="asc-summary">{{ profile.name }} · {{ profile.role }}</div>
+      </div>
+      <a href="{{ url_for('profile_edit') }}" class="btn btn-primary">프로필 수정</a>
+    </div>
+    <div class="profile-preview">
+      <div class="pp-row"><span class="pp-key">이메일</span><span>{{ profile.email or '—' }}</span></div>
+      <div class="pp-row"><span class="pp-key">LinkedIn</span><span>{{ profile.linkedin_url or '—' }}</span></div>
+      <div class="pp-row"><span class="pp-key">GitHub</span><span>{{ profile.github_url or '—' }}</span></div>
+      <div class="pp-row"><span class="pp-key">핵심 역량</span><span>{{ profile.skills or '—' }}</span></div>
+    </div>
+  </div>
+
+  <!-- 프로젝트 -->
+  <div class="admin-section-card">
+    <div class="asc-header">
+      <div>
+        <div class="asc-label">프로젝트</div>
+        <div class="asc-summary">{{ projects | length }}개 등록됨</div>
+      </div>
+      <a href="{{ url_for('project_new') }}" class="btn btn-primary">+ 새 프로젝트</a>
+    </div>
+    <table class="admin-table">
+      <thead>
+        <tr><th>순서</th><th>제목</th><th>기간</th><th>기술 스택</th><th>관리</th></tr>
+      </thead>
+      <tbody>
+        {% for p in projects %}
+        <tr>
+          <td>{{ p.order }}</td>
+          <td>{{ p.title }}</td>
+          <td>{{ p.period or '—' }}</td>
+          <td class="td-muted">{{ p.tech_stack }}</td>
+          <td>
+            <a href="{{ url_for('project_edit', pid=p.id) }}" class="btn-sm">수정</a>
+            <form method="POST" action="{{ url_for('project_delete', pid=p.id) }}" style="display:inline" onsubmit="return confirm('삭제하시겠습니까?')">
+              <button type="submit" class="btn-sm btn-danger">삭제</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" style="text-align:center;color:var(--muted)">등록된 프로젝트가 없습니다.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+</div>
+{% endblock %}

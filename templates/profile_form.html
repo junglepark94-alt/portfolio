@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}프로필 수정{% endblock %}
+{% block content %}
+<div class="container profile-edit-page">
+  <div class="pep-header">
+    <h2>프로필 수정</h2>
+    <a href="{{ url_for('admin_dashboard') }}" class="btn btn-ghost">← 대시보드</a>
+  </div>
+
+  <form method="POST">
+
+    <!-- ── 기본 정보 ── -->
+    <div class="form-card">
+      <div class="fc-title">기본 정보</div>
+      <div class="form-row-2">
+        <div class="form-group">
+          <label>이름 *</label>
+          <input type="text" name="name" value="{{ profile.name }}" required />
+        </div>
+        <div class="form-group">
+          <label>직함 / 역할</label>
+          <input type="text" name="role" value="{{ profile.role }}" placeholder="마케팅 & 콘텐츠 기획자" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label>한 줄 소개 (Hero 문구)</label>
+        <textarea name="tagline" rows="2" placeholder="데이터를 기반으로 콘텐츠 전략을 설계하고...">{{ profile.tagline }}</textarea>
+        <div class="form-hint">줄바꿈이 그대로 반영됩니다.</div>
+      </div>
+      <div class="form-group">
+        <label>About 본문</label>
+        <textarea name="about_text" rows="4" placeholder="자신을 소개하는 글을 입력하세요.">{{ profile.about_text }}</textarea>
+        <div class="form-hint">줄바꿈으로 문단을 구분합니다.</div>
+      </div>
+      <div class="form-group">
+        <label>핵심 역량</label>
+        <input type="text" name="skills" value="{{ profile.skills }}" placeholder="콘텐츠 기획,마케팅 전략,Python" />
+        <div class="form-hint">쉼표(,)로 구분합니다.</div>
+      </div>
+    </div>
+
+    <!-- ── 연락처 / SNS ── -->
+    <div class="form-card">
+      <div class="fc-title">연락처 & SNS</div>
+      <div class="form-row-2">
+        <div class="form-group">
+          <label>이메일</label>
+          <input type="email" name="email" value="{{ profile.email }}" placeholder="your@email.com" />
+        </div>
+        <div class="form-group">
+          <label>LinkedIn URL</label>
+          <input type="url" name="linkedin_url" value="{{ profile.linkedin_url }}" placeholder="https://linkedin.com/in/..." />
+        </div>
+        <div class="form-group">
+          <label>GitHub URL</label>
+          <input type="url" name="github_url" value="{{ profile.github_url }}" placeholder="https://github.com/..." />
+        </div>
+        <div class="form-group">
+          <label>Blog URL</label>
+          <input type="url" name="blog_url" value="{{ profile.blog_url }}" placeholder="https://..." />
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 경력 ── -->
+    <div class="form-card">
+      <div class="fc-title">경력 사항</div>
+      <div id="exp-list">
+        {% for exp in profile.experience %}
+        <div class="exp-item">
+          <div class="exp-item-header">
+            <span class="exp-num">경력 {{ loop.index }}</span>
+            <button type="button" class="btn-sm btn-danger" onclick="removeExp(this)">삭제</button>
+          </div>
+          <div class="form-row-2">
+            <div class="form-group">
+              <label>회사명</label>
+              <input type="text" name="exp_company" value="{{ exp.company }}" placeholder="빙그레 (BINGGRAE)" />
+            </div>
+            <div class="form-group">
+              <label>기간</label>
+              <input type="text" name="exp_period" value="{{ exp.period }}" placeholder="2022.03 – 현재" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>직책 / 역할</label>
+            <input type="text" name="exp_role" value="{{ exp.role }}" placeholder="마케팅 / 콘텐츠 기획" />
+          </div>
+          <div class="form-group">
+            <label>주요 업무</label>
+            <textarea name="exp_bullets" rows="4" placeholder="줄바꿈으로 항목을 구분합니다.">{{ exp.bullets | join('\n') }}</textarea>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      <button type="button" class="btn btn-ghost" onclick="addExp()" style="margin-top:1rem;">+ 경력 추가</button>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">저장</button>
+      <a href="{{ url_for('admin_dashboard') }}" class="btn btn-ghost">취소</a>
+      <a href="{{ url_for('index') }}" class="btn btn-ghost" target="_blank">미리보기 →</a>
+    </div>
+
+  </form>
+</div>
+
+<script>
+let expCount = {{ profile.experience | length }};
+
+function addExp() {
+  expCount++;
+  const list = document.getElementById('exp-list');
+  const div = document.createElement('div');
+  div.className = 'exp-item';
+  div.innerHTML = `
+    <div class="exp-item-header">
+      <span class="exp-num">경력 ${expCount}</span>
+      <button type="button" class="btn-sm btn-danger" onclick="removeExp(this)">삭제</button>
+    </div>
+    <div class="form-row-2">
+      <div class="form-group">
+        <label>회사명</label>
+        <input type="text" name="exp_company" placeholder="회사명" />
+      </div>
+      <div class="form-group">
+        <label>기간</label>
+        <input type="text" name="exp_period" placeholder="2022.03 – 현재" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>직책 / 역할</label>
+      <input type="text" name="exp_role" placeholder="직책" />
+    </div>
+    <div class="form-group">
+      <label>주요 업무</label>
+      <textarea name="exp_bullets" rows="4" placeholder="줄바꿈으로 항목을 구분합니다."></textarea>
+    </div>
+  `;
+  list.appendChild(div);
+}
+
+function removeExp(btn) {
+  btn.closest('.exp-item').remove();
+}
+</script>
+{% endblock %}
