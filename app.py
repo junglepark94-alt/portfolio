@@ -401,7 +401,16 @@ def profile_edit():
         profile.linkedin_url = request.form.get('linkedin_url', '')
         profile.github_url = request.form.get('github_url', '')
         profile.blog_url = request.form.get('blog_url', '')
-        profile.og_image_url = request.form.get('og_image_url', '')
+        og_file = request.files.get('og_image_file')
+        if og_file and og_file.filename:
+            ext = og_file.filename.rsplit('.', 1)[-1].lower() if '.' in og_file.filename else ''
+            if ext in ALLOWED_EXTENSIONS:
+                fn = f"og_{int(time.time())}.{ext}"
+                os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+                og_file.save(os.path.join(app.config['UPLOAD_FOLDER'], fn))
+                profile.og_image_url = url_for('static', filename='uploads/' + fn, _external=True)
+        else:
+            profile.og_image_url = request.form.get('og_image_url', '')
         profile.open_to_work = bool(request.form.get('open_to_work'))
 
         # 이력서 PDF 업로드
