@@ -199,7 +199,7 @@ def init_db():
                 conn.execute(db.text(sql))
                 conn.commit()
             except Exception:
-                pass
+                conn.rollback()
 
         # image_filename → project_image 테이블 마이그레이션
         old_imgs = conn.execute(db.text(
