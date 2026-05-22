@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}프로필 수정{% endblock %}
 {% block content %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css" />
 <div class="container profile-edit-page">
   <div class="pep-header">
     <h2>프로필 수정</h2>
@@ -204,15 +205,36 @@
       </div>
       <div class="form-group">
         <label>Open Graph 이미지 (SNS 공유 시 미리보기)</label>
+        <input type="hidden" name="og_cropped_data" id="ogCroppedData" />
+
         {% if profile.og_image_url %}
-        <div style="margin-bottom:0.75rem;">
-          <img src="{{ profile.og_image_url }}" alt="OG 이미지" style="max-width:300px; border-radius:6px; border:1px solid var(--border);" onerror="this.style.display='none'" />
+        <div id="ogCurrentWrap" style="margin-bottom:0.75rem;">
+          <img src="{{ profile.og_image_url }}" alt="OG 이미지" style="max-width:300px; aspect-ratio:40/21; object-fit:cover; border-radius:6px; border:1px solid var(--border);" onerror="this.style.display='none'" />
           <div class="form-hint" style="margin-top:0.25rem;">현재 설정된 이미지</div>
         </div>
         {% endif %}
+
+        <!-- 크롭 영역 -->
+        <div id="ogCropZone" style="display:none; margin-bottom:0.75rem;">
+          <div class="crop-wrap" style="max-height:340px; background:#111; overflow:hidden;">
+            <img id="ogCropTarget" src="" alt="" style="display:block; max-width:100%;" />
+          </div>
+          <div style="display:flex; gap:0.75rem; padding:0.75rem 0;">
+            <button type="button" id="ogApplyCrop" class="btn btn-primary">크롭 적용</button>
+            <button type="button" id="ogSkipCrop" class="btn btn-ghost">크롭 없이 사용</button>
+          </div>
+        </div>
+
+        <!-- 크롭 완료 미리보기 -->
+        <div id="ogPreviewWrap" style="display:none; margin-bottom:0.75rem;">
+          <img id="ogPreview" src="" alt="" style="max-width:300px; aspect-ratio:40/21; object-fit:cover; border-radius:6px; border:1px solid var(--border);" />
+          <div style="margin-top:0.4rem; font-size:0.78rem; color:var(--accent);">✓ 크롭 완료 (1200×630 비율)</div>
+        </div>
+
         <label style="font-weight:400; font-size:0.875rem; margin-bottom:0.25rem; display:block;">이미지 파일 업로드 <span style="color:var(--muted);">(업로드 시 URL보다 우선 적용)</span></label>
-        <input type="file" name="og_image_file" accept="image/*" />
+        <input type="file" id="ogFileInput" name="og_image_file" accept="image/*" />
         <div class="form-hint" style="margin-bottom:0.75rem;">JPG · PNG · WebP · 권장 크기: 1200×630px</div>
+
         <label style="font-weight:400; font-size:0.875rem; margin-bottom:0.25rem; display:block;">또는 이미지 URL 직접 입력</label>
         <input type="url" name="og_image_url" value="{{ profile.og_image_url }}" placeholder="https://..." />
         <div class="form-hint">카카오톡·링크드인에 URL 공유할 때 보이는 썸네일 이미지</div>
@@ -285,6 +307,7 @@
   </form>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
 <script>
 function removeRow(el) { el.remove(); }
 
@@ -330,6 +353,48 @@ function addAward() {
     <button type="button" class="btn-sm btn-danger" onclick="removeRow(this.closest('.award-item'))">삭제</button>`;
   document.getElementById('awardRows').appendChild(div);
 }
+
+// ── OG 이미지 크롭 ──────────────────────────
+(function () {
+  const fileInput   = document.getElementById('ogFileInput');
+  const cropZone    = document.getElementById('ogCropZone');
+  const cropTarget  = document.getElementById('ogCropTarget');
+  const previewWrap = document.getElementById('ogPreviewWrap');
+  const previewImg  = document.getElementById('ogPreview');
+  const croppedData = document.getElementById('ogCroppedData');
+  const currentWrap = document.getElementById('ogCurrentWrap');
+  let cropper = null;
+
+  fileInput.addEventListener('change', function () {
+    const file = this.files[0];
+    if (!file) return;
+    cropTarget.src = URL.createObjectURL(file);
+    cropZone.style.display = '';
+    previewWrap.style.display = 'none';
+    croppedData.value = '';
+    if (currentWrap) currentWrap.style.display = 'none';
+    cropTarget.onload = function () {
+      if (cropper) cropper.destroy();
+      cropper = new Cropper(cropTarget, { aspectRatio: 1200/630, viewMode: 1, autoCropArea: 0.9 });
+    };
+  });
+
+  document.getElementById('ogApplyCrop').addEventListener('click', function () {
+    if (!cropper) return;
+    const canvas = cropper.getCroppedCanvas({ width: 1200, height: 630 });
+    croppedData.value = canvas.toDataURL('image/jpeg', 0.88);
+    previewImg.src = croppedData.value;
+    previewWrap.style.display = '';
+    cropZone.style.display = 'none';
+    fileInput.value = '';
+  });
+
+  document.getElementById('ogSkipCrop').addEventListener('click', function () {
+    cropZone.style.display = 'none';
+    croppedData.value = '';
+    if (currentWrap) currentWrap.style.display = '';
+  });
+})();
 
 let expCount = {{ profile.experience | length }};
 function addExp() {

@@ -401,8 +401,17 @@ def profile_edit():
         profile.linkedin_url = request.form.get('linkedin_url', '')
         profile.github_url = request.form.get('github_url', '')
         profile.blog_url = request.form.get('blog_url', '')
+        import base64 as _b64
+        og_cropped = request.form.get('og_cropped_data', '')
         og_file = request.files.get('og_image_file')
-        if og_file and og_file.filename:
+        if og_cropped and ',' in og_cropped:
+            _, _data = og_cropped.split(',', 1)
+            fn = f"og_{int(time.time())}.jpg"
+            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+            with open(os.path.join(app.config['UPLOAD_FOLDER'], fn), 'wb') as _f:
+                _f.write(_b64.b64decode(_data))
+            profile.og_image_url = url_for('static', filename='uploads/' + fn, _external=True)
+        elif og_file and og_file.filename:
             ext = og_file.filename.rsplit('.', 1)[-1].lower() if '.' in og_file.filename else ''
             if ext in ALLOWED_EXTENSIONS:
                 fn = f"og_{int(time.time())}.{ext}"
