@@ -7,7 +7,17 @@
     <a href="{{ url_for('admin_dashboard') }}" class="btn btn-ghost">← 대시보드</a>
   </div>
 
-  <form method="POST">
+  <form method="POST" enctype="multipart/form-data">
+
+    <!-- ── 이직 검토 상태 ── -->
+    <div class="form-card">
+      <div class="fc-title">상태</div>
+      <label class="otw-toggle-label">
+        <input type="checkbox" name="open_to_work" value="1" {% if profile.open_to_work %}checked{% endif %} />
+        <span class="otw-toggle-text">새로운 기회를 검토 중입니다 배지 표시</span>
+      </label>
+      <div class="form-hint" style="margin-top:0.5rem;">체크하면 Hero 영역에 초록 배지가 표시됩니다.</div>
+    </div>
 
     <!-- ── 기본 정보 ── -->
     <div class="form-card">
@@ -179,6 +189,24 @@
         {% endif %}
       </div>
       <button type="button" class="btn-add-link" onclick="addAward()" style="margin-top:0.5rem;">+ 수상내역 추가</button>
+    </div>
+
+    <!-- ── 이력서 & OG 이미지 ── -->
+    <div class="form-card">
+      <div class="fc-title">이력서 & 공유 이미지</div>
+      <div class="form-group">
+        <label>이력서 PDF 업로드</label>
+        {% if profile.resume_filename %}
+        <div class="form-hint" style="margin-bottom:0.5rem;">✅ 현재 파일: {{ profile.resume_filename }} — 새 파일을 올리면 교체됩니다.</div>
+        {% endif %}
+        <input type="file" name="resume_file" accept=".pdf" />
+        <div class="form-hint">PDF 파일만 가능 · 5MB 이하</div>
+      </div>
+      <div class="form-group">
+        <label>Open Graph 이미지 URL (SNS 공유 시 미리보기)</label>
+        <input type="url" name="og_image_url" value="{{ profile.og_image_url }}" placeholder="https://..." />
+        <div class="form-hint">카카오톡·링크드인에 URL 공유할 때 보이는 썸네일 이미지 주소</div>
+      </div>
     </div>
 
     <!-- ── 연락처 / SNS ── -->

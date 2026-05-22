@@ -25,6 +25,24 @@ if (modal) {
     document.getElementById('modalPeriod').textContent = d.period || '';
     document.getElementById('modalDesc').textContent = d.desc || '';
 
+    const metaRow = document.getElementById('modalMetaRow');
+    const myRoleEl = document.getElementById('modalMyRole');
+    if (d.myrole && d.myrole.trim()) {
+      myRoleEl.textContent = d.myrole;
+      metaRow.style.display = '';
+    } else {
+      metaRow.style.display = 'none';
+    }
+
+    const kpiBlock = document.getElementById('modalKpiBlock');
+    const kpiEl = document.getElementById('modalKpi');
+    if (d.kpi && d.kpi.trim()) {
+      kpiEl.textContent = d.kpi;
+      kpiBlock.style.display = '';
+    } else {
+      kpiBlock.style.display = 'none';
+    }
+
     const detailBlock = document.getElementById('modalDetailBlock');
     if (d.detail && d.detail.trim()) {
       document.getElementById('modalDetail').textContent = d.detail;
@@ -184,6 +202,35 @@ if (linkRows && addLinkBtn) {
     linkRows.appendChild(row);
     wireRemoveBtn(row);
     row.querySelector('input').focus();
+  });
+}
+
+// ── Project Category Filter ──────────────────
+const filterBar = document.getElementById('projectFilterBar');
+if (filterBar) {
+  const projectCards = document.querySelectorAll('.project-card');
+  const cats = [...new Set(
+    [...projectCards].map(c => c.dataset.category).filter(c => c && c.trim())
+  )];
+  if (cats.length > 0) {
+    filterBar.classList.add('visible');
+    cats.forEach(cat => {
+      const btn = document.createElement('button');
+      btn.className = 'filter-btn';
+      btn.dataset.cat = cat;
+      btn.textContent = cat;
+      filterBar.appendChild(btn);
+    });
+  }
+  filterBar.addEventListener('click', e => {
+    const btn = e.target.closest('.filter-btn');
+    if (!btn) return;
+    filterBar.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const cat = btn.dataset.cat;
+    projectCards.forEach(card => {
+      card.style.display = (!cat || card.dataset.category === cat) ? '' : 'none';
+    });
   });
 }
 

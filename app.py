@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory, abort
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
@@ -62,6 +62,9 @@ class Project(db.Model):
     image_filename = db.Column(db.String(300), default='')  # 레거시
     detail_text = db.Column(db.Text, default='')
     links_json = db.Column(db.Text, default='[]')
+    kpi = db.Column(db.String(300), default='')
+    my_role = db.Column(db.String(200), default='')
+    category = db.Column(db.String(100), default='')
     images = db.relationship('ProjectImage', backref='project',
                              cascade='all, delete-orphan',
                              order_by='ProjectImage.sort_order, ProjectImage.id',
@@ -150,6 +153,12 @@ class Profile(db.Model):
     skills_json = db.Column(db.Text, default='[]')
     # 스킬/툴 [{name, level}]
     tools_json = db.Column(db.Text, default='[]')
+    # 이력서 PDF
+    resume_filename = db.Column(db.String(300), default='')
+    # Open Graph 이미지 URL
+    og_image_url = db.Column(db.String(500), default='')
+    # 이직 검토 중 배지
+    open_to_work = db.Column(db.Boolean, default=False)
 
     @property
     def skill_list(self):
@@ -211,6 +220,12 @@ def init_db():
             "ALTER TABLE profile ADD COLUMN awards_json TEXT DEFAULT '[]'",
             "ALTER TABLE profile ADD COLUMN skills_json TEXT DEFAULT '[]'",
             "ALTER TABLE profile ADD COLUMN tools_json TEXT DEFAULT '[]'",
+            "ALTER TABLE profile ADD COLUMN resume_filename VARCHAR(300) DEFAULT ''",
+            "ALTER TABLE profile ADD COLUMN og_image_url VARCHAR(500) DEFAULT ''",
+            "ALTER TABLE profile ADD COLUMN open_to_work BOOLEAN DEFAULT FALSE",
+            "ALTER TABLE project ADD COLUMN kpi VARCHAR(300) DEFAULT ''",
+            "ALTER TABLE project ADD COLUMN my_role VARCHAR(200) DEFAULT ''",
+            "ALTER TABLE project ADD COLUMN category VARCHAR(100) DEFAULT ''",
         ]:
             try:
                 conn.execute(db.text(sql))
@@ -306,6 +321,17 @@ def init_db():
         db.session.commit()
 
 
+# ── Context Processor ────────────────────────────────────
+
+@app.context_processor
+def inject_globals():
+    try:
+        p = db.session.get(Profile, 1)
+    except Exception:
+        p = None
+    return {'profile': p}
+
+
 # ── Public Routes ────────────────────────────────────────
 
 @app.route('/')
@@ -375,6 +401,18 @@ def profile_edit():
         profile.linkedin_url = request.form.get('linkedin_url', '')
         profile.github_url = request.form.get('github_url', '')
         profile.blog_url = request.form.get('blog_url', '')
+        profile.og_image_url = request.form.get('og_image_url', '')
+        profile.open_to_work = bool(request.form.get('open_to_work'))
+
+        # 이력서 PDF 업로드
+        resume_file = request.files.get('resume_file')
+        if resume_file and resume_file.filename:
+            ext = resume_file.filename.rsplit('.', 1)[-1].lower() if '.' in resume_file.filename else ''
+            if ext == 'pdf':
+                filename = f"resume_{int(time.time())}.pdf"
+                os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+                resume_file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                profile.resume_filename = filename
 
         # 핵심 역량 (단순 목록)
         profile.skills = request.form.get('skills', '')
@@ -449,6 +487,9 @@ def project_new():
             detail_text=request.form.get('detail_text', ''),
             image_filename=img or '',
             links_json=_json.dumps(links, ensure_ascii=False),
+            kpi=request.form.get('kpi', ''),
+            my_role=request.form.get('my_role', ''),
+            category=request.form.get('category', ''),
         )
         db.session.add(p)
         db.session.commit()
@@ -474,6 +515,9 @@ def project_edit(pid):
         p.order = int(request.form.get('order', 0))
         p.detail_text = request.form.get('detail_text', '')
         p.links_json = _json.dumps(links, ensure_ascii=False)
+        p.kpi = request.form.get('kpi', '')
+        p.my_role = request.form.get('my_role', '')
+        p.category = request.form.get('category', '')
         db.session.commit()
         flash('프로젝트가 수정되었습니다.')
         return redirect(url_for('admin_dashboard'))
@@ -488,6 +532,15 @@ def project_delete(pid):
     db.session.commit()
     flash('프로젝트가 삭제되었습니다.')
     return redirect(url_for('admin_dashboard'))
+
+
+@app.route('/resume')
+def serve_resume():
+    profile = db.session.get(Profile, 1)
+    if not profile or not profile.resume_filename:
+        abort(404)
+    return send_from_directory(app.config['UPLOAD_FOLDER'], profile.resume_filename,
+                               as_attachment=True, download_name='resume.pdf')
 
 
 # ── Gallery CRUD ────────────────────────────────────────

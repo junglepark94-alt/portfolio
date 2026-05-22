@@ -47,8 +47,20 @@
       <textarea name="description" rows="4" required>{{ project.description if project else '' }}</textarea>
     </div>
     <div class="form-group">
-      <label>상세 성과 / 추가 설명</label>
-      <textarea name="detail_text" rows="6" placeholder="주요 성과, 구체적인 수치, 과정 등을 입력하세요.">{{ project.detail_text if project else '' }}</textarea>
+      <label>핵심 성과 수치 <span style="color:var(--muted); font-weight:400;">(카드에 강조 표시)</span></label>
+      <input type="text" name="kpi" placeholder="예: 작업 시간 70% 단축 / 팔로워 +12,000명 / 캠페인 CTR 8.3%" value="{{ project.kpi if project else '' }}" />
+    </div>
+    <div class="form-group">
+      <label>역할 / 기여 범위</label>
+      <input type="text" name="my_role" placeholder="예: 개인 프로젝트 / 팀 (3인, 기획·콘텐츠 담당)" value="{{ project.my_role if project else '' }}" />
+    </div>
+    <div class="form-group">
+      <label>카테고리 <span style="color:var(--muted); font-weight:400;">(필터 분류용)</span></label>
+      <input type="text" name="category" placeholder="예: 콘텐츠 기획 / 캠페인 / 데이터 분석 / 도구·자동화" value="{{ project.category if project else '' }}" />
+    </div>
+    <div class="form-group">
+      <label>상세 설명</label>
+      <textarea name="detail_text" rows="6" placeholder="문제 배경, 접근 방법, 과정 등 추가 맥락을 입력하세요.">{{ project.detail_text if project else '' }}</textarea>
     </div>
     <div class="form-group">
       <label>기술 스택 (쉼표로 구분)</label>

@@ -6,12 +6,20 @@
 <!-- ── HERO ─────────────────────────────────────────── -->
 <section class="hero" id="hero">
   <div class="hero-inner">
+    {% if profile.open_to_work %}
+    <div class="otw-badge">
+      <span class="otw-dot"></span>새로운 기회를 검토 중입니다
+    </div>
+    {% endif %}
     <div class="hero-eyebrow">{{ profile.role }}</div>
     <h1 class="hero-name">안녕하세요,<br/><span class="accent">{{ profile.name }}</span>입니다.</h1>
     <p class="hero-sub">{{ profile.tagline | replace('\n', '<br/>') | safe }}</p>
     <div class="hero-cta">
       <a href="#projects" class="btn btn-primary">프로젝트 보기</a>
       <a href="#contact" class="btn btn-ghost">연락하기</a>
+      {% if profile.resume_filename %}
+      <a href="{{ url_for('serve_resume') }}" class="btn btn-resume" target="_blank">이력서 다운로드 ↓</a>
+      {% endif %}
     </div>
   </div>
   <div class="hero-line"></div>
@@ -125,6 +133,9 @@
   <div class="container">
     <div class="section-label">Projects</div>
     <h2>주요 프로젝트</h2>
+    <div class="filter-bar" id="projectFilterBar">
+      <button class="filter-btn active" data-cat="">전체</button>
+    </div>
     <div class="projects-grid">
       {% for p in projects %}
       {% set imgs = p.images %}
@@ -137,6 +148,9 @@
         data-tags="{{ p.tech_stack | e }}"
         data-links="{{ p.links | tojson | forceescape }}"
         data-images="{{ imgs | map(attribute='filename') | list | tojson | forceescape }}"
+        data-kpi="{{ p.kpi | e }}"
+        data-myrole="{{ p.my_role | e }}"
+        data-category="{{ p.category | e }}"
       >
         {% if main_img %}
         <div class="pc-thumb">
@@ -145,9 +159,15 @@
         {% endif %}
         <div class="pc-header">
           <h3 class="pc-title">{{ p.title }}</h3>
-          {% if p.period %}<span class="pc-period">{{ p.period }}</span>{% endif %}
+          <div class="pc-header-right">
+            {% if p.my_role %}<span class="pc-role-badge">{{ p.my_role }}</span>{% endif %}
+            {% if p.period %}<span class="pc-period">{{ p.period }}</span>{% endif %}
+          </div>
         </div>
         <p class="pc-desc">{{ p.description }}</p>
+        {% if p.kpi %}
+        <div class="pc-kpi">📊 {{ p.kpi }}</div>
+        {% endif %}
         <div class="pc-tags">
           {% for t in p.tech_list %}
           <span class="tag">{{ t }}</span>
@@ -159,7 +179,7 @@
             <a href="{{ lk.url }}" class="pc-link" target="_blank" rel="noopener">{{ lk.label }} →</a>
             {% endfor %}
           </div>
-          {% if p.detail_text %}
+          {% if p.detail_text or p.kpi or p.my_role %}
           <span class="pc-more">자세히 보기 →</span>
           {% endif %}
         </div>
@@ -248,6 +268,13 @@
         <span class="cc-value">{{ profile.blog_url | replace('https://', '') }}</span>
       </a>
       {% endif %}
+      {% if profile.resume_filename %}
+      <a href="{{ url_for('serve_resume') }}" class="contact-card" target="_blank">
+        <span class="cc-icon">📄</span>
+        <span class="cc-label">이력서</span>
+        <span class="cc-value">PDF 다운로드</span>
+      </a>
+      {% endif %}
     </div>
   </div>
 </section>
@@ -267,9 +294,16 @@
     <div class="modal-body">
       <div class="modal-eyebrow" id="modalPeriod"></div>
       <h3 class="modal-title" id="modalTitle"></h3>
+      <div class="modal-meta-row" id="modalMetaRow" style="display:none;">
+        <span class="modal-role-badge" id="modalMyRole"></span>
+      </div>
       <p class="modal-desc" id="modalDesc"></p>
+      <div class="modal-kpi-block" id="modalKpiBlock" style="display:none;">
+        <span class="modal-kpi-label">핵심 성과</span>
+        <span class="modal-kpi-value" id="modalKpi"></span>
+      </div>
       <div class="modal-detail-block" id="modalDetailBlock" style="display:none;">
-        <div class="modal-detail-label">주요 성과 &amp; 상세 설명</div>
+        <div class="modal-detail-label">상세 설명</div>
         <div class="modal-detail" id="modalDetail"></div>
       </div>
       <div class="pc-tags" id="modalTags" style="margin-top:1.25rem;"></div>

@@ -4,6 +4,16 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{% block title %}Portfolio{% endblock %}</title>
+  <meta name="description" content="{{ profile.tagline | replace('\n', ' ') if profile else '' }}" />
+  {% if profile %}
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="{{ profile.name }} — Portfolio" />
+  <meta property="og:description" content="{{ profile.tagline | replace('\n', ' ') }}" />
+  <meta property="og:url" content="{{ request.url }}" />
+  {% if profile.og_image_url %}
+  <meta property="og:image" content="{{ profile.og_image_url }}" />
+  {% endif %}
+  {% endif %}
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Noto+Sans+KR:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
@@ -39,7 +49,7 @@
   </main>
 
   <footer class="site-footer">
-    <p>© 2025 [이름]. Built with Flask &amp; ☕</p>
+    <p>© 2025 {{ profile.name if profile else '' }}. Built with Flask &amp; ☕</p>
   </footer>
 
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>

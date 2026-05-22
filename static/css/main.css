@@ -1050,6 +1050,154 @@ ul { list-style: none; }
   .form-row-3 { grid-template-columns: 1fr; }
 }
 
+/* ── Open-to-Work Badge ──────────────────────── */
+.otw-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #15803d;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.35rem 0.9rem;
+  border-radius: 20px;
+  margin-bottom: 1.25rem;
+}
+.otw-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 2px rgba(34,197,94,0.25);
+  animation: pulse-green 2s infinite;
+  flex-shrink: 0;
+}
+@keyframes pulse-green {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(34,197,94,0.25); }
+  50%       { box-shadow: 0 0 0 5px rgba(34,197,94,0.08); }
+}
+
+/* ── Resume Button ───────────────────────────── */
+.btn-resume {
+  background: transparent;
+  color: var(--text-2);
+  border: 1.5px solid var(--border);
+  font-weight: 600;
+}
+.btn-resume:hover {
+  border-color: var(--accent-2);
+  color: var(--accent-2);
+  background: #fef9f0;
+}
+
+/* ── Filter Bar ──────────────────────────────── */
+.filter-bar {
+  display: none;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+.filter-bar.visible { display: flex; }
+.filter-btn {
+  padding: 0.35rem 1rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  color: var(--text-2);
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: var(--font-body);
+}
+.filter-btn:hover { border-color: var(--accent); color: var(--accent); }
+.filter-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* ── Project KPI / Role Badge ────────────────── */
+.pc-header-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.3rem;
+  flex-shrink: 0;
+}
+.pc-role-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--accent-2);
+  background: #fff8ee;
+  border: 1px solid #fde8bb;
+  border-radius: 3px;
+  padding: 0.12rem 0.45rem;
+  white-space: nowrap;
+}
+.pc-kpi {
+  font-size: 0.83rem;
+  font-weight: 700;
+  color: #15803d;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: var(--radius);
+  padding: 0.45rem 0.75rem;
+}
+
+/* ── Modal Meta ──────────────────────────────── */
+.modal-meta-row { margin-bottom: 0.75rem; }
+.modal-role-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--accent-2);
+  background: #fff8ee;
+  border: 1px solid #fde8bb;
+  border-radius: 3px;
+  padding: 0.2rem 0.6rem;
+}
+.modal-kpi-block {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
+.modal-kpi-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #15803d;
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+.modal-kpi-value {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #15803d;
+}
+
+/* ── Profile form toggle ─────────────────────── */
+.otw-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text);
+}
+.otw-toggle-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
 /* ── Scroll Reveal ──────────────────────────── */
 .reveal {
   opacity: 0;
