@@ -205,7 +205,6 @@ if (modal) {
       .then(r => r.json())
       .then(d => {
         if (d.error) { item.querySelector('.yt-title').textContent = '재생목록'; return; }
-        item.querySelector('.yt-card').href = d.videoUrl;
         if (d.thumbnail) item.querySelector('.yt-thumb-wrap img').src = d.thumbnail;
         item.querySelector('.yt-title').textContent = d.title || '';
         item.querySelector('.yt-views').textContent    = d.viewCount    ? '▶ ' + fmtNum(d.viewCount)    + ' 회' : '';
