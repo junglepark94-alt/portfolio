@@ -18,6 +18,11 @@
         <li><a href="#projects">Projects</a></li>
         <li><a href="#contact">Contact</a></li>
       </ul>
+      {% if session.get('logged_in') %}
+      <a href="{{ url_for('admin_dashboard') }}" class="nav-admin-btn">관리자</a>
+      {% else %}
+      <a href="{{ url_for('login') }}" class="nav-admin-btn">관리자</a>
+      {% endif %}
     </nav>
   </header>
 

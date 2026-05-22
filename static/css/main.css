@@ -78,6 +78,23 @@ ul { list-style: none; }
   transition: color 0.2s;
 }
 .nav-links a:hover { color: var(--accent); }
+.nav-admin-btn {
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.25rem 0.6rem;
+  transition: color 0.2s, border-color 0.2s, background 0.2s;
+  white-space: nowrap;
+}
+.nav-admin-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-light);
+}
 
 /* ── Hero ───────────────────────────────────── */
 .hero {
