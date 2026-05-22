@@ -198,10 +198,15 @@
       <div class="form-group">
         <label>이력서 PDF 업로드</label>
         {% if profile.resume_filename %}
-        <div class="form-hint" style="margin-bottom:0.5rem;">✅ 현재 파일: {{ profile.resume_filename }} — 새 파일을 올리면 교체됩니다.</div>
+        <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:0.5rem;">
+          <span class="form-hint" style="margin:0;">✅ {{ profile.resume_filename }}</span>
+          <form method="POST" action="{{ url_for('profile_resume_delete') }}" onsubmit="return confirm('이력서를 삭제하시겠습니까?')">
+            <button type="submit" class="btn-sm btn-danger">삭제</button>
+          </form>
+        </div>
         {% endif %}
         <input type="file" name="resume_file" accept=".pdf" />
-        <div class="form-hint">PDF 파일만 가능 · 5MB 이하</div>
+        <div class="form-hint">PDF 파일만 가능 · 5MB 이하{% if profile.resume_filename %} · 새 파일을 올리면 교체됩니다{% endif %}</div>
       </div>
       <div class="form-group">
         <label>Open Graph 이미지 (SNS 공유 시 미리보기)</label>

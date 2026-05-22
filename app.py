@@ -555,6 +555,20 @@ def project_delete(pid):
     return redirect(url_for('admin_dashboard'))
 
 
+@app.route('/admin/profile/resume/delete', methods=['POST'])
+@login_required
+def profile_resume_delete():
+    profile = db.session.get(Profile, 1)
+    if profile and profile.resume_filename:
+        fpath = os.path.join(app.config['UPLOAD_FOLDER'], profile.resume_filename)
+        if os.path.exists(fpath):
+            os.remove(fpath)
+        profile.resume_filename = ''
+        db.session.commit()
+        flash('이력서가 삭제되었습니다.')
+    return redirect(url_for('profile_edit'))
+
+
 @app.route('/resume')
 def serve_resume():
     profile = db.session.get(Profile, 1)
