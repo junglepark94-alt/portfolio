@@ -709,6 +709,55 @@ ul { list-style: none; }
   border-color: var(--accent);
 }
 
+/* ── YouTube Card ───────────────────────────── */
+#modalYoutube { margin-top: 1.25rem; }
+.yt-card {
+  display: block;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  text-decoration: none;
+  color: var(--text);
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+.yt-card:hover { box-shadow: var(--shadow); border-color: #e00; }
+.yt-thumb-wrap {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  overflow: hidden;
+}
+.yt-thumb-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.yt-play {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 48px; height: 48px;
+  background: rgba(0,0,0,0.65);
+  color: #fff;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.1rem;
+  padding-left: 3px;
+  pointer-events: none;
+}
+.yt-info { padding: 0.75rem 1rem 0.9rem; }
+.yt-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.45;
+  margin-bottom: 0.45rem;
+  color: var(--text);
+  word-break: keep-all;
+}
+.yt-stats {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.76rem;
+  color: var(--muted);
+  font-family: var(--font-mono);
+}
+
 /* ── Flash ──────────────────────────────────── */
 .flash-wrap { max-width: var(--max); margin: 0 auto; padding: 1rem 2rem 0; }
 .flash {

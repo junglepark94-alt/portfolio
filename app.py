@@ -677,6 +677,47 @@ def project_image_delete(img_id):
     return app.response_class(response=_json.dumps({'ok': True}), mimetype='application/json')
 
 
+# ── YouTube API Proxy ────────────────────────────────────
+
+@app.route('/api/youtube')
+def youtube_info():
+    import json as _json, urllib.request as _req, urllib.error as _err
+    video_id = request.args.get('v', '').strip()
+    if not video_id:
+        return _json.dumps({'error': 'no video id'}), 400, {'Content-Type': 'application/json'}
+    api_key = os.environ.get('YOUTUBE_API_KEY', '')
+    if not api_key:
+        return _json.dumps({'error': 'YOUTUBE_API_KEY not set'}), 503, {'Content-Type': 'application/json'}
+    url = (
+        'https://www.googleapis.com/youtube/v3/videos'
+        f'?part=snippet,statistics&id={video_id}&key={api_key}'
+    )
+    try:
+        with _req.urlopen(url, timeout=6) as resp:
+            data = _json.loads(resp.read())
+        items = data.get('items', [])
+        if not items:
+            return _json.dumps({'error': 'not found'}), 404, {'Content-Type': 'application/json'}
+        snippet = items[0].get('snippet', {})
+        stats   = items[0].get('statistics', {})
+        thumb   = (snippet.get('thumbnails', {}).get('high') or
+                   snippet.get('thumbnails', {}).get('medium') or {}).get('url', '')
+        return app.response_class(
+            response=_json.dumps({
+                'title':        snippet.get('title', ''),
+                'thumbnail':    thumb,
+                'viewCount':    stats.get('viewCount', '0'),
+                'likeCount':    stats.get('likeCount', '0'),
+                'commentCount': stats.get('commentCount', '0'),
+            }),
+            mimetype='application/json'
+        )
+    except _err.HTTPError as e:
+        return _json.dumps({'error': f'youtube api {e.code}'}), 502, {'Content-Type': 'application/json'}
+    except Exception as e:
+        return _json.dumps({'error': str(e)}), 500, {'Content-Type': 'application/json'}
+
+
 # ── Entry ────────────────────────────────────────────────
 
 if __name__ == '__main__':

@@ -107,6 +107,11 @@ if (modal) {
       `<a href="${lk.url}" class="pc-link" target="_blank" rel="noopener">${lk.label} →</a>`
     ).join('');
 
+    // YouTube 카드
+    ytWrap.style.display = 'none';
+    const ytLink_ = links.find(lk => extractYtId(lk.url));
+    if (ytLink_) loadYoutube(ytLink_.url, extractYtId(ytLink_.url));
+
     modal.classList.add('active');
     modal.setAttribute('aria-hidden', 'false');
     document.body.style.overflow = 'hidden';
@@ -158,6 +163,45 @@ if (modal) {
     galleryIdx = (galleryIdx + 1) % galleryImgs.length;
     setGallerySlide(galleryIdx);
   });
+
+  // ── YouTube 카드 ────────────────────────────
+  const ytWrap   = document.getElementById('modalYoutube');
+  const ytLink   = document.getElementById('modalYoutubeLink');
+  const ytThumb  = document.getElementById('modalYoutubeThumb');
+  const ytTitle  = document.getElementById('modalYoutubeTitle');
+  const ytViews  = document.getElementById('modalYoutubeViews');
+  const ytLikes  = document.getElementById('modalYoutubeLikes');
+  const ytCmnts  = document.getElementById('modalYoutubeComments');
+
+  function extractYtId(url) {
+    const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+    return m ? m[1] : null;
+  }
+  function fmtNum(n) {
+    n = parseInt(n) || 0;
+    if (n >= 10000) return (n / 10000).toFixed(1) + '만';
+    if (n >= 1000)  return (n / 1000).toFixed(1) + 'k';
+    return n.toLocaleString();
+  }
+  function loadYoutube(videoUrl, videoId) {
+    ytWrap.style.display = 'none';
+    ytLink.href = videoUrl;
+    ytThumb.src = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+    ytTitle.textContent = '로딩 중…';
+    ytViews.textContent = ytLikes.textContent = ytCmnts.textContent = '';
+    ytWrap.style.display = '';
+    fetch(`/api/youtube?v=${videoId}`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.error) return;
+        if (d.thumbnail) ytThumb.src = d.thumbnail;
+        ytTitle.textContent  = d.title || '';
+        ytViews.textContent  = d.viewCount  ? '▶ ' + fmtNum(d.viewCount)  + ' 회' : '';
+        ytLikes.textContent  = d.likeCount  ? '👍 ' + fmtNum(d.likeCount)         : '';
+        ytCmnts.textContent  = d.commentCount ? '💬 ' + fmtNum(d.commentCount)    : '';
+      })
+      .catch(() => { ytTitle.textContent = ''; });
+  }
 
   modalClose.addEventListener('click', closeModal);
   modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
