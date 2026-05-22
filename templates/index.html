@@ -127,6 +127,8 @@
     <h2>주요 프로젝트</h2>
     <div class="projects-grid">
       {% for p in projects %}
+      {% set imgs = p.images %}
+      {% set main_img = p.main_image %}
       <article class="project-card"
         data-title="{{ p.title | e }}"
         data-period="{{ p.period | e }}"
@@ -134,11 +136,11 @@
         data-detail="{{ p.detail_text | e }}"
         data-tags="{{ p.tech_stack | e }}"
         data-links="{{ p.links | tojson | e }}"
-        data-image="{{ url_for('static', filename='uploads/' + p.image_filename) if p.image_filename else '' }}"
+        data-images="{{ imgs | map(attribute='filename') | list | tojson | e }}"
       >
-        {% if p.image_filename %}
+        {% if main_img %}
         <div class="pc-thumb">
-          <img src="{{ url_for('static', filename='uploads/' + p.image_filename) }}" alt="{{ p.title }}" />
+          <img src="{{ url_for('static', filename='uploads/' + main_img.filename) }}" alt="{{ p.title }}" />
         </div>
         {% endif %}
         <div class="pc-header">
@@ -212,8 +214,13 @@
 <div class="modal-overlay" id="projectModal" aria-hidden="true">
   <div class="modal-box" role="dialog" aria-modal="true">
     <button class="modal-close" id="modalClose" aria-label="닫기">×</button>
-    <div class="modal-image-wrap" id="modalImageWrap" style="display:none;">
-      <img id="modalImage" src="" alt="" />
+    <div class="modal-gallery-wrap" id="modalGalleryWrap" style="display:none;">
+      <div class="modal-gallery-main">
+        <img id="modalGalleryImg" src="" alt="" />
+        <button class="gallery-nav gallery-prev" id="galleryPrev">&#8249;</button>
+        <button class="gallery-nav gallery-next" id="galleryNext">&#8250;</button>
+      </div>
+      <div class="modal-gallery-thumbs" id="modalGalleryThumbs"></div>
     </div>
     <div class="modal-body">
       <div class="modal-eyebrow" id="modalPeriod"></div>

@@ -1,9 +1,43 @@
 {% extends "base.html" %}
 {% block title %}{{ '프로젝트 수정' if project else '새 프로젝트' }}{% endblock %}
 {% block content %}
-<div class="container" style="padding-top:6rem; max-width:640px;">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css" />
+
+<div class="container" style="padding-top:6rem; max-width:680px;">
   <h2>{{ '프로젝트 수정' if project else '새 프로젝트 추가' }}</h2>
-  <form method="POST" enctype="multipart/form-data" style="margin-top:2rem;">
+
+  <!-- ── 이미지 매니저 (수정 모드에서만) ── -->
+  {% if project %}
+  <div class="form-card img-manager-card" style="margin-top:2rem;">
+    <div class="fc-title" style="padding:1.25rem 1.5rem; border-bottom:1px solid var(--border); background:var(--bg-alt);">프로젝트 이미지</div>
+    <div style="padding:1.5rem;">
+      <div class="img-manager-grid" id="imgGrid">
+        {% for img in project.images %}
+        <div class="img-tile" data-id="{{ img.id }}">
+          <img src="{{ url_for('static', filename='uploads/' + img.filename) }}" alt="" />
+          {% if img.is_main %}<span class="img-main-badge">대표</span>{% endif %}
+          <div class="img-tile-actions">
+            {% if not img.is_main %}
+            <button type="button" class="img-btn-main" data-id="{{ img.id }}">대표로 설정</button>
+            {% endif %}
+            <button type="button" class="img-btn-del" data-id="{{ img.id }}">삭제</button>
+          </div>
+        </div>
+        {% endfor %}
+        <div class="img-tile img-add-tile" id="addTile">
+          <span class="img-add-icon">+</span>
+          <span class="img-add-label">이미지 추가</span>
+          <input type="file" id="fileInput" accept="image/*" multiple style="display:none;" />
+        </div>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <p style="margin-top:1.5rem; color:var(--muted); font-size:0.875rem;">저장 후 이미지를 추가할 수 있습니다.</p>
+  {% endif %}
+
+  <!-- ── 프로젝트 정보 폼 ── -->
+  <form method="POST" style="margin-top:1.5rem;">
     <div class="form-group">
       <label>제목 *</label>
       <input type="text" name="title" value="{{ project.title if project else '' }}" required />
@@ -15,19 +49,6 @@
     <div class="form-group">
       <label>상세 성과 / 추가 설명</label>
       <textarea name="detail_text" rows="6" placeholder="주요 성과, 구체적인 수치, 과정 등을 입력하세요.">{{ project.detail_text if project else '' }}</textarea>
-    </div>
-    <div class="form-group">
-      <label>대표 이미지</label>
-      {% if project and project.image_filename %}
-      <div class="img-preview-wrap">
-        <img src="{{ url_for('static', filename='uploads/' + project.image_filename) }}" alt="현재 이미지" class="img-preview" />
-        <label class="img-remove-label">
-          <input type="checkbox" name="remove_image" value="1" /> 이미지 삭제
-        </label>
-      </div>
-      {% endif %}
-      <input type="file" name="image" accept="image/*" style="margin-top:0.5rem;" />
-      <small style="color:var(--muted); display:block; margin-top:0.3rem;">PNG, JPG, WEBP 등 최대 5MB</small>
     </div>
     <div class="form-group">
       <label>기술 스택 (쉼표로 구분)</label>
@@ -43,7 +64,7 @@
         {% if project and project.links %}
           {% for lk in project.links %}
           <div class="link-row">
-            <input type="text" name="link_label" placeholder="링크 이름 (예: GitHub, 발표자료)" value="{{ lk.label }}" />
+            <input type="text" name="link_label" placeholder="링크 이름" value="{{ lk.label }}" />
             <input type="url"  name="link_url"   placeholder="https://..." value="{{ lk.url }}" />
             <button type="button" class="link-remove-btn" aria-label="삭제">×</button>
           </div>
@@ -68,4 +89,153 @@
     </div>
   </form>
 </div>
+
+<!-- ── 크롭 모달 ── -->
+{% if project %}
+<div id="cropOverlay">
+  <div class="crop-modal">
+    <div class="crop-modal-head">
+      이미지 크롭 <span id="cropProgress" style="color:var(--muted); font-size:0.85rem;"></span>
+    </div>
+    <div class="crop-wrap">
+      <img id="cropTarget" src="" alt="" />
+    </div>
+    <div class="crop-modal-foot">
+      <button type="button" id="applyCropBtn" class="btn btn-primary">크롭 적용</button>
+      <button type="button" id="skipCropBtn" class="btn btn-ghost">크롭 없이 추가</button>
+      <button type="button" id="cancelCropBtn" style="margin-left:auto; color:var(--muted); background:none; border:none; cursor:pointer; font-size:0.875rem;">취소</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
+<script>
+(function () {
+  const PID = {{ project.id }};
+  const grid = document.getElementById('imgGrid');
+  const addTile = document.getElementById('addTile');
+  const fileInput = document.getElementById('fileInput');
+  const overlay = document.getElementById('cropOverlay');
+  const cropTarget = document.getElementById('cropTarget');
+  const progressEl = document.getElementById('cropProgress');
+  let cropper = null;
+  let queue = [];
+  let queueIdx = 0;
+
+  // ── 파일 선택 ──────────────────────────────────
+  addTile.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', () => {
+    queue = Array.from(fileInput.files);
+    queueIdx = 0;
+    fileInput.value = '';
+    if (queue.length) processNext();
+  });
+
+  function processNext() {
+    if (queueIdx >= queue.length) { closeCrop(); return; }
+    const file = queue[queueIdx];
+    progressEl.textContent = queue.length > 1 ? `(${queueIdx + 1}/${queue.length})` : '';
+    const url = URL.createObjectURL(file);
+    cropTarget.src = url;
+    overlay.classList.add('active');
+    if (cropper) { cropper.destroy(); cropper = null; }
+    cropTarget.onload = () => {
+      cropper = new Cropper(cropTarget, { aspectRatio: NaN, viewMode: 1, autoCropArea: 0.8 });
+    };
+  }
+
+  // ── 크롭 적용 ──────────────────────────────────
+  document.getElementById('applyCropBtn').addEventListener('click', () => {
+    if (!cropper) return;
+    const canvas = cropper.getCroppedCanvas({ maxWidth: 1200, maxHeight: 900 });
+    upload(null, canvas.toDataURL('image/jpeg', 0.88));
+  });
+
+  // ── 크롭 없이 추가 ─────────────────────────────
+  document.getElementById('skipCropBtn').addEventListener('click', () => {
+    upload(queue[queueIdx], null);
+  });
+
+  // ── 취소 ───────────────────────────────────────
+  document.getElementById('cancelCropBtn').addEventListener('click', () => {
+    queue = []; queueIdx = 0; closeCrop();
+  });
+
+  function closeCrop() {
+    overlay.classList.remove('active');
+    if (cropper) { cropper.destroy(); cropper = null; }
+  }
+
+  // ── 서버 업로드 ────────────────────────────────
+  function upload(file, croppedData) {
+    const fd = new FormData();
+    if (croppedData) {
+      fd.append('cropped_data', croppedData);
+    } else {
+      fd.append('image', file);
+    }
+    fetch(`/admin/project/${PID}/images/upload`, { method: 'POST', body: fd })
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) { alert(data.error); return; }
+        addTileToGrid(data);
+        queueIdx++;
+        processNext();
+      });
+  }
+
+  // ── 갤러리 타일 추가 ───────────────────────────
+  function addTileToGrid(data) {
+    const tile = document.createElement('div');
+    tile.className = 'img-tile';
+    tile.dataset.id = data.id;
+    tile.innerHTML = `
+      <img src="${data.url}" alt="" />
+      ${data.is_main ? '<span class="img-main-badge">대표</span>' : ''}
+      <div class="img-tile-actions">
+        ${!data.is_main ? `<button type="button" class="img-btn-main" data-id="${data.id}">대표로 설정</button>` : ''}
+        <button type="button" class="img-btn-del" data-id="${data.id}">삭제</button>
+      </div>`;
+    grid.insertBefore(tile, addTile);
+    wireButtons(tile);
+  }
+
+  // ── 버튼 이벤트 ────────────────────────────────
+  function wireButtons(tile) {
+    const mainBtn = tile.querySelector('.img-btn-main');
+    if (mainBtn) mainBtn.addEventListener('click', () => setMain(tile, mainBtn.dataset.id));
+    const delBtn = tile.querySelector('.img-btn-del');
+    if (delBtn) delBtn.addEventListener('click', () => deleteTile(tile, delBtn.dataset.id));
+  }
+
+  grid.querySelectorAll('.img-tile[data-id]').forEach(wireButtons);
+
+  function setMain(tile, id) {
+    fetch(`/admin/project/images/${id}/set-main`, { method: 'POST' })
+      .then(r => r.json()).then(() => {
+        // 모든 타일에서 대표 배지 제거
+        grid.querySelectorAll('.img-tile[data-id]').forEach(t => {
+          t.querySelector('.img-main-badge')?.remove();
+          const mb = t.querySelector('.img-btn-main');
+          if (mb) mb.style.display = '';
+        });
+        // 현재 타일에 대표 배지 추가
+        tile.querySelector('.img-btn-main')?.remove();
+        const badge = document.createElement('span');
+        badge.className = 'img-main-badge';
+        badge.textContent = '대표';
+        tile.insertBefore(badge, tile.querySelector('.img-tile-actions'));
+      });
+  }
+
+  function deleteTile(tile, id) {
+    if (!confirm('이 이미지를 삭제하시겠습니까?')) return;
+    fetch(`/admin/project/images/${id}/delete`, { method: 'POST' })
+      .then(r => r.json()).then(d => {
+        if (d.ok) tile.remove();
+      });
+  }
+})();
+</script>
+{% endif %}
 {% endblock %}

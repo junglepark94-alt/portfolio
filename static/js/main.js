@@ -33,13 +33,15 @@ if (modal) {
       detailBlock.style.display = 'none';
     }
 
-    const imageWrap = document.getElementById('modalImageWrap');
-    if (d.image) {
-      document.getElementById('modalImage').src = d.image;
-      document.getElementById('modalImage').alt = d.title || '';
-      imageWrap.style.display = '';
+    // 갤러리
+    const galleryWrap = document.getElementById('modalGalleryWrap');
+    let images = [];
+    try { images = JSON.parse(d.images || '[]').map(fn => `/static/uploads/${fn}`); } catch(e) {}
+    if (images.length) {
+      galleryWrap.style.display = '';
+      initGallery(images, d.title || '');
     } else {
-      imageWrap.style.display = 'none';
+      galleryWrap.style.display = 'none';
     }
 
     const tagsEl = document.getElementById('modalTags');
@@ -65,6 +67,47 @@ if (modal) {
     modal.setAttribute('aria-hidden', 'true');
     document.body.style.overflow = '';
   }
+
+  // ── 갤러리 ─────────────────────────────────
+  let galleryIdx = 0;
+  let galleryImgs = [];
+  const galleryMainImg = document.getElementById('modalGalleryImg');
+  const thumbsEl = document.getElementById('modalGalleryThumbs');
+  const prevBtn = document.getElementById('galleryPrev');
+  const nextBtn = document.getElementById('galleryNext');
+
+  function initGallery(imgs, alt) {
+    galleryImgs = imgs;
+    galleryIdx = 0;
+    setGallerySlide(0, alt);
+    // 썸네일
+    thumbsEl.innerHTML = '';
+    if (imgs.length > 1) {
+      imgs.forEach((src, i) => {
+        const th = document.createElement('img');
+        th.src = src; th.alt = ''; th.className = i === 0 ? 'active' : '';
+        th.addEventListener('click', () => { galleryIdx = i; setGallerySlide(i, alt); });
+        thumbsEl.appendChild(th);
+      });
+    }
+    prevBtn.style.display = imgs.length > 1 ? '' : 'none';
+    nextBtn.style.display = imgs.length > 1 ? '' : 'none';
+  }
+
+  function setGallerySlide(i, alt) {
+    galleryMainImg.src = galleryImgs[i];
+    galleryMainImg.alt = alt || '';
+    thumbsEl.querySelectorAll('img').forEach((t, ti) => t.classList.toggle('active', ti === i));
+  }
+
+  prevBtn?.addEventListener('click', () => {
+    galleryIdx = (galleryIdx - 1 + galleryImgs.length) % galleryImgs.length;
+    setGallerySlide(galleryIdx);
+  });
+  nextBtn?.addEventListener('click', () => {
+    galleryIdx = (galleryIdx + 1) % galleryImgs.length;
+    setGallerySlide(galleryIdx);
+  });
 
   modalClose.addEventListener('click', closeModal);
   modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });

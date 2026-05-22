@@ -53,15 +53,24 @@ class Project(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(120), nullable=False)
     description = db.Column(db.Text, nullable=False)
-    tech_stack = db.Column(db.String(250))   # comma-separated
-    github_url = db.Column(db.String(300))   # 레거시 — links_json으로 대체됨
-    demo_url = db.Column(db.String(300))     # 레거시 — links_json으로 대체됨
-    period = db.Column(db.String(80))        # e.g. "2024.03 – 2024.06"
+    tech_stack = db.Column(db.String(250))
+    github_url = db.Column(db.String(300))
+    demo_url = db.Column(db.String(300))
+    period = db.Column(db.String(80))
     order = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    image_filename = db.Column(db.String(300), default='')
+    image_filename = db.Column(db.String(300), default='')  # 레거시
     detail_text = db.Column(db.Text, default='')
-    links_json = db.Column(db.Text, default='[]')  # [{"label": "...", "url": "..."}]
+    links_json = db.Column(db.Text, default='[]')
+    images = db.relationship('ProjectImage', backref='project',
+                             cascade='all, delete-orphan',
+                             order_by='ProjectImage.sort_order, ProjectImage.id',
+                             lazy='select')
+
+    @property
+    def main_image(self):
+        m = next((i for i in self.images if i.is_main), None)
+        return m or (self.images[0] if self.images else None)
 
     @property
     def links(self):
@@ -74,6 +83,15 @@ class Project(db.Model):
     @property
     def tech_list(self):
         return [t.strip() for t in self.tech_stack.split(',') if t.strip()]
+
+
+class ProjectImage(db.Model):
+    __tablename__ = 'project_image'
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('project.id', ondelete='CASCADE'), nullable=False)
+    filename = db.Column(db.String(300), nullable=False)
+    is_main = db.Column(db.Boolean, default=False)
+    sort_order = db.Column(db.Integer, default=0)
 
 
 class Admin(db.Model):
@@ -171,6 +189,7 @@ def init_db():
             "ALTER TABLE project ADD COLUMN image_filename VARCHAR(300) DEFAULT ''",
             "ALTER TABLE project ADD COLUMN detail_text TEXT DEFAULT ''",
             "ALTER TABLE project ADD COLUMN links_json TEXT DEFAULT '[]'",
+            # project_image 테이블은 create_all()이 처리하므로 ALTER 불필요
             "ALTER TABLE profile ADD COLUMN education_json TEXT DEFAULT '[]'",
             "ALTER TABLE profile ADD COLUMN awards_json TEXT DEFAULT '[]'",
             "ALTER TABLE profile ADD COLUMN skills_json TEXT DEFAULT '[]'",
@@ -181,6 +200,20 @@ def init_db():
                 conn.commit()
             except Exception:
                 pass
+
+        # image_filename → project_image 테이블 마이그레이션
+        old_imgs = conn.execute(db.text(
+            "SELECT id, image_filename FROM project WHERE image_filename IS NOT NULL AND image_filename != ''"
+        )).fetchall()
+        for row in old_imgs:
+            exists = conn.execute(db.text(
+                "SELECT 1 FROM project_image WHERE project_id = :pid LIMIT 1"
+            ), {'pid': row[0]}).fetchone()
+            if not exists:
+                conn.execute(db.text(
+                    "INSERT INTO project_image (project_id, filename, is_main, sort_order) VALUES (:pid, :fn, TRUE, 0)"
+                ), {'pid': row[0], 'fn': row[1]})
+        conn.commit()
 
         # github_url / demo_url → links_json 자동 마이그레이션
         import json as _json
@@ -399,8 +432,8 @@ def project_new():
         )
         db.session.add(p)
         db.session.commit()
-        flash('프로젝트가 추가되었습니다.')
-        return redirect(url_for('admin_dashboard'))
+        flash('프로젝트가 추가되었습니다. 아래에서 이미지를 추가하세요.')
+        return redirect(url_for('project_edit', pid=p.id))
     return render_template('project_form.html', project=None)
 
 
@@ -421,11 +454,6 @@ def project_edit(pid):
         p.order = int(request.form.get('order', 0))
         p.detail_text = request.form.get('detail_text', '')
         p.links_json = _json.dumps(links, ensure_ascii=False)
-        img = save_uploaded_image(request.files.get('image'))
-        if img:
-            p.image_filename = img
-        elif request.form.get('remove_image'):
-            p.image_filename = ''
         db.session.commit()
         flash('프로젝트가 수정되었습니다.')
         return redirect(url_for('admin_dashboard'))
@@ -440,6 +468,65 @@ def project_delete(pid):
     db.session.commit()
     flash('프로젝트가 삭제되었습니다.')
     return redirect(url_for('admin_dashboard'))
+
+
+# ── Image AJAX Routes ───────────────────────────────────
+
+@app.route('/admin/project/<int:pid>/images/upload', methods=['POST'])
+@login_required
+def project_image_upload(pid):
+    import base64 as _b64, json as _json
+    p = Project.query.get_or_404(pid)
+    cropped = request.form.get('cropped_data')
+    if cropped and ',' in cropped:
+        _, data = cropped.split(',', 1)
+        filename = f"proj{pid}_{int(time.time())}.jpg"
+        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+        with open(os.path.join(app.config['UPLOAD_FOLDER'], filename), 'wb') as f:
+            f.write(_b64.b64decode(data))
+    else:
+        filename = save_uploaded_image(request.files.get('image'))
+        if not filename:
+            return _json.dumps({'error': 'invalid file'}), 400, {'Content-Type': 'application/json'}
+    has_any = ProjectImage.query.filter_by(project_id=pid).first() is not None
+    img = ProjectImage(project_id=pid, filename=filename, is_main=not has_any)
+    db.session.add(img)
+    db.session.commit()
+    return app.response_class(
+        response=_json.dumps({'id': img.id, 'is_main': img.is_main,
+                              'url': url_for('static', filename='uploads/' + filename)}),
+        mimetype='application/json'
+    )
+
+
+@app.route('/admin/project/images/<int:img_id>/set-main', methods=['POST'])
+@login_required
+def project_image_set_main(img_id):
+    import json as _json
+    img = ProjectImage.query.get_or_404(img_id)
+    ProjectImage.query.filter_by(project_id=img.project_id).update({'is_main': False})
+    img.is_main = True
+    db.session.commit()
+    return app.response_class(response=_json.dumps({'ok': True}), mimetype='application/json')
+
+
+@app.route('/admin/project/images/<int:img_id>/delete', methods=['POST'])
+@login_required
+def project_image_delete(img_id):
+    import json as _json
+    img = ProjectImage.query.get_or_404(img_id)
+    was_main, pid = img.is_main, img.project_id
+    fpath = os.path.join(app.config['UPLOAD_FOLDER'], img.filename)
+    if os.path.exists(fpath):
+        os.remove(fpath)
+    db.session.delete(img)
+    db.session.commit()
+    if was_main:
+        nxt = ProjectImage.query.filter_by(project_id=pid).first()
+        if nxt:
+            nxt.is_main = True
+            db.session.commit()
+    return app.response_class(response=_json.dumps({'ok': True}), mimetype='application/json')
 
 
 # ── Entry ────────────────────────────────────────────────
