@@ -212,7 +212,6 @@ ul { list-style: none; }
 .about-intro p {
   color: var(--text-2);
   font-size: 1rem;
-  max-width: 720px;
   line-height: 1.9;
   word-break: keep-all;
   margin-bottom: 1rem;
