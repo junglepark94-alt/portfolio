@@ -126,6 +126,13 @@
     cropZone.style.display = 'none';
     croppedData.value = '';
   });
+
+  document.getElementById('galleryForm').addEventListener('submit', function (e) {
+    if (cropZone.style.display !== 'none' && !croppedData.value) {
+      e.preventDefault();
+      alert('크롭을 적용하거나 "크롭 없이 사용"을 눌러주세요.');
+    }
+  });
 })();
 </script>
 {% endblock %}
