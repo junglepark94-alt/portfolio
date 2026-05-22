@@ -97,13 +97,29 @@ ul { list-style: none; }
 }
 
 /* ── Hero ───────────────────────────────────── */
+@keyframes meshGradient {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
 .hero {
   min-height: 100vh;
   display: flex;
   align-items: center;
   position: relative;
   overflow: hidden;
-  background: linear-gradient(160deg, #f9f8f6 55%, #edf2f7 100%);
+  background: linear-gradient(
+    -45deg,
+    #f9f8f6,
+    #e8f0f8,
+    #fef6ed,
+    #edf2f7,
+    #f4ede3,
+    #e8f0f8
+  );
+  background-size: 400% 400%;
+  animation: meshGradient 16s ease infinite;
 }
 .hero::before {
   content: '';
@@ -113,7 +129,7 @@ ul { list-style: none; }
   width: 600px;
   height: 600px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(200,135,58,0.06) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(200,135,58,0.09) 0%, transparent 70%);
   pointer-events: none;
 }
 .hero-inner {
