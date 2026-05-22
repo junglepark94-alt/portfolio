@@ -49,9 +49,11 @@ if (modal) {
       .join('');
 
     const linksEl = document.getElementById('modalLinks');
-    linksEl.innerHTML = '';
-    if (d.github) linksEl.innerHTML += `<a href="${d.github}" class="pc-link" target="_blank" rel="noopener">GitHub →</a>`;
-    if (d.demo)   linksEl.innerHTML += `<a href="${d.demo}" class="pc-link" target="_blank" rel="noopener">Demo →</a>`;
+    let links = [];
+    try { links = JSON.parse(d.links || '[]'); } catch (e) {}
+    linksEl.innerHTML = links.map(lk =>
+      `<a href="${lk.url}" class="pc-link" target="_blank" rel="noopener">${lk.label} →</a>`
+    ).join('');
 
     modal.classList.add('active');
     modal.setAttribute('aria-hidden', 'false');
@@ -74,6 +76,31 @@ if (modal) {
       if (e.target.closest('a')) return;
       openModal(card);
     });
+  });
+}
+
+// ── Project Form: Dynamic Links ──────────────
+const linkRows = document.getElementById('linkRows');
+const addLinkBtn = document.getElementById('addLinkBtn');
+if (linkRows && addLinkBtn) {
+  function wireRemoveBtn(row) {
+    row.querySelector('.link-remove-btn').addEventListener('click', () => {
+      if (linkRows.querySelectorAll('.link-row').length > 1) {
+        row.remove();
+      }
+    });
+  }
+  linkRows.querySelectorAll('.link-row').forEach(wireRemoveBtn);
+  addLinkBtn.addEventListener('click', () => {
+    const row = document.createElement('div');
+    row.className = 'link-row';
+    row.innerHTML = `
+      <input type="text" name="link_label" placeholder="링크 이름 (예: GitHub, 발표자료)" />
+      <input type="url"  name="link_url"   placeholder="https://..." />
+      <button type="button" class="link-remove-btn" aria-label="삭제">×</button>`;
+    linkRows.appendChild(row);
+    wireRemoveBtn(row);
+    row.querySelector('input').focus();
   });
 }
 

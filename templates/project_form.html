@@ -38,12 +38,25 @@
       <input type="text" name="period" placeholder="2024.03 – 2024.06" value="{{ project.period if project else '' }}" />
     </div>
     <div class="form-group">
-      <label>GitHub URL</label>
-      <input type="url" name="github_url" value="{{ project.github_url if project else '' }}" />
-    </div>
-    <div class="form-group">
-      <label>Demo URL</label>
-      <input type="url" name="demo_url" value="{{ project.demo_url if project else '' }}" />
+      <label>관련 링크</label>
+      <div id="linkRows">
+        {% if project and project.links %}
+          {% for lk in project.links %}
+          <div class="link-row">
+            <input type="text" name="link_label" placeholder="링크 이름 (예: GitHub, 발표자료)" value="{{ lk.label }}" />
+            <input type="url"  name="link_url"   placeholder="https://..." value="{{ lk.url }}" />
+            <button type="button" class="link-remove-btn" aria-label="삭제">×</button>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="link-row">
+            <input type="text" name="link_label" placeholder="링크 이름 (예: GitHub, 발표자료)" />
+            <input type="url"  name="link_url"   placeholder="https://..." />
+            <button type="button" class="link-remove-btn" aria-label="삭제">×</button>
+          </div>
+        {% endif %}
+      </div>
+      <button type="button" id="addLinkBtn" class="btn-add-link">+ 링크 추가</button>
     </div>
     <div class="form-group">
       <label>정렬 순서 (숫자가 낮을수록 먼저 표시)</label>

@@ -620,6 +620,45 @@ ul { list-style: none; }
   border-color: var(--accent);
 }
 
+/* ── Dynamic Link Rows (project form) ──────── */
+.link-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+.link-row input[type="text"] { flex: 0 0 180px; }
+.link-row input[type="url"]  { flex: 1; }
+.link-remove-btn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-alt);
+  color: var(--muted);
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+.link-remove-btn:hover { background: #fde8e8; color: #b91c1c; }
+.btn-add-link {
+  margin-top: 0.4rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-light);
+  border: 1px dashed var(--accent);
+  border-radius: var(--radius);
+  padding: 0.35rem 0.9rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-add-link:hover { background: #d4e5f7; }
+
 /* ── Image Upload Preview ───────────────────── */
 .img-preview-wrap {
   display: flex;

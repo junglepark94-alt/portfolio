@@ -42,13 +42,22 @@ class Project(db.Model):
     title = db.Column(db.String(120), nullable=False)
     description = db.Column(db.Text, nullable=False)
     tech_stack = db.Column(db.String(250))   # comma-separated
-    github_url = db.Column(db.String(300))
-    demo_url = db.Column(db.String(300))
+    github_url = db.Column(db.String(300))   # 레거시 — links_json으로 대체됨
+    demo_url = db.Column(db.String(300))     # 레거시 — links_json으로 대체됨
     period = db.Column(db.String(80))        # e.g. "2024.03 – 2024.06"
     order = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     image_filename = db.Column(db.String(300), default='')
     detail_text = db.Column(db.Text, default='')
+    links_json = db.Column(db.Text, default='[]')  # [{"label": "...", "url": "..."}]
+
+    @property
+    def links(self):
+        import json as _json
+        try:
+            return _json.loads(self.links_json or '[]')
+        except Exception:
+            return []
 
     @property
     def tech_list(self):
@@ -109,12 +118,34 @@ def init_db():
         for sql in [
             "ALTER TABLE project ADD COLUMN image_filename VARCHAR(300) DEFAULT ''",
             "ALTER TABLE project ADD COLUMN detail_text TEXT DEFAULT ''",
+            "ALTER TABLE project ADD COLUMN links_json TEXT DEFAULT '[]'",
         ]:
             try:
                 conn.execute(db.text(sql))
                 conn.commit()
             except Exception:
                 pass
+
+        # github_url / demo_url → links_json 자동 마이그레이션
+        import json as _json
+        rows = conn.execute(db.text(
+            "SELECT id, github_url, demo_url, links_json FROM project"
+        )).fetchall()
+        for row in rows:
+            links_val = row[3]
+            if links_val and links_val != '[]':
+                continue  # 이미 마이그레이션됨
+            links = []
+            if row[1]:
+                links.append({'label': 'GitHub', 'url': row[1]})
+            if row[2]:
+                links.append({'label': 'Demo', 'url': row[2]})
+            if links:
+                conn.execute(
+                    db.text("UPDATE project SET links_json = :lj WHERE id = :id"),
+                    {'lj': _json.dumps(links, ensure_ascii=False), 'id': row[0]}
+                )
+        conn.commit()
     if not Admin.query.first():
         admin = Admin(username='admin')
         admin.set_password(os.environ.get('ADMIN_PASSWORD', 'changeme123!'))
@@ -246,17 +277,23 @@ def profile_edit():
 @login_required
 def project_new():
     if request.method == 'POST':
+        import json as _json
+        labels = request.form.getlist('link_label')
+        urls   = request.form.getlist('link_url')
+        links  = [{'label': l.strip(), 'url': u.strip()}
+                  for l, u in zip(labels, urls) if l.strip() and u.strip()]
         img = save_uploaded_image(request.files.get('image'))
         p = Project(
             title=request.form['title'],
             description=request.form['description'],
             tech_stack=request.form['tech_stack'],
-            github_url=request.form.get('github_url', ''),
-            demo_url=request.form.get('demo_url', ''),
+            github_url='',
+            demo_url='',
             period=request.form.get('period', ''),
             order=int(request.form.get('order', 0)),
             detail_text=request.form.get('detail_text', ''),
             image_filename=img or '',
+            links_json=_json.dumps(links, ensure_ascii=False),
         )
         db.session.add(p)
         db.session.commit()
@@ -270,14 +307,18 @@ def project_new():
 def project_edit(pid):
     p = Project.query.get_or_404(pid)
     if request.method == 'POST':
+        import json as _json
+        labels = request.form.getlist('link_label')
+        urls   = request.form.getlist('link_url')
+        links  = [{'label': l.strip(), 'url': u.strip()}
+                  for l, u in zip(labels, urls) if l.strip() and u.strip()]
         p.title = request.form['title']
         p.description = request.form['description']
         p.tech_stack = request.form['tech_stack']
-        p.github_url = request.form.get('github_url', '')
-        p.demo_url = request.form.get('demo_url', '')
         p.period = request.form.get('period', '')
         p.order = int(request.form.get('order', 0))
         p.detail_text = request.form.get('detail_text', '')
+        p.links_json = _json.dumps(links, ensure_ascii=False)
         img = save_uploaded_image(request.files.get('image'))
         if img:
             p.image_filename = img

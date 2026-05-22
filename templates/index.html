@@ -79,8 +79,7 @@
         data-desc="{{ p.description | e }}"
         data-detail="{{ p.detail_text | e }}"
         data-tags="{{ p.tech_stack | e }}"
-        data-github="{{ p.github_url | e }}"
-        data-demo="{{ p.demo_url | e }}"
+        data-links="{{ p.links | tojson | e }}"
         data-image="{{ url_for('static', filename='uploads/' + p.image_filename) if p.image_filename else '' }}"
       >
         {% if p.image_filename %}
@@ -100,8 +99,9 @@
         </div>
         <div class="pc-footer">
           <div class="pc-links">
-            {% if p.github_url %}<a href="{{ p.github_url }}" class="pc-link" target="_blank" rel="noopener">GitHub →</a>{% endif %}
-            {% if p.demo_url %}<a href="{{ p.demo_url }}" class="pc-link" target="_blank" rel="noopener">Demo →</a>{% endif %}
+            {% for lk in p.links %}
+            <a href="{{ lk.url }}" class="pc-link" target="_blank" rel="noopener">{{ lk.label }} →</a>
+            {% endfor %}
           </div>
           {% if p.detail_text %}
           <span class="pc-more">자세히 보기 →</span>
