@@ -808,7 +808,7 @@ def youtube_playlist_info():
             views = int(v.get('statistics', {}).get('viewCount', 0) or 0)
             videos.append((dur, views, v))
 
-        long_form = [(dur, views, v) for dur, views, v in videos if dur > 60]
+        long_form = [(dur, views, v) for dur, views, v in videos if dur > 180]
         pool = long_form if long_form else videos
         pool.sort(key=lambda x: x[1], reverse=True)
         best = pool[0][2]
