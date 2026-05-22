@@ -534,6 +534,8 @@ ul { list-style: none; }
   color: var(--text-2);
   line-height: 1.75;
   margin-bottom: 1.25rem;
+  white-space: pre-line;
+  word-break: keep-all;
 }
 .modal-detail-block {
   background: var(--bg-alt);
