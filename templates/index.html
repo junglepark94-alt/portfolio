@@ -135,8 +135,8 @@
         data-desc="{{ p.description | e }}"
         data-detail="{{ p.detail_text | e }}"
         data-tags="{{ p.tech_stack | e }}"
-        data-links="{{ p.links | tojson | e }}"
-        data-images="{{ imgs | map(attribute='filename') | list | tojson | e }}"
+        data-links="{{ p.links | tojson | forceescape }}"
+        data-images="{{ imgs | map(attribute='filename') | list | tojson | forceescape }}"
       >
         {% if main_img %}
         <div class="pc-thumb">
@@ -184,7 +184,7 @@
       <div class="gallery-card"
         data-title="{{ item.title | e }}"
         data-desc="{{ item.description | e }}"
-        data-links="{{ item.links | tojson | e }}"
+        data-links="{{ item.links | tojson | forceescape }}"
         data-image="{{ url_for('static', filename='uploads/' + item.image_filename) }}"
       >
         <div class="gallery-thumb">
