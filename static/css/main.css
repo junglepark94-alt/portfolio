@@ -1132,15 +1132,13 @@ ul { list-style: none; }
   /* Contact */
   .contact-grid { grid-template-columns: 1fr; }
 
-  /* Modal — 하단 시트 */
-  .modal-overlay { align-items: flex-end; }
+  /* Modal — 모바일 중앙 */
   .modal-box {
-    max-width: 100%;
-    max-height: 92dvh;
-    border-radius: calc(var(--radius) * 2) calc(var(--radius) * 2) 0 0;
-    margin: 0;
+    max-width: calc(100% - 2rem);
+    max-height: 90dvh;
+    margin: 1rem;
   }
-  .modal-body { padding: 1.25rem 1.25rem 2rem; }
+  .modal-body { padding: 1.25rem 1.25rem 1.5rem; }
   .modal-image-wrap { max-height: 44vw; }
 
   /* Footer */
