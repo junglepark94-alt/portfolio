@@ -680,7 +680,7 @@ def project_image_delete(img_id):
     return app.response_class(response=_json.dumps({'ok': True}), mimetype='application/json')
 
 
-# ── Project Reorder ─────────────────────────────────────
+# ── Reorder ─────────────────────────────────────────────
 
 @app.route('/admin/projects/reorder', methods=['POST'])
 @login_required
@@ -691,6 +691,19 @@ def projects_reorder():
         p = db.session.get(Project, int(pid))
         if p:
             p.order = i
+    db.session.commit()
+    return app.response_class(response=_json.dumps({'ok': True}), mimetype='application/json')
+
+
+@app.route('/admin/gallery/reorder', methods=['POST'])
+@login_required
+def gallery_reorder():
+    import json as _json
+    ids = (_json.loads(request.data) or {}).get('ids', [])
+    for i, gid in enumerate(ids):
+        g = db.session.get(GalleryItem, int(gid))
+        if g:
+            g.sort_order = i
     db.session.commit()
     return app.response_class(response=_json.dumps({'ok': True}), mimetype='application/json')
 
