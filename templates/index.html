@@ -157,31 +157,12 @@
           <img src="{{ url_for('static', filename='uploads/' + main_img.filename) }}" alt="{{ p.title }}" />
         </div>
         {% endif %}
-        <div class="pc-header">
-          <h3 class="pc-title">{{ p.title }}</h3>
-          <div class="pc-header-right">
+        <div class="pc-body">
+          <div class="pc-meta-row">
             {% if p.my_role %}<span class="pc-role-badge">{{ p.my_role }}</span>{% endif %}
             {% if p.period %}<span class="pc-period">{{ p.period }}</span>{% endif %}
           </div>
-        </div>
-        <p class="pc-desc">{{ p.description }}</p>
-        {% if p.kpi %}
-        <div class="pc-kpi">📊 {{ p.kpi }}</div>
-        {% endif %}
-        <div class="pc-tags">
-          {% for t in p.tech_list %}
-          <span class="tag">{{ t }}</span>
-          {% endfor %}
-        </div>
-        <div class="pc-footer">
-          <div class="pc-links">
-            {% for lk in p.links %}
-            <a href="{{ lk.url }}" class="pc-link" target="_blank" rel="noopener">{{ lk.label }} →</a>
-            {% endfor %}
-          </div>
-          {% if p.detail_text or p.kpi or p.my_role %}
-          <span class="pc-more">자세히 보기 →</span>
-          {% endif %}
+          <h3 class="pc-title">{{ p.title }}</h3>
         </div>
       </article>
       {% else %}
@@ -300,7 +281,7 @@
       <p class="modal-desc" id="modalDesc"></p>
       <div class="modal-kpi-block" id="modalKpiBlock" style="display:none;">
         <span class="modal-kpi-label">핵심 성과</span>
-        <span class="modal-kpi-value" id="modalKpi"></span>
+        <div class="modal-kpi-value" id="modalKpi"></div>
       </div>
       <div class="modal-detail-block" id="modalDetailBlock" style="display:none;">
         <div class="modal-detail-label">상세 설명</div>

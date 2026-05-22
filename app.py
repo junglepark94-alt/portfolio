@@ -475,6 +475,8 @@ def project_new():
         urls   = request.form.getlist('link_url')
         links  = [{'label': l.strip(), 'url': u.strip()}
                   for l, u in zip(labels, urls) if l.strip() and u.strip()]
+        kpi_items = request.form.getlist('kpi_item')
+        kpi = '\n'.join(i.strip() for i in kpi_items if i.strip())
         img = save_uploaded_image(request.files.get('image'))
         p = Project(
             title=request.form['title'],
@@ -487,7 +489,7 @@ def project_new():
             detail_text=request.form.get('detail_text', ''),
             image_filename=img or '',
             links_json=_json.dumps(links, ensure_ascii=False),
-            kpi=request.form.get('kpi', ''),
+            kpi=kpi,
             my_role=request.form.get('my_role', ''),
             category=request.form.get('category', ''),
         )
@@ -515,7 +517,8 @@ def project_edit(pid):
         p.order = int(request.form.get('order', 0))
         p.detail_text = request.form.get('detail_text', '')
         p.links_json = _json.dumps(links, ensure_ascii=False)
-        p.kpi = request.form.get('kpi', '')
+        kpi_items = request.form.getlist('kpi_item')
+        p.kpi = '\n'.join(i.strip() for i in kpi_items if i.strip())
         p.my_role = request.form.get('my_role', '')
         p.category = request.form.get('category', '')
         db.session.commit()

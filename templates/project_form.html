@@ -47,8 +47,23 @@
       <textarea name="description" rows="4" required>{{ project.description if project else '' }}</textarea>
     </div>
     <div class="form-group">
-      <label>핵심 성과 수치 <span style="color:var(--muted); font-weight:400;">(카드에 강조 표시)</span></label>
-      <input type="text" name="kpi" placeholder="예: 작업 시간 70% 단축 / 팔로워 +12,000명 / 캠페인 CTR 8.3%" value="{{ project.kpi if project else '' }}" />
+      <label>핵심 성과 수치 <span style="color:var(--muted); font-weight:400;">(항목별로 추가)</span></label>
+      <div id="kpiRows">
+        {% if project and project.kpi %}
+          {% for item in project.kpi.split('\n') if item.strip() %}
+          <div class="kpi-row">
+            <input type="text" name="kpi_item" value="{{ item.strip() }}" placeholder="예: 작업 시간 70% 단축" />
+            <button type="button" class="kpi-remove-btn" aria-label="삭제">×</button>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="kpi-row">
+            <input type="text" name="kpi_item" placeholder="예: 작업 시간 70% 단축" />
+            <button type="button" class="kpi-remove-btn" aria-label="삭제">×</button>
+          </div>
+        {% endif %}
+      </div>
+      <button type="button" id="addKpiBtn" class="btn-add-link">+ 성과 추가</button>
     </div>
     <div class="form-group">
       <label>역할 / 기여 범위</label>

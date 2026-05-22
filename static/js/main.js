@@ -68,8 +68,11 @@ if (modal) {
 
     const kpiBlock = document.getElementById('modalKpiBlock');
     const kpiEl = document.getElementById('modalKpi');
-    if (d.kpi && d.kpi.trim()) {
-      kpiEl.textContent = d.kpi;
+    const kpiItems = (d.kpi || '').split('\n').filter(function (s) { return s.trim(); });
+    if (kpiItems.length) {
+      kpiEl.innerHTML = kpiItems.map(function (item) {
+        return '<div class="modal-kpi-item">📊 ' + item.trim() + '</div>';
+      }).join('');
       kpiBlock.style.display = '';
     } else {
       kpiBlock.style.display = 'none';
@@ -253,6 +256,27 @@ if (galleryModal) {
 
   document.querySelectorAll('.gallery-card').forEach(card => {
     card.addEventListener('click', () => openGalleryModal(card));
+  });
+}
+
+// ── Project Form: KPI Rows ───────────────────
+const kpiRows = document.getElementById('kpiRows');
+const addKpiBtn = document.getElementById('addKpiBtn');
+if (kpiRows && addKpiBtn) {
+  function wireKpiRemove(row) {
+    row.querySelector('.kpi-remove-btn').addEventListener('click', function () {
+      if (kpiRows.querySelectorAll('.kpi-row').length > 1) row.remove();
+    });
+  }
+  kpiRows.querySelectorAll('.kpi-row').forEach(wireKpiRemove);
+  addKpiBtn.addEventListener('click', function () {
+    const row = document.createElement('div');
+    row.className = 'kpi-row';
+    row.innerHTML = '<input type="text" name="kpi_item" placeholder="예: 작업 시간 70% 단축" />'
+      + '<button type="button" class="kpi-remove-btn" aria-label="삭제">×</button>';
+    kpiRows.appendChild(row);
+    wireKpiRemove(row);
+    row.querySelector('input').focus();
   });
 }
 
