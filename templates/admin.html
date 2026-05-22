@@ -42,18 +42,18 @@
     <div class="asc-header">
       <div>
         <div class="asc-label">프로젝트</div>
-        <div class="asc-summary">{{ projects | length }}개 등록됨</div>
+        <div class="asc-summary">{{ projects | length }}개 등록됨 <span id="reorderSaved" style="color:var(--accent);font-size:0.8rem;opacity:0;transition:opacity 0.4s;margin-left:0.5rem;">✓ 저장됨</span></div>
       </div>
       <a href="{{ url_for('project_new') }}" class="btn btn-primary">+ 새 프로젝트</a>
     </div>
     <table class="admin-table">
       <thead>
-        <tr><th>순서</th><th>제목</th><th>기간</th><th>기술 스택</th><th>관리</th></tr>
+        <tr><th style="width:36px;"></th><th>제목</th><th>기간</th><th>기술 스택</th><th>관리</th></tr>
       </thead>
-      <tbody>
+      <tbody id="projectTbody">
         {% for p in projects %}
-        <tr>
-          <td>{{ p.order }}</td>
+        <tr data-id="{{ p.id }}">
+          <td style="text-align:center;"><span class="drag-handle" title="드래그하여 순서 변경">⠿</span></td>
           <td>{{ p.title }}</td>
           <td>{{ p.period or '—' }}</td>
           <td class="td-muted">{{ p.tech_stack }}</td>
@@ -106,4 +106,54 @@
   </div>
 
 </div>
+
+<script>
+(function () {
+  const tbody = document.getElementById('projectTbody');
+  if (!tbody) return;
+  let src = null;
+
+  tbody.addEventListener('mousedown', function (e) {
+    if (e.target.closest('.drag-handle')) {
+      const row = e.target.closest('tr');
+      if (row) row.draggable = true;
+    }
+  });
+
+  tbody.addEventListener('dragstart', function (e) {
+    src = e.target.closest('tr[data-id]');
+    if (!src) return;
+    e.dataTransfer.effectAllowed = 'move';
+    setTimeout(function () { src.style.opacity = '0.35'; }, 0);
+  });
+
+  tbody.addEventListener('dragover', function (e) {
+    e.preventDefault();
+    const over = e.target.closest('tr[data-id]');
+    if (!over || over === src) return;
+    const mid = over.getBoundingClientRect().top + over.offsetHeight / 2;
+    tbody.insertBefore(src, e.clientY < mid ? over : over.nextSibling);
+  });
+
+  tbody.addEventListener('dragend', function () {
+    if (!src) return;
+    src.style.opacity = '';
+    src.draggable = false;
+    src = null;
+    tbody.querySelectorAll('tr[data-id]').forEach(function (r) { r.draggable = false; });
+
+    const ids = [...tbody.querySelectorAll('tr[data-id]')].map(function (r) { return parseInt(r.dataset.id); });
+    fetch('/admin/projects/reorder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: ids })
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      if (d.ok) {
+        const el = document.getElementById('reorderSaved');
+        if (el) { el.style.opacity = '1'; setTimeout(function () { el.style.opacity = '0'; }, 1500); }
+      }
+    });
+  });
+})();
+</script>
 {% endblock %}

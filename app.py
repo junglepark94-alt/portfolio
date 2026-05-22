@@ -680,6 +680,21 @@ def project_image_delete(img_id):
     return app.response_class(response=_json.dumps({'ok': True}), mimetype='application/json')
 
 
+# ── Project Reorder ─────────────────────────────────────
+
+@app.route('/admin/projects/reorder', methods=['POST'])
+@login_required
+def projects_reorder():
+    import json as _json
+    ids = (_json.loads(request.data) or {}).get('ids', [])
+    for i, pid in enumerate(ids):
+        p = db.session.get(Project, int(pid))
+        if p:
+            p.order = i
+    db.session.commit()
+    return app.response_class(response=_json.dumps({'ok': True}), mimetype='application/json')
+
+
 # ── YouTube API Proxy ────────────────────────────────────
 
 @app.route('/api/youtube')
