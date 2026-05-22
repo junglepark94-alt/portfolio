@@ -122,6 +122,46 @@ if (modal) {
   });
 }
 
+// ── Gallery Modal ────────────────────────────
+const galleryModal = document.getElementById('galleryModal');
+if (galleryModal) {
+  const gClose = document.getElementById('galleryModalClose');
+
+  function openGalleryModal(card) {
+    const d = card.dataset;
+    document.getElementById('galleryModalImg').src = d.image || '';
+    document.getElementById('galleryModalImg').alt = d.title || '';
+    document.getElementById('galleryModalTitle').textContent = d.title || '';
+    document.getElementById('galleryModalDesc').textContent = d.desc || '';
+    document.getElementById('galleryModalImgWrap').style.display = d.image ? '' : 'none';
+
+    const linksEl = document.getElementById('galleryModalLinks');
+    let links = [];
+    try { links = JSON.parse(d.links || '[]'); } catch(e) {}
+    linksEl.innerHTML = links.map(lk =>
+      `<a href="${lk.url}" class="pc-link" target="_blank" rel="noopener">${lk.label} →</a>`
+    ).join('');
+
+    galleryModal.classList.add('active');
+    galleryModal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeGalleryModal() {
+    galleryModal.classList.remove('active');
+    galleryModal.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+  }
+
+  gClose.addEventListener('click', closeGalleryModal);
+  galleryModal.addEventListener('click', e => { if (e.target === galleryModal) closeGalleryModal(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeGalleryModal(); });
+
+  document.querySelectorAll('.gallery-card').forEach(card => {
+    card.addEventListener('click', () => openGalleryModal(card));
+  });
+}
+
 // ── Project Form: Dynamic Links ──────────────
 const linkRows = document.getElementById('linkRows');
 const addLinkBtn = document.getElementById('addLinkBtn');

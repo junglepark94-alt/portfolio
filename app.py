@@ -94,6 +94,23 @@ class ProjectImage(db.Model):
     sort_order = db.Column(db.Integer, default=0)
 
 
+class GalleryItem(db.Model):
+    __tablename__ = 'gallery_item'
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, default='')
+    image_filename = db.Column(db.String(300), nullable=False)
+    links_json = db.Column(db.Text, default='[]')
+    sort_order = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    @property
+    def links(self):
+        import json as _j
+        try: return _j.loads(self.links_json or '[]')
+        except: return []
+
+
 class Admin(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
@@ -294,8 +311,9 @@ def init_db():
 @app.route('/')
 def index():
     projects = Project.query.order_by(Project.order, Project.created_at.desc()).all()
+    gallery_items = GalleryItem.query.order_by(GalleryItem.sort_order, GalleryItem.created_at).all()
     profile = db.session.get(Profile, 1)
-    return render_template('index.html', projects=projects, profile=profile)
+    return render_template('index.html', projects=projects, gallery_items=gallery_items, profile=profile)
 
 
 # ── Admin Auth ───────────────────────────────────────────
@@ -334,11 +352,13 @@ def login_required(f):
 def admin_dashboard():
     projects = Project.query.order_by(Project.order, Project.created_at.desc()).all()
     profile = db.session.get(Profile, 1)
+    gallery_items = GalleryItem.query.order_by(GalleryItem.sort_order, GalleryItem.created_at).all()
     db_info = {
         'engine': 'SQLite ⚠️ (재배포 시 데이터 소멸)' if _using_sqlite else 'PostgreSQL ✅',
         'warning': _using_sqlite and _is_production,
     }
-    return render_template('admin.html', projects=projects, profile=profile, db_info=db_info)
+    return render_template('admin.html', projects=projects, profile=profile,
+                           gallery_items=gallery_items, db_info=db_info)
 
 
 @app.route('/admin/profile', methods=['GET', 'POST'])
@@ -467,6 +487,81 @@ def project_delete(pid):
     db.session.delete(p)
     db.session.commit()
     flash('프로젝트가 삭제되었습니다.')
+    return redirect(url_for('admin_dashboard'))
+
+
+# ── Gallery CRUD ────────────────────────────────────────
+
+def _save_gallery_image(request):
+    import base64 as _b64, json as _j
+    cropped = request.form.get('cropped_data')
+    if cropped and ',' in cropped:
+        _, data = cropped.split(',', 1)
+        filename = f"gallery_{int(time.time())}.jpg"
+        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+        with open(os.path.join(app.config['UPLOAD_FOLDER'], filename), 'wb') as f:
+            f.write(_b64.b64decode(data))
+        return filename
+    return save_uploaded_image(request.files.get('image'))
+
+@app.route('/admin/gallery/new', methods=['GET', 'POST'])
+@login_required
+def gallery_new():
+    import json as _j
+    if request.method == 'POST':
+        filename = _save_gallery_image(request)
+        if not filename:
+            flash('이미지를 선택해주세요.')
+            return redirect(request.url)
+        labels = request.form.getlist('link_label')
+        urls   = request.form.getlist('link_url')
+        links  = [{'label': l.strip(), 'url': u.strip()}
+                  for l, u in zip(labels, urls) if l.strip() and u.strip()]
+        item = GalleryItem(
+            title=request.form['title'],
+            description=request.form.get('description', ''),
+            image_filename=filename,
+            links_json=_j.dumps(links, ensure_ascii=False),
+            sort_order=int(request.form.get('sort_order', 0)),
+        )
+        db.session.add(item)
+        db.session.commit()
+        flash('갤러리 항목이 추가되었습니다.')
+        return redirect(url_for('admin_dashboard'))
+    return render_template('gallery_form.html', item=None)
+
+@app.route('/admin/gallery/<int:gid>/edit', methods=['GET', 'POST'])
+@login_required
+def gallery_edit(gid):
+    import json as _j
+    item = GalleryItem.query.get_or_404(gid)
+    if request.method == 'POST':
+        labels = request.form.getlist('link_label')
+        urls   = request.form.getlist('link_url')
+        links  = [{'label': l.strip(), 'url': u.strip()}
+                  for l, u in zip(labels, urls) if l.strip() and u.strip()]
+        item.title = request.form['title']
+        item.description = request.form.get('description', '')
+        item.links_json = _j.dumps(links, ensure_ascii=False)
+        item.sort_order = int(request.form.get('sort_order', 0))
+        new_img = _save_gallery_image(request)
+        if new_img:
+            item.image_filename = new_img
+        db.session.commit()
+        flash('갤러리 항목이 수정되었습니다.')
+        return redirect(url_for('admin_dashboard'))
+    return render_template('gallery_form.html', item=item)
+
+@app.route('/admin/gallery/<int:gid>/delete', methods=['POST'])
+@login_required
+def gallery_delete(gid):
+    item = GalleryItem.query.get_or_404(gid)
+    fpath = os.path.join(app.config['UPLOAD_FOLDER'], item.image_filename)
+    if os.path.exists(fpath):
+        os.remove(fpath)
+    db.session.delete(item)
+    db.session.commit()
+    flash('갤러리 항목이 삭제되었습니다.')
     return redirect(url_for('admin_dashboard'))
 
 

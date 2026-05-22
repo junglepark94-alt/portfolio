@@ -171,6 +171,48 @@
   </div>
 </section>
 
+<!-- ── GALLERY ───────────────────────────────────────── -->
+{% if gallery_items %}
+<section class="section section-alt" id="gallery">
+  <div class="container">
+    <div class="section-label">Gallery</div>
+    <h2>갤러리</h2>
+  </div>
+  <div class="gallery-scroll-wrap">
+    <div class="gallery-scroll" id="galleryScroll">
+      {% for item in gallery_items %}
+      <div class="gallery-card"
+        data-title="{{ item.title | e }}"
+        data-desc="{{ item.description | e }}"
+        data-links="{{ item.links | tojson | e }}"
+        data-image="{{ url_for('static', filename='uploads/' + item.image_filename) }}"
+      >
+        <div class="gallery-thumb">
+          <img src="{{ url_for('static', filename='uploads/' + item.image_filename) }}" alt="{{ item.title }}" loading="lazy" />
+        </div>
+        <div class="gallery-card-title">{{ item.title }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<!-- ── Gallery Modal ─────────────────────────────────── -->
+<div class="modal-overlay" id="galleryModal" aria-hidden="true">
+  <div class="modal-box" role="dialog" aria-modal="true">
+    <button class="modal-close" id="galleryModalClose" aria-label="닫기">×</button>
+    <div class="modal-image-wrap" id="galleryModalImgWrap">
+      <img id="galleryModalImg" src="" alt="" />
+    </div>
+    <div class="modal-body">
+      <h3 class="modal-title" id="galleryModalTitle"></h3>
+      <p class="modal-desc" id="galleryModalDesc"></p>
+      <div class="modal-links" id="galleryModalLinks"></div>
+    </div>
+  </div>
+</div>
+
 <!-- ── CONTACT ───────────────────────────────────────── -->
 <section class="section section-alt" id="contact">
   <div class="container">

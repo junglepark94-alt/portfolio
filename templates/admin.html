@@ -37,6 +37,40 @@
     </div>
   </div>
 
+  <!-- 갤러리 -->
+  <div class="admin-section-card">
+    <div class="asc-header">
+      <div>
+        <div class="asc-label">갤러리</div>
+        <div class="asc-summary">{{ gallery_items | length }}개 등록됨</div>
+      </div>
+      <a href="{{ url_for('gallery_new') }}" class="btn btn-primary">+ 갤러리 추가</a>
+    </div>
+    <table class="admin-table">
+      <thead>
+        <tr><th>순서</th><th>이미지</th><th>제목</th><th>관리</th></tr>
+      </thead>
+      <tbody>
+        {% for g in gallery_items %}
+        <tr>
+          <td>{{ g.sort_order }}</td>
+          <td><img src="{{ url_for('static', filename='uploads/' + g.image_filename) }}"
+                   style="width:60px; height:45px; object-fit:cover; border-radius:4px; border:1px solid var(--border);" /></td>
+          <td>{{ g.title }}</td>
+          <td>
+            <a href="{{ url_for('gallery_edit', gid=g.id) }}" class="btn-sm">수정</a>
+            <form method="POST" action="{{ url_for('gallery_delete', gid=g.id) }}" style="display:inline" onsubmit="return confirm('삭제하시겠습니까?')">
+              <button type="submit" class="btn-sm btn-danger">삭제</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" style="text-align:center;color:var(--muted)">등록된 갤러리 항목이 없습니다.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
   <!-- 프로젝트 -->
   <div class="admin-section-card">
     <div class="asc-header">

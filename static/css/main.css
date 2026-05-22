@@ -557,6 +557,64 @@ ul { list-style: none; }
   flex-wrap: wrap;
 }
 
+/* ── Gallery ────────────────────────────────── */
+.gallery-scroll-wrap {
+  overflow: hidden;
+  padding: 0.5rem 0 1.5rem;
+}
+.gallery-scroll {
+  display: flex;
+  gap: 1.25rem;
+  overflow-x: auto;
+  padding: 0.5rem 2rem 1rem;
+  max-width: var(--max);
+  margin: 0 auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x mandatory;
+}
+.gallery-scroll::-webkit-scrollbar { height: 5px; }
+.gallery-scroll::-webkit-scrollbar-track { background: transparent; }
+.gallery-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.gallery-card {
+  flex-shrink: 0;
+  width: 220px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  cursor: pointer;
+  scroll-snap-align: start;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.gallery-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow);
+}
+.gallery-thumb {
+  width: 220px;
+  height: 165px;
+  overflow: hidden;
+}
+.gallery-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.35s ease;
+  display: block;
+}
+.gallery-card:hover .gallery-thumb img { transform: scale(1.06); }
+.gallery-card-title {
+  padding: 0.7rem 0.9rem 0.8rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* ── Contact ────────────────────────────────── */
 .contact-sub {
   color: var(--text-2);
