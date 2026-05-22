@@ -52,12 +52,14 @@
         {% if project and project.kpi %}
           {% for item in project.kpi.split('\n') if item.strip() %}
           <div class="kpi-row">
+            <span class="drag-handle" title="드래그하여 순서 변경">⠿</span>
             <input type="text" name="kpi_item" value="{{ item.strip() }}" placeholder="예: 작업 시간 70% 단축" />
             <button type="button" class="kpi-remove-btn" aria-label="삭제">×</button>
           </div>
           {% endfor %}
         {% else %}
           <div class="kpi-row">
+            <span class="drag-handle" title="드래그하여 순서 변경">⠿</span>
             <input type="text" name="kpi_item" placeholder="예: 작업 시간 70% 단축" />
             <button type="button" class="kpi-remove-btn" aria-label="삭제">×</button>
           </div>
@@ -91,6 +93,7 @@
         {% if project and project.links %}
           {% for lk in project.links %}
           <div class="link-row">
+            <span class="drag-handle" title="드래그하여 순서 변경">⠿</span>
             <input type="text" name="link_label" placeholder="링크 이름" value="{{ lk.label }}" />
             <input type="url"  name="link_url"   placeholder="https://..." value="{{ lk.url }}" />
             <button type="button" class="link-remove-btn" aria-label="삭제">×</button>
@@ -98,6 +101,7 @@
           {% endfor %}
         {% else %}
           <div class="link-row">
+            <span class="drag-handle" title="드래그하여 순서 변경">⠿</span>
             <input type="text" name="link_label" placeholder="링크 이름 (예: GitHub, 발표자료)" />
             <input type="url"  name="link_url"   placeholder="https://..." />
             <button type="button" class="link-remove-btn" aria-label="삭제">×</button>

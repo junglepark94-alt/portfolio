@@ -845,6 +845,20 @@ ul { list-style: none; }
   margin-bottom: 1rem;
 }
 
+/* ── Drag Handle ─────────────────────────────── */
+.drag-handle {
+  flex-shrink: 0;
+  cursor: grab;
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0 3px;
+  user-select: none;
+}
+.drag-handle:active { cursor: grabbing; }
+.kpi-row.dragging,
+.link-row.dragging { opacity: 0.35; }
+
 /* ── KPI Rows (project form) ────────────────── */
 .kpi-row {
   display: flex;
@@ -1071,6 +1085,7 @@ ul { list-style: none; }
   overflow-x: auto;
   background: #1a1814;
 }
+.modal-gallery-thumbs:empty { display: none; }
 .modal-gallery-thumbs img {
   width: 56px;
   height: 42px;

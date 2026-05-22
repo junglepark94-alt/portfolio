@@ -259,6 +259,42 @@ if (galleryModal) {
   });
 }
 
+// ── Sortable rows (drag-handle based) ───────
+function makeSortable(container, itemSelector) {
+  let src = null;
+
+  container.addEventListener('mousedown', function (e) {
+    if (e.target.closest('.drag-handle')) {
+      const row = e.target.closest(itemSelector);
+      if (row) row.draggable = true;
+    }
+  });
+
+  container.addEventListener('dragstart', function (e) {
+    src = e.target.closest(itemSelector);
+    if (!src) return;
+    e.dataTransfer.effectAllowed = 'move';
+    setTimeout(function () { src.classList.add('dragging'); }, 0);
+  });
+
+  container.addEventListener('dragover', function (e) {
+    e.preventDefault();
+    const over = e.target.closest(itemSelector);
+    if (!over || over === src) return;
+    const mid = over.getBoundingClientRect().top + over.offsetHeight / 2;
+    if (e.clientY < mid) {
+      container.insertBefore(src, over);
+    } else {
+      container.insertBefore(src, over.nextSibling);
+    }
+  });
+
+  container.addEventListener('dragend', function () {
+    if (src) { src.classList.remove('dragging'); src.draggable = false; src = null; }
+    container.querySelectorAll(itemSelector).forEach(function (r) { r.draggable = false; });
+  });
+}
+
 // ── Project Form: KPI Rows ───────────────────
 const kpiRows = document.getElementById('kpiRows');
 const addKpiBtn = document.getElementById('addKpiBtn');
@@ -272,12 +308,14 @@ if (kpiRows && addKpiBtn) {
   addKpiBtn.addEventListener('click', function () {
     const row = document.createElement('div');
     row.className = 'kpi-row';
-    row.innerHTML = '<input type="text" name="kpi_item" placeholder="예: 작업 시간 70% 단축" />'
+    row.innerHTML = '<span class="drag-handle" title="드래그하여 순서 변경">⠿</span>'
+      + '<input type="text" name="kpi_item" placeholder="예: 작업 시간 70% 단축" />'
       + '<button type="button" class="kpi-remove-btn" aria-label="삭제">×</button>';
     kpiRows.appendChild(row);
     wireKpiRemove(row);
     row.querySelector('input').focus();
   });
+  makeSortable(kpiRows, '.kpi-row');
 }
 
 // ── Project Form: Dynamic Links ──────────────
@@ -296,6 +334,7 @@ if (linkRows && addLinkBtn) {
     const row = document.createElement('div');
     row.className = 'link-row';
     row.innerHTML = `
+      <span class="drag-handle" title="드래그하여 순서 변경">⠿</span>
       <input type="text" name="link_label" placeholder="링크 이름 (예: GitHub, 발표자료)" />
       <input type="url"  name="link_url"   placeholder="https://..." />
       <button type="button" class="link-remove-btn" aria-label="삭제">×</button>`;
@@ -303,6 +342,7 @@ if (linkRows && addLinkBtn) {
     wireRemoveBtn(row);
     row.querySelector('input').focus();
   });
+  makeSortable(linkRows, '.link-row');
 }
 
 // ── Project Category Filter ──────────────────
