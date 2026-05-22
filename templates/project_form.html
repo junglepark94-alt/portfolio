@@ -140,7 +140,7 @@
     overlay.classList.add('active');
     if (cropper) { cropper.destroy(); cropper = null; }
     cropTarget.onload = () => {
-      cropper = new Cropper(cropTarget, { aspectRatio: NaN, viewMode: 1, autoCropArea: 0.8 });
+      cropper = new Cropper(cropTarget, { aspectRatio: 5/3, viewMode: 1, autoCropArea: 0.9 });
     };
   }
 
