@@ -683,9 +683,30 @@ ul { list-style: none; }
 .site-footer {
   border-top: 1px solid var(--border);
   padding: 2rem;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
   font-size: 0.82rem;
   color: var(--muted);
+}
+.footer-admin-btn {
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.25rem 0.6rem;
+  text-decoration: none;
+  transition: color 0.2s, border-color 0.2s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.footer-admin-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
 }
 
 /* ── Flash ──────────────────────────────────── */
@@ -1113,7 +1134,6 @@ ul { list-style: none; }
 @media (max-width: 768px) {
   /* Nav */
   .nav-links { display: none; }
-  .nav-admin-btn { display: none; }
   .nav-hamburger { display: flex; }
 
   /* Layout */
