@@ -213,10 +213,11 @@ ul { list-style: none; }
   color: var(--text-2);
   font-size: 1rem;
   max-width: 720px;
-  white-space: pre-line;
   line-height: 1.9;
   word-break: keep-all;
+  margin-bottom: 1rem;
 }
+.about-intro p:last-child { margin-bottom: 0; }
 .about-summary-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

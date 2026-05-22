@@ -33,7 +33,9 @@
 
     <!-- 소개 본문 -->
     <div class="about-intro reveal">
-      <p>{{ profile.about_text }}</p>
+      {% for para in profile.about_text.split('\n\n') if para.strip() %}
+      <p>{{ para.replace('\n', ' ') }}</p>
+      {% endfor %}
     </div>
 
     <!-- 학력 / 수상내역 -->
