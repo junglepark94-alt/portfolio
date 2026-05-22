@@ -1,13 +1,30 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
 from datetime import datetime
 import os
+import time
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-change-in-prod')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///portfolio.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
+app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5MB
+
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+
+def save_uploaded_image(file):
+    if not file or not file.filename:
+        return None
+    ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
+    if ext not in ALLOWED_EXTENSIONS:
+        return None
+    filename = f"project_{int(time.time())}.{ext}"
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+    return filename
 
 db = SQLAlchemy(app)
 
@@ -23,6 +40,8 @@ class Project(db.Model):
     period = db.Column(db.String(80))        # e.g. "2024.03 – 2024.06"
     order = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    image_filename = db.Column(db.String(300), default='')
+    detail_text = db.Column(db.Text, default='')
 
     @property
     def tech_list(self):
@@ -78,6 +97,17 @@ class Profile(db.Model):
 
 def init_db():
     db.create_all()
+    # 신규 컬럼 마이그레이션 (SQLite는 IF NOT EXISTS 미지원 → try/except)
+    with db.engine.connect() as conn:
+        for sql in [
+            "ALTER TABLE project ADD COLUMN image_filename VARCHAR(300) DEFAULT ''",
+            "ALTER TABLE project ADD COLUMN detail_text TEXT DEFAULT ''",
+        ]:
+            try:
+                conn.execute(db.text(sql))
+                conn.commit()
+            except Exception:
+                pass
     if not Admin.query.first():
         admin = Admin(username='admin')
         admin.set_password(os.environ.get('ADMIN_PASSWORD', 'changeme123!'))
@@ -209,6 +239,7 @@ def profile_edit():
 @login_required
 def project_new():
     if request.method == 'POST':
+        img = save_uploaded_image(request.files.get('image'))
         p = Project(
             title=request.form['title'],
             description=request.form['description'],
@@ -217,6 +248,8 @@ def project_new():
             demo_url=request.form.get('demo_url', ''),
             period=request.form.get('period', ''),
             order=int(request.form.get('order', 0)),
+            detail_text=request.form.get('detail_text', ''),
+            image_filename=img or '',
         )
         db.session.add(p)
         db.session.commit()
@@ -237,6 +270,12 @@ def project_edit(pid):
         p.demo_url = request.form.get('demo_url', '')
         p.period = request.form.get('period', '')
         p.order = int(request.form.get('order', 0))
+        p.detail_text = request.form.get('detail_text', '')
+        img = save_uploaded_image(request.files.get('image'))
+        if img:
+            p.image_filename = img
+        elif request.form.get('remove_image'):
+            p.image_filename = ''
         db.session.commit()
         flash('프로젝트가 수정되었습니다.')
         return redirect(url_for('admin_dashboard'))

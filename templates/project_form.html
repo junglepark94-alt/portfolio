@@ -3,7 +3,7 @@
 {% block content %}
 <div class="container" style="padding-top:6rem; max-width:640px;">
   <h2>{{ '프로젝트 수정' if project else '새 프로젝트 추가' }}</h2>
-  <form method="POST" style="margin-top:2rem;">
+  <form method="POST" enctype="multipart/form-data" style="margin-top:2rem;">
     <div class="form-group">
       <label>제목 *</label>
       <input type="text" name="title" value="{{ project.title if project else '' }}" required />
@@ -11,6 +11,23 @@
     <div class="form-group">
       <label>설명 *</label>
       <textarea name="description" rows="4" required>{{ project.description if project else '' }}</textarea>
+    </div>
+    <div class="form-group">
+      <label>상세 성과 / 추가 설명</label>
+      <textarea name="detail_text" rows="6" placeholder="주요 성과, 구체적인 수치, 과정 등을 입력하세요.">{{ project.detail_text if project else '' }}</textarea>
+    </div>
+    <div class="form-group">
+      <label>대표 이미지</label>
+      {% if project and project.image_filename %}
+      <div class="img-preview-wrap">
+        <img src="{{ url_for('static', filename='uploads/' + project.image_filename) }}" alt="현재 이미지" class="img-preview" />
+        <label class="img-remove-label">
+          <input type="checkbox" name="remove_image" value="1" /> 이미지 삭제
+        </label>
+      </div>
+      {% endif %}
+      <input type="file" name="image" accept="image/*" style="margin-top:0.5rem;" />
+      <small style="color:var(--muted); display:block; margin-top:0.3rem;">PNG, JPG, WEBP 등 최대 5MB</small>
     </div>
     <div class="form-group">
       <label>기술 스택 (쉼표로 구분)</label>

@@ -73,7 +73,21 @@
     <h2>주요 프로젝트</h2>
     <div class="projects-grid">
       {% for p in projects %}
-      <article class="project-card">
+      <article class="project-card"
+        data-title="{{ p.title | e }}"
+        data-period="{{ p.period | e }}"
+        data-desc="{{ p.description | e }}"
+        data-detail="{{ p.detail_text | e }}"
+        data-tags="{{ p.tech_stack | e }}"
+        data-github="{{ p.github_url | e }}"
+        data-demo="{{ p.demo_url | e }}"
+        data-image="{{ url_for('static', filename='uploads/' + p.image_filename) if p.image_filename else '' }}"
+      >
+        {% if p.image_filename %}
+        <div class="pc-thumb">
+          <img src="{{ url_for('static', filename='uploads/' + p.image_filename) }}" alt="{{ p.title }}" />
+        </div>
+        {% endif %}
         <div class="pc-header">
           <h3 class="pc-title">{{ p.title }}</h3>
           {% if p.period %}<span class="pc-period">{{ p.period }}</span>{% endif %}
@@ -84,9 +98,14 @@
           <span class="tag">{{ t }}</span>
           {% endfor %}
         </div>
-        <div class="pc-links">
-          {% if p.github_url %}<a href="{{ p.github_url }}" class="pc-link" target="_blank" rel="noopener">GitHub →</a>{% endif %}
-          {% if p.demo_url %}<a href="{{ p.demo_url }}" class="pc-link" target="_blank" rel="noopener">Demo →</a>{% endif %}
+        <div class="pc-footer">
+          <div class="pc-links">
+            {% if p.github_url %}<a href="{{ p.github_url }}" class="pc-link" target="_blank" rel="noopener">GitHub →</a>{% endif %}
+            {% if p.demo_url %}<a href="{{ p.demo_url }}" class="pc-link" target="_blank" rel="noopener">Demo →</a>{% endif %}
+          </div>
+          {% if p.detail_text %}
+          <span class="pc-more">자세히 보기 →</span>
+          {% endif %}
         </div>
       </article>
       {% else %}
@@ -134,5 +153,26 @@
     </div>
   </div>
 </section>
+
+<!-- ── Project Detail Modal ─────────────────────── -->
+<div class="modal-overlay" id="projectModal" aria-hidden="true">
+  <div class="modal-box" role="dialog" aria-modal="true">
+    <button class="modal-close" id="modalClose" aria-label="닫기">×</button>
+    <div class="modal-image-wrap" id="modalImageWrap" style="display:none;">
+      <img id="modalImage" src="" alt="" />
+    </div>
+    <div class="modal-body">
+      <div class="modal-eyebrow" id="modalPeriod"></div>
+      <h3 class="modal-title" id="modalTitle"></h3>
+      <p class="modal-desc" id="modalDesc"></p>
+      <div class="modal-detail-block" id="modalDetailBlock" style="display:none;">
+        <div class="modal-detail-label">주요 성과 &amp; 상세 설명</div>
+        <div class="modal-detail" id="modalDetail"></div>
+      </div>
+      <div class="pc-tags" id="modalTags" style="margin-top:1.25rem;"></div>
+      <div class="modal-links" id="modalLinks"></div>
+    </div>
+  </div>
+</div>
 
 {% endblock %}
