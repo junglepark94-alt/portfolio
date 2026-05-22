@@ -37,24 +37,33 @@
     <!-- ── 핵심 역량 ── -->
     <div class="form-card">
       <div class="fc-title">핵심 역량</div>
-      <div class="form-hint" style="margin-bottom:1rem;">역량명과 숙련도(상/중/하)를 함께 입력하세요.</div>
-      <div id="skillRows">
-        {% if profile.skills_with_level %}
-          {% for sk in profile.skills_with_level %}
+      <div class="form-group">
+        <input type="text" name="skills" value="{{ profile.skills }}" placeholder="콘텐츠 기획,마케팅 전략,데이터 분석" />
+        <div class="form-hint">쉼표(,)로 구분합니다.</div>
+      </div>
+    </div>
+
+    <!-- ── 스킬 ── -->
+    <div class="form-card">
+      <div class="fc-title">스킬</div>
+      <div class="form-hint" style="margin-bottom:1rem;">다룰 수 있는 툴·기술과 숙련도를 입력하세요.</div>
+      <div id="toolRows">
+        {% if profile.tools %}
+          {% for tk in profile.tools %}
           <div class="skill-row">
-            <input type="text" name="skill_name" placeholder="역량명 (예: 콘텐츠 기획)" value="{{ sk.name }}" />
-            <select name="skill_level">
-              <option value="상" {% if sk.level == '상' %}selected{% endif %}>상</option>
-              <option value="중" {% if sk.level == '중' %}selected{% endif %}>중</option>
-              <option value="하" {% if sk.level == '하' %}selected{% endif %}>하</option>
+            <input type="text" name="tool_name" placeholder="툴/기술명 (예: Figma, Python)" value="{{ tk.name }}" />
+            <select name="tool_level">
+              <option value="상" {% if tk.level == '상' %}selected{% endif %}>상</option>
+              <option value="중" {% if tk.level == '중' %}selected{% endif %}>중</option>
+              <option value="하" {% if tk.level == '하' %}selected{% endif %}>하</option>
             </select>
             <button type="button" class="link-remove-btn" onclick="removeRow(this)">×</button>
           </div>
           {% endfor %}
         {% else %}
           <div class="skill-row">
-            <input type="text" name="skill_name" placeholder="역량명 (예: 콘텐츠 기획)" />
-            <select name="skill_level">
+            <input type="text" name="tool_name" placeholder="툴/기술명 (예: Figma, Python)" />
+            <select name="tool_level">
               <option value="상">상</option>
               <option value="중" selected>중</option>
               <option value="하">하</option>
@@ -63,7 +72,7 @@
           </div>
         {% endif %}
       </div>
-      <button type="button" class="btn-add-link" onclick="addSkill()">+ 역량 추가</button>
+      <button type="button" class="btn-add-link" onclick="addTool()">+ 스킬 추가</button>
     </div>
 
     <!-- ── 학력 ── -->
@@ -241,18 +250,18 @@
 <script>
 function removeRow(el) { el.remove(); }
 
-function addSkill() {
+function addTool() {
   const row = document.createElement('div');
   row.className = 'skill-row';
   row.innerHTML = `
-    <input type="text" name="skill_name" placeholder="역량명 (예: 콘텐츠 기획)" />
-    <select name="skill_level">
+    <input type="text" name="tool_name" placeholder="툴/기술명 (예: Figma, Python)" />
+    <select name="tool_level">
       <option value="상">상</option>
       <option value="중" selected>중</option>
       <option value="하">하</option>
     </select>
     <button type="button" class="link-remove-btn" onclick="removeRow(this)">×</button>`;
-  document.getElementById('skillRows').appendChild(row);
+  document.getElementById('toolRows').appendChild(row);
 }
 
 function addEdu() {

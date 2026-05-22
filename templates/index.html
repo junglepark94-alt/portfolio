@@ -65,14 +65,26 @@
     {% endif %}
 
     <!-- 핵심 역량 -->
-    {% if profile.skills_with_level %}
+    {% if profile.skill_list %}
     <div class="about-skills-wrap">
       <h4 class="about-block-title">핵심 역량</h4>
+      <ul class="skill-list">
+        {% for s in profile.skill_list %}
+        <li><span class="skill-tag">{{ s }}</span></li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    <!-- 스킬 -->
+    {% if profile.tools %}
+    <div class="about-skills-wrap">
+      <h4 class="about-block-title">스킬</h4>
       <ul class="skill-level-list">
-        {% for sk in profile.skills_with_level %}
+        {% for tk in profile.tools %}
         <li>
-          <span class="skill-tag">{{ sk.name }}</span>
-          <span class="level-badge level-{{ '상' if sk.level == '상' else ('하' if sk.level == '하' else '중') }}">{{ sk.level }}</span>
+          <span class="skill-tag">{{ tk.name }}</span>
+          <span class="level-badge level-{{ tk.level }}">{{ tk.level }}</span>
         </li>
         {% endfor %}
       </ul>

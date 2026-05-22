@@ -101,6 +101,8 @@ class Profile(db.Model):
     awards_json = db.Column(db.Text, default='[]')
     # 핵심 역량 with 레벨 [{name, level}]  level: 상|중|하
     skills_json = db.Column(db.Text, default='[]')
+    # 스킬/툴 [{name, level}]
+    tools_json = db.Column(db.Text, default='[]')
 
     @property
     def skill_list(self):
@@ -111,6 +113,14 @@ class Profile(db.Model):
         import json as _j
         try:
             return _j.loads(self.skills_json or '[]')
+        except Exception:
+            return []
+
+    @property
+    def tools(self):
+        import json as _j
+        try:
+            return _j.loads(self.tools_json or '[]')
         except Exception:
             return []
 
@@ -152,6 +162,7 @@ def init_db():
             "ALTER TABLE profile ADD COLUMN education_json TEXT DEFAULT '[]'",
             "ALTER TABLE profile ADD COLUMN awards_json TEXT DEFAULT '[]'",
             "ALTER TABLE profile ADD COLUMN skills_json TEXT DEFAULT '[]'",
+            "ALTER TABLE profile ADD COLUMN tools_json TEXT DEFAULT '[]'",
         ]:
             try:
                 conn.execute(db.text(sql))
@@ -296,13 +307,15 @@ def profile_edit():
         profile.github_url = request.form.get('github_url', '')
         profile.blog_url = request.form.get('blog_url', '')
 
-        # 핵심 역량 (with level)
-        skill_names  = request.form.getlist('skill_name')
-        skill_levels = request.form.getlist('skill_level')
-        skills = [{'name': n.strip(), 'level': l}
-                  for n, l in zip(skill_names, skill_levels) if n.strip()]
-        profile.skills_json = json.dumps(skills, ensure_ascii=False)
-        profile.skills = ','.join(s['name'] for s in skills)  # 하위 호환
+        # 핵심 역량 (단순 목록)
+        profile.skills = request.form.get('skills', '')
+
+        # 스킬/툴 (with level)
+        tool_names  = request.form.getlist('tool_name')
+        tool_levels = request.form.getlist('tool_level')
+        tools = [{'name': n.strip(), 'level': l}
+                 for n, l in zip(tool_names, tool_levels) if n.strip()]
+        profile.tools_json = json.dumps(tools, ensure_ascii=False)
 
         # 학력
         edu_schools  = request.form.getlist('edu_school')
