@@ -1042,14 +1042,117 @@ ul { list-style: none; }
 .btn-sm:hover { opacity: 0.75; }
 .btn-danger { background: #fde8e8; color: #b91c1c; }
 
+/* ── Hamburger ──────────────────────────────── */
+.nav-hamburger {
+  display: none;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 22px;
+  height: 16px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+.nav-hamburger span {
+  display: block;
+  width: 100%;
+  height: 2px;
+  background: var(--text);
+  border-radius: 2px;
+  transition: transform 0.25s ease, opacity 0.25s ease;
+}
+.nav-hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.nav-hamburger.open span:nth-child(2) { opacity: 0; transform: scaleX(0); }
+.nav-hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+/* ── Mobile Nav Menu ────────────────────────── */
+.nav-mobile-menu {
+  display: none;
+  position: fixed;
+  top: 60px;
+  left: 0; right: 0; bottom: 0;
+  background: var(--bg);
+  z-index: 998;
+  overflow-y: auto;
+  border-top: 1px solid var(--border);
+  padding: 0.5rem 1.5rem 2rem;
+}
+.nav-mobile-menu.open { display: block; }
+.nav-mobile-links { list-style: none; }
+.nav-mobile-links li { border-bottom: 1px solid var(--border); }
+.nav-mobile-links li:last-child { border-bottom: none; }
+.nav-mobile-links a {
+  display: block;
+  padding: 1rem 0;
+  font-size: 1.05rem;
+  font-weight: 500;
+  color: var(--text);
+  text-decoration: none;
+}
+.nav-mobile-links a:active { color: var(--accent); }
+
 /* ── Responsive ─────────────────────────────── */
 @media (max-width: 768px) {
+  /* Nav */
   .nav-links { display: none; }
-  .hero-name { font-size: 2.5rem; }
-  .section { padding: 4rem 0; }
+  .nav-admin-btn { display: none; }
+  .nav-hamburger { display: flex; }
+
+  /* Layout */
+  .container { padding: 0 1.25rem; }
+  .section { padding: 3.5rem 0; }
+
+  /* Hero */
+  .hero-inner { padding: 5rem 1.25rem 3rem; }
+  .hero-name { font-size: 2.4rem; }
+  .hero-sub { font-size: 1rem; }
+  .hero-cta { flex-direction: column; gap: 0.75rem; }
+  .hero-cta .btn { width: 100%; text-align: center; }
+
+  /* About */
   .about-summary-grid { grid-template-columns: 1fr; gap: 1.5rem; }
+
+  /* Timeline */
+  .timeline { gap: 1.25rem; }
+  .timeline-item { padding: 1.25rem; }
+  .timeline-meta { flex-direction: column; gap: 0.15rem; }
+
+  /* Projects */
+  .project-card { padding: 1.25rem; }
+  .pc-thumb { height: 160px; }
+  .pc-header { flex-wrap: wrap; }
+  .pc-footer { flex-wrap: wrap; gap: 0.5rem; }
+
+  /* Gallery */
+  .gallery-scroll { padding: 0.5rem 1.25rem 1rem; }
+  .gallery-card { width: 200px; }
+
+  /* Contact */
   .contact-grid { grid-template-columns: 1fr; }
+
+  /* Modal — 하단 시트 */
+  .modal-overlay { align-items: flex-end; }
+  .modal-box {
+    max-width: 100%;
+    max-height: 92dvh;
+    border-radius: calc(var(--radius) * 2) calc(var(--radius) * 2) 0 0;
+    margin: 0;
+  }
+  .modal-body { padding: 1.25rem 1.25rem 2rem; }
+  .modal-image-wrap { max-height: 44vw; }
+
+  /* Footer */
+  .site-footer { padding: 1.5rem 1.25rem; }
+
+  /* Admin forms */
   .form-row-3 { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 600px) {
+  .form-row-2 { grid-template-columns: 1fr; }
+  .asc-header { flex-direction: column; align-items: flex-start; gap: 1rem; }
 }
 
 /* ── Open-to-Work Badge ──────────────────────── */

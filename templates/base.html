@@ -35,8 +35,28 @@
       {% else %}
       <a href="{{ url_for('login') }}" class="nav-admin-btn">관리자</a>
       {% endif %}
+      <button class="nav-hamburger" id="navHamburger" aria-label="메뉴" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
     </nav>
   </header>
+
+  <div class="nav-mobile-menu" id="navMobileMenu" aria-hidden="true">
+    <ul class="nav-mobile-links">
+      <li><a href="#about">About</a></li>
+      <li><a href="#experience">Experience</a></li>
+      <li><a href="#projects">Projects</a></li>
+      <li><a href="#gallery">Gallery</a></li>
+      <li><a href="#contact">Contact</a></li>
+      <li>
+        {% if session.get('logged_in') %}
+        <a href="{{ url_for('admin_dashboard') }}">관리자</a>
+        {% else %}
+        <a href="{{ url_for('login') }}">관리자</a>
+        {% endif %}
+      </li>
+    </ul>
+  </div>
 
   <main>
     {% with messages = get_flashed_messages() %}
