@@ -8,6 +8,18 @@
     <a href="{{ url_for('logout') }}" class="btn btn-ghost btn-sm-text">로그아웃</a>
   </div>
 
+  {% if db_info.warning %}
+  <div class="db-warning-banner">
+    ⚠️ <strong>데이터베이스 경고</strong> — 현재 SQLite를 사용 중입니다. 재배포할 때마다 모든 데이터가 삭제됩니다.<br>
+    Railway 대시보드 → 프로젝트 → <strong>Variables</strong> 탭에서 <code>DATABASE_URL</code>이 설정되어 있는지 확인하세요.<br>
+    PostgreSQL 서비스가 없다면 Railway에서 <strong>+ New → Database → PostgreSQL</strong>을 추가한 뒤 앱에 연결하세요.
+  </div>
+  {% else %}
+  <div class="db-ok-banner">
+    DB: {{ db_info.engine }}
+  </div>
+  {% endif %}
+
   <!-- 프로필 카드 -->
   <div class="admin-section-card">
     <div class="asc-header">

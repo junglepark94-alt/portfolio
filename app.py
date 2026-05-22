@@ -9,14 +9,26 @@ import time
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-change-in-prod')
 
-_db_url = os.environ.get('DATABASE_URL', 'sqlite:///portfolio.db')
+_db_url = os.environ.get('DATABASE_URL', '')
 # Railway/Heroku는 postgres:// 를 제공하지만 SQLAlchemy 1.4+는 postgresql:// 필요
 if _db_url.startswith('postgres://'):
     _db_url = _db_url.replace('postgres://', 'postgresql://', 1)
+
+_is_production = bool(os.environ.get('PORT'))  # Railway는 PORT를 주입함
+_using_sqlite = not _db_url or _db_url.startswith('sqlite')
+
+if _using_sqlite:
+    _db_url = 'sqlite:///portfolio.db'
+    if _is_production:
+        print("=" * 60)
+        print("WARNING: DATABASE_URL is not set. Using SQLite.")
+        print("Data WILL be lost on every redeploy!")
+        print("Set DATABASE_URL in Railway environment variables.")
+        print("=" * 60)
+
 app.config['SQLALCHEMY_DATABASE_URI'] = _db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-print(f"[DB] Using: {_db_url[:40]}...")
+print(f"[DB] engine={'SQLite (ephemeral!)' if _using_sqlite else 'PostgreSQL'}")
 app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
 app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5MB
 
@@ -289,7 +301,11 @@ def login_required(f):
 def admin_dashboard():
     projects = Project.query.order_by(Project.order, Project.created_at.desc()).all()
     profile = db.session.get(Profile, 1)
-    return render_template('admin.html', projects=projects, profile=profile)
+    db_info = {
+        'engine': 'SQLite ⚠️ (재배포 시 데이터 소멸)' if _using_sqlite else 'PostgreSQL ✅',
+        'warning': _using_sqlite and _is_production,
+    }
+    return render_template('admin.html', projects=projects, profile=profile, db_info=db_info)
 
 
 @app.route('/admin/profile', methods=['GET', 'POST'])
