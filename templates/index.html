@@ -21,7 +21,7 @@
 <section class="section" id="about">
   <div class="container">
     <div class="section-label">About</div>
-    <h2>경력 요약</h2>
+    <h2>프로필</h2>
 
     <!-- 소개 본문 -->
     <div class="about-intro">
@@ -30,23 +30,9 @@
       {% endfor %}
     </div>
 
-    <!-- 재직 이력 / 학력 / 수상내역 -->
-    {% if profile.experience or profile.education or profile.awards %}
+    <!-- 학력 / 수상내역 -->
+    {% if profile.education or profile.awards %}
     <div class="about-summary-grid">
-      {% if profile.experience %}
-      <div class="about-block">
-        <h4 class="about-block-title">재직 이력</h4>
-        <ul class="about-list">
-          {% for exp in profile.experience %}
-          <li class="about-list-item">
-            <span class="ali-period">{{ exp.period }}</span>
-            <span class="ali-main">{{ exp.company }}</span>
-            <span class="ali-sub">{{ exp.role }}</span>
-          </li>
-          {% endfor %}
-        </ul>
-      </div>
-      {% endif %}
       {% if profile.education %}
       <div class="about-block">
         <h4 class="about-block-title">학력</h4>
