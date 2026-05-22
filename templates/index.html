@@ -21,22 +21,78 @@
 <section class="section" id="about">
   <div class="container">
     <div class="section-label">About</div>
-    <div class="about-grid">
-      <div class="about-text">
-        <h2>경력 요약</h2>
-        {% for line in profile.about_text.split('\n') if line.strip() %}
-        <p>{{ line }}</p>
-        {% endfor %}
-      </div>
-      <div class="about-skills">
-        <h3>핵심 역량</h3>
-        <ul class="skill-list">
-          {% for s in profile.skill_list %}
-          <li><span class="skill-tag">{{ s }}</span></li>
+    <h2>경력 요약</h2>
+
+    <!-- 소개 본문 -->
+    <div class="about-intro">
+      {% for line in profile.about_text.split('\n') if line.strip() %}
+      <p>{{ line }}</p>
+      {% endfor %}
+    </div>
+
+    <!-- 재직 이력 / 학력 / 수상내역 -->
+    {% if profile.experience or profile.education or profile.awards %}
+    <div class="about-summary-grid">
+      {% if profile.experience %}
+      <div class="about-block">
+        <h4 class="about-block-title">재직 이력</h4>
+        <ul class="about-list">
+          {% for exp in profile.experience %}
+          <li class="about-list-item">
+            <span class="ali-period">{{ exp.period }}</span>
+            <span class="ali-main">{{ exp.company }}</span>
+            <span class="ali-sub">{{ exp.role }}</span>
+          </li>
           {% endfor %}
         </ul>
       </div>
+      {% endif %}
+      {% if profile.education %}
+      <div class="about-block">
+        <h4 class="about-block-title">학력</h4>
+        <ul class="about-list">
+          {% for ed in profile.education %}
+          <li class="about-list-item">
+            <span class="ali-period">{{ ed.period }}</span>
+            <span class="ali-main">{{ ed.school }}</span>
+            <span class="ali-sub">{{ ed.major }}{% if ed.degree %} · {{ ed.degree }}{% endif %}</span>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+      {% if profile.awards %}
+      <div class="about-block">
+        <h4 class="about-block-title">수상내역</h4>
+        <ul class="about-list">
+          {% for aw in profile.awards %}
+          <li class="about-list-item">
+            <span class="ali-period">{{ aw.year }}</span>
+            <span class="ali-main">{{ aw.title }}</span>
+            {% if aw.org %}<span class="ali-sub">{{ aw.org }}</span>{% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
     </div>
+    {% endif %}
+
+    <!-- 핵심 역량 -->
+    {% if profile.skills_with_level %}
+    <div class="about-skills-wrap">
+      <h4 class="about-block-title">핵심 역량</h4>
+      <ul class="skill-level-list">
+        {% for sk in profile.skills_with_level %}
+        <li>
+          <span class="skill-tag">{{ sk.name }}</span>
+          <span class="level-badge level-{{ '상' if sk.level == '상' else ('하' if sk.level == '하' else '중') }}">{{ sk.level }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
   </div>
 </section>
 

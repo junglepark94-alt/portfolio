@@ -32,11 +32,144 @@
         <textarea name="about_text" rows="4" placeholder="자신을 소개하는 글을 입력하세요.">{{ profile.about_text }}</textarea>
         <div class="form-hint">줄바꿈으로 문단을 구분합니다.</div>
       </div>
-      <div class="form-group">
-        <label>핵심 역량</label>
-        <input type="text" name="skills" value="{{ profile.skills }}" placeholder="콘텐츠 기획,마케팅 전략,Python" />
-        <div class="form-hint">쉼표(,)로 구분합니다.</div>
+    </div>
+
+    <!-- ── 핵심 역량 ── -->
+    <div class="form-card">
+      <div class="fc-title">핵심 역량</div>
+      <div class="form-hint" style="margin-bottom:1rem;">역량명과 숙련도(상/중/하)를 함께 입력하세요.</div>
+      <div id="skillRows">
+        {% if profile.skills_with_level %}
+          {% for sk in profile.skills_with_level %}
+          <div class="skill-row">
+            <input type="text" name="skill_name" placeholder="역량명 (예: 콘텐츠 기획)" value="{{ sk.name }}" />
+            <select name="skill_level">
+              <option value="상" {% if sk.level == '상' %}selected{% endif %}>상</option>
+              <option value="중" {% if sk.level == '중' %}selected{% endif %}>중</option>
+              <option value="하" {% if sk.level == '하' %}selected{% endif %}>하</option>
+            </select>
+            <button type="button" class="link-remove-btn" onclick="removeRow(this)">×</button>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="skill-row">
+            <input type="text" name="skill_name" placeholder="역량명 (예: 콘텐츠 기획)" />
+            <select name="skill_level">
+              <option value="상">상</option>
+              <option value="중" selected>중</option>
+              <option value="하">하</option>
+            </select>
+            <button type="button" class="link-remove-btn" onclick="removeRow(this)">×</button>
+          </div>
+        {% endif %}
       </div>
+      <button type="button" class="btn-add-link" onclick="addSkill()">+ 역량 추가</button>
+    </div>
+
+    <!-- ── 학력 ── -->
+    <div class="form-card">
+      <div class="fc-title">학력</div>
+      <div id="eduRows">
+        {% if profile.education %}
+          {% for ed in profile.education %}
+          <div class="edu-item">
+            <div class="form-row-2">
+              <div class="form-group">
+                <label>학교명</label>
+                <input type="text" name="edu_school" value="{{ ed.school }}" placeholder="OO대학교" />
+              </div>
+              <div class="form-group">
+                <label>기간</label>
+                <input type="text" name="edu_period" value="{{ ed.period }}" placeholder="2018.03 – 2022.02" />
+              </div>
+            </div>
+            <div class="form-row-2">
+              <div class="form-group">
+                <label>전공</label>
+                <input type="text" name="edu_major" value="{{ ed.major }}" placeholder="경영학과" />
+              </div>
+              <div class="form-group">
+                <label>학위</label>
+                <input type="text" name="edu_degree" value="{{ ed.degree }}" placeholder="학사" />
+              </div>
+            </div>
+            <button type="button" class="btn-sm btn-danger" onclick="removeRow(this.closest('.edu-item'))">삭제</button>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="edu-item">
+            <div class="form-row-2">
+              <div class="form-group">
+                <label>학교명</label>
+                <input type="text" name="edu_school" placeholder="OO대학교" />
+              </div>
+              <div class="form-group">
+                <label>기간</label>
+                <input type="text" name="edu_period" placeholder="2018.03 – 2022.02" />
+              </div>
+            </div>
+            <div class="form-row-2">
+              <div class="form-group">
+                <label>전공</label>
+                <input type="text" name="edu_major" placeholder="경영학과" />
+              </div>
+              <div class="form-group">
+                <label>학위</label>
+                <input type="text" name="edu_degree" placeholder="학사" />
+              </div>
+            </div>
+            <button type="button" class="btn-sm btn-danger" onclick="removeRow(this.closest('.edu-item'))">삭제</button>
+          </div>
+        {% endif %}
+      </div>
+      <button type="button" class="btn-add-link" onclick="addEdu()" style="margin-top:0.5rem;">+ 학력 추가</button>
+    </div>
+
+    <!-- ── 수상내역 ── -->
+    <div class="form-card">
+      <div class="fc-title">수상내역</div>
+      <div id="awardRows">
+        {% if profile.awards %}
+          {% for aw in profile.awards %}
+          <div class="award-item">
+            <div class="form-row-3">
+              <div class="form-group">
+                <label>수상명</label>
+                <input type="text" name="award_title" value="{{ aw.title }}" placeholder="우수사원상" />
+              </div>
+              <div class="form-group">
+                <label>수여 기관</label>
+                <input type="text" name="award_org" value="{{ aw.org }}" placeholder="빙그레" />
+              </div>
+              <div class="form-group">
+                <label>연도</label>
+                <input type="text" name="award_year" value="{{ aw.year }}" placeholder="2023" />
+              </div>
+            </div>
+            <button type="button" class="btn-sm btn-danger" onclick="removeRow(this.closest('.award-item'))">삭제</button>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="award-item">
+            <div class="form-row-3">
+              <div class="form-group">
+                <label>수상명</label>
+                <input type="text" name="award_title" placeholder="우수사원상" />
+              </div>
+              <div class="form-group">
+                <label>수여 기관</label>
+                <input type="text" name="award_org" placeholder="빙그레" />
+              </div>
+              <div class="form-group">
+                <label>연도</label>
+                <input type="text" name="award_year" placeholder="2023" />
+              </div>
+            </div>
+            <button type="button" class="btn-sm btn-danger" onclick="removeRow(this.closest('.award-item'))">삭제</button>
+          </div>
+        {% endif %}
+      </div>
+      <button type="button" class="btn-add-link" onclick="addAward()" style="margin-top:0.5rem;">+ 수상내역 추가</button>
     </div>
 
     <!-- ── 연락처 / SNS ── -->
@@ -62,15 +195,15 @@
       </div>
     </div>
 
-    <!-- ── 경력 ── -->
+    <!-- ── 재직 이력 ── -->
     <div class="form-card">
-      <div class="fc-title">경력 사항</div>
+      <div class="fc-title">재직 이력</div>
       <div id="exp-list">
         {% for exp in profile.experience %}
         <div class="exp-item">
           <div class="exp-item-header">
-            <span class="exp-num">경력 {{ loop.index }}</span>
-            <button type="button" class="btn-sm btn-danger" onclick="removeExp(this)">삭제</button>
+            <span class="exp-num">이력 {{ loop.index }}</span>
+            <button type="button" class="btn-sm btn-danger" onclick="removeRow(this.closest('.exp-item'))">삭제</button>
           </div>
           <div class="form-row-2">
             <div class="form-group">
@@ -93,7 +226,7 @@
         </div>
         {% endfor %}
       </div>
-      <button type="button" class="btn btn-ghost" onclick="addExp()" style="margin-top:1rem;">+ 경력 추가</button>
+      <button type="button" class="btn-add-link" onclick="addExp()" style="margin-top:0.5rem;">+ 이력 추가</button>
     </div>
 
     <div class="form-actions">
@@ -106,42 +239,68 @@
 </div>
 
 <script>
-let expCount = {{ profile.experience | length }};
+function removeRow(el) { el.remove(); }
 
+function addSkill() {
+  const row = document.createElement('div');
+  row.className = 'skill-row';
+  row.innerHTML = `
+    <input type="text" name="skill_name" placeholder="역량명 (예: 콘텐츠 기획)" />
+    <select name="skill_level">
+      <option value="상">상</option>
+      <option value="중" selected>중</option>
+      <option value="하">하</option>
+    </select>
+    <button type="button" class="link-remove-btn" onclick="removeRow(this)">×</button>`;
+  document.getElementById('skillRows').appendChild(row);
+}
+
+function addEdu() {
+  const div = document.createElement('div');
+  div.className = 'edu-item';
+  div.innerHTML = `
+    <div class="form-row-2">
+      <div class="form-group"><label>학교명</label><input type="text" name="edu_school" placeholder="OO대학교" /></div>
+      <div class="form-group"><label>기간</label><input type="text" name="edu_period" placeholder="2018.03 – 2022.02" /></div>
+    </div>
+    <div class="form-row-2">
+      <div class="form-group"><label>전공</label><input type="text" name="edu_major" placeholder="경영학과" /></div>
+      <div class="form-group"><label>학위</label><input type="text" name="edu_degree" placeholder="학사" /></div>
+    </div>
+    <button type="button" class="btn-sm btn-danger" onclick="removeRow(this.closest('.edu-item'))">삭제</button>`;
+  document.getElementById('eduRows').appendChild(div);
+}
+
+function addAward() {
+  const div = document.createElement('div');
+  div.className = 'award-item';
+  div.innerHTML = `
+    <div class="form-row-3">
+      <div class="form-group"><label>수상명</label><input type="text" name="award_title" placeholder="우수사원상" /></div>
+      <div class="form-group"><label>수여 기관</label><input type="text" name="award_org" placeholder="빙그레" /></div>
+      <div class="form-group"><label>연도</label><input type="text" name="award_year" placeholder="2023" /></div>
+    </div>
+    <button type="button" class="btn-sm btn-danger" onclick="removeRow(this.closest('.award-item'))">삭제</button>`;
+  document.getElementById('awardRows').appendChild(div);
+}
+
+let expCount = {{ profile.experience | length }};
 function addExp() {
   expCount++;
-  const list = document.getElementById('exp-list');
   const div = document.createElement('div');
   div.className = 'exp-item';
   div.innerHTML = `
     <div class="exp-item-header">
-      <span class="exp-num">경력 ${expCount}</span>
-      <button type="button" class="btn-sm btn-danger" onclick="removeExp(this)">삭제</button>
+      <span class="exp-num">이력 ${expCount}</span>
+      <button type="button" class="btn-sm btn-danger" onclick="removeRow(this.closest('.exp-item'))">삭제</button>
     </div>
     <div class="form-row-2">
-      <div class="form-group">
-        <label>회사명</label>
-        <input type="text" name="exp_company" placeholder="회사명" />
-      </div>
-      <div class="form-group">
-        <label>기간</label>
-        <input type="text" name="exp_period" placeholder="2022.03 – 현재" />
-      </div>
+      <div class="form-group"><label>회사명</label><input type="text" name="exp_company" placeholder="회사명" /></div>
+      <div class="form-group"><label>기간</label><input type="text" name="exp_period" placeholder="2022.03 – 현재" /></div>
     </div>
-    <div class="form-group">
-      <label>직책 / 역할</label>
-      <input type="text" name="exp_role" placeholder="직책" />
-    </div>
-    <div class="form-group">
-      <label>주요 업무</label>
-      <textarea name="exp_bullets" rows="4" placeholder="줄바꿈으로 항목을 구분합니다."></textarea>
-    </div>
-  `;
-  list.appendChild(div);
-}
-
-function removeExp(btn) {
-  btn.closest('.exp-item').remove();
+    <div class="form-group"><label>직책 / 역할</label><input type="text" name="exp_role" placeholder="직책" /></div>
+    <div class="form-group"><label>주요 업무</label><textarea name="exp_bullets" rows="4" placeholder="줄바꿈으로 항목을 구분합니다."></textarea></div>`;
+  document.getElementById('exp-list').appendChild(div);
 }
 </script>
 {% endblock %}

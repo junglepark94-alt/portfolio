@@ -95,16 +95,46 @@ class Profile(db.Model):
     blog_url = db.Column(db.String(300), default='')
     # 경력 (JSON string: list of {company, period, role, bullets})
     experience_json = db.Column(db.Text, default='[]')
+    # 학력 [{school, major, degree, period}]
+    education_json = db.Column(db.Text, default='[]')
+    # 수상내역 [{title, org, year}]
+    awards_json = db.Column(db.Text, default='[]')
+    # 핵심 역량 with 레벨 [{name, level}]  level: 상|중|하
+    skills_json = db.Column(db.Text, default='[]')
 
     @property
     def skill_list(self):
         return [s.strip() for s in self.skills.split(',') if s.strip()]
 
     @property
+    def skills_with_level(self):
+        import json as _j
+        try:
+            return _j.loads(self.skills_json or '[]')
+        except Exception:
+            return []
+
+    @property
     def experience(self):
         import json
         try:
             return json.loads(self.experience_json or '[]')
+        except Exception:
+            return []
+
+    @property
+    def education(self):
+        import json as _j
+        try:
+            return _j.loads(self.education_json or '[]')
+        except Exception:
+            return []
+
+    @property
+    def awards(self):
+        import json as _j
+        try:
+            return _j.loads(self.awards_json or '[]')
         except Exception:
             return []
 
@@ -119,6 +149,9 @@ def init_db():
             "ALTER TABLE project ADD COLUMN image_filename VARCHAR(300) DEFAULT ''",
             "ALTER TABLE project ADD COLUMN detail_text TEXT DEFAULT ''",
             "ALTER TABLE project ADD COLUMN links_json TEXT DEFAULT '[]'",
+            "ALTER TABLE profile ADD COLUMN education_json TEXT DEFAULT '[]'",
+            "ALTER TABLE profile ADD COLUMN awards_json TEXT DEFAULT '[]'",
+            "ALTER TABLE profile ADD COLUMN skills_json TEXT DEFAULT '[]'",
         ]:
             try:
                 conn.execute(db.text(sql))
@@ -145,6 +178,19 @@ def init_db():
                     db.text("UPDATE project SET links_json = :lj WHERE id = :id"),
                     {'lj': _json.dumps(links, ensure_ascii=False), 'id': row[0]}
                 )
+
+        # skills → skills_json 마이그레이션
+        p_rows = conn.execute(db.text("SELECT id, skills, skills_json FROM profile")).fetchall()
+        for row in p_rows:
+            if row[2] and row[2] != '[]':
+                continue
+            if row[1]:
+                sj = _json.dumps(
+                    [{'name': s.strip(), 'level': '중'} for s in row[1].split(',') if s.strip()],
+                    ensure_ascii=False
+                )
+                conn.execute(db.text("UPDATE profile SET skills_json = :sj WHERE id = :id"),
+                             {'sj': sj, 'id': row[0]})
         conn.commit()
     if not Admin.query.first():
         admin = Admin(username='admin')
@@ -245,11 +291,38 @@ def profile_edit():
         profile.role = request.form.get('role', '')
         profile.tagline = request.form.get('tagline', '')
         profile.about_text = request.form.get('about_text', '')
-        profile.skills = request.form.get('skills', '')
         profile.email = request.form.get('email', '')
         profile.linkedin_url = request.form.get('linkedin_url', '')
         profile.github_url = request.form.get('github_url', '')
         profile.blog_url = request.form.get('blog_url', '')
+
+        # 핵심 역량 (with level)
+        skill_names  = request.form.getlist('skill_name')
+        skill_levels = request.form.getlist('skill_level')
+        skills = [{'name': n.strip(), 'level': l}
+                  for n, l in zip(skill_names, skill_levels) if n.strip()]
+        profile.skills_json = json.dumps(skills, ensure_ascii=False)
+        profile.skills = ','.join(s['name'] for s in skills)  # 하위 호환
+
+        # 학력
+        edu_schools  = request.form.getlist('edu_school')
+        edu_majors   = request.form.getlist('edu_major')
+        edu_degrees  = request.form.getlist('edu_degree')
+        edu_periods  = request.form.getlist('edu_period')
+        education = [{'school': s.strip(), 'major': edu_majors[i].strip() if i < len(edu_majors) else '',
+                      'degree': edu_degrees[i].strip() if i < len(edu_degrees) else '',
+                      'period': edu_periods[i].strip() if i < len(edu_periods) else ''}
+                     for i, s in enumerate(edu_schools) if s.strip()]
+        profile.education_json = json.dumps(education, ensure_ascii=False)
+
+        # 수상내역
+        award_titles = request.form.getlist('award_title')
+        award_orgs   = request.form.getlist('award_org')
+        award_years  = request.form.getlist('award_year')
+        awards = [{'title': t.strip(), 'org': award_orgs[i].strip() if i < len(award_orgs) else '',
+                   'year': award_years[i].strip() if i < len(award_years) else ''}
+                  for i, t in enumerate(award_titles) if t.strip()]
+        profile.awards_json = json.dumps(awards, ensure_ascii=False)
 
         # 경력 파싱: 폼에서 배열로 받기
         companies = request.form.getlist('exp_company')

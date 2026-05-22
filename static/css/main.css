@@ -209,27 +209,64 @@ ul { list-style: none; }
 }
 
 /* ── About ──────────────────────────────────── */
-.about-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4rem;
-  align-items: start;
-}
-.about-text p {
+.about-intro p {
   color: var(--text-2);
   margin-bottom: 1rem;
   font-size: 1rem;
+  max-width: 720px;
 }
-.about-skills h3 {
-  font-size: 1rem;
+.about-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 2rem;
+  margin-top: 2.5rem;
+}
+.about-block-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--accent-2);
+  font-family: var(--font-mono);
+  margin-bottom: 1rem;
+}
+.about-list { display: flex; flex-direction: column; gap: 0.9rem; }
+.about-list-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding-left: 0.75rem;
+  border-left: 2px solid var(--border);
+}
+.ali-period {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.ali-main {
+  font-size: 0.92rem;
   font-weight: 600;
-  margin-bottom: 1.25rem;
   color: var(--text);
 }
-.skill-list {
+.ali-sub {
+  font-size: 0.82rem;
+  color: var(--text-2);
+}
+.about-skills-wrap {
+  margin-top: 2.5rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--border);
+}
+.skill-level-list {
   display: flex;
   flex-wrap: wrap;
   gap: 0.6rem;
+  margin-top: 0.75rem;
+}
+.skill-level-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
 }
 .skill-tag {
   background: var(--surface);
@@ -240,6 +277,17 @@ ul { list-style: none; }
   font-weight: 500;
   color: var(--text-2);
 }
+.level-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.15rem 0.45rem;
+  border-radius: 3px;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+.level-상 { background: #dcfce7; color: #15803d; }
+.level-중 { background: #fef9c3; color: #a16207; }
+.level-하 { background: #f1f5f9; color: #64748b; }
 
 /* ── Timeline ───────────────────────────────── */
 .timeline { display: flex; flex-direction: column; gap: 2.5rem; }
@@ -620,6 +668,39 @@ ul { list-style: none; }
   border-color: var(--accent);
 }
 
+/* ── Form 3-col row ─────────────────────────── */
+.form-row-3 {
+  display: grid;
+  grid-template-columns: 2fr 1.5fr 1fr;
+  gap: 1rem;
+}
+
+/* ── Skill Rows (profile form) ──────────────── */
+.skill-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+.skill-row input[type="text"] { flex: 1; }
+.skill-row select {
+  flex: 0 0 70px;
+  padding: 0.7rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  background: var(--bg);
+  color: var(--text);
+}
+.edu-item, .award-item {
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+}
+
 /* ── Dynamic Link Rows (project form) ──────── */
 .link-row {
   display: flex;
@@ -721,10 +802,11 @@ ul { list-style: none; }
 /* ── Responsive ─────────────────────────────── */
 @media (max-width: 768px) {
   .nav-links { display: none; }
-  .about-grid { grid-template-columns: 1fr; gap: 2rem; }
   .hero-name { font-size: 2.5rem; }
   .section { padding: 4rem 0; }
+  .about-summary-grid { grid-template-columns: 1fr; gap: 1.5rem; }
   .contact-grid { grid-template-columns: 1fr; }
+  .form-row-3 { grid-template-columns: 1fr; }
 }
 
 /* ── Scroll Reveal ──────────────────────────── */
