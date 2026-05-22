@@ -1198,6 +1198,17 @@ ul { list-style: none; }
   cursor: pointer;
 }
 
+/* ── Hero Fade-in ───────────────────────────── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(22px); }
+  to   { opacity: 1; transform: none; }
+}
+.otw-badge    { animation: fadeUp 0.6s ease both 0s; }
+.hero-eyebrow { animation: fadeUp 0.6s ease both 0.15s; }
+.hero-name    { animation: fadeUp 0.7s ease both 0.3s; }
+.hero-sub     { animation: fadeUp 0.6s ease both 0.52s; }
+.hero-cta     { animation: fadeUp 0.6s ease both 0.72s; }
+
 /* ── Scroll Reveal ──────────────────────────── */
 .reveal {
   opacity: 0;

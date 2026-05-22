@@ -28,11 +28,11 @@
 <!-- ── ABOUT ────────────────────────────────────────── -->
 <section class="section" id="about">
   <div class="container">
-    <div class="section-label">About</div>
-    <h2>프로필</h2>
+    <div class="section-label reveal">About</div>
+    <h2 class="reveal">프로필</h2>
 
     <!-- 소개 본문 -->
-    <div class="about-intro">
+    <div class="about-intro reveal">
       {% for line in profile.about_text.split('\n') if line.strip() %}
       <p>{{ line }}</p>
       {% endfor %}
@@ -40,7 +40,7 @@
 
     <!-- 학력 / 수상내역 -->
     {% if profile.education or profile.awards %}
-    <div class="about-summary-grid">
+    <div class="about-summary-grid reveal">
       {% if profile.education %}
       <div class="about-block">
         <h4 class="about-block-title">학력</h4>
@@ -74,7 +74,7 @@
 
     <!-- 핵심 역량 -->
     {% if profile.skill_list %}
-    <div class="about-skills-wrap">
+    <div class="about-skills-wrap reveal">
       <h4 class="about-block-title">핵심 역량</h4>
       <ul class="skill-list">
         {% for s in profile.skill_list %}
@@ -86,7 +86,7 @@
 
     <!-- 스킬 -->
     {% if profile.tools %}
-    <div class="about-skills-wrap">
+    <div class="about-skills-wrap reveal">
       <h4 class="about-block-title">스킬</h4>
       <ul class="skill-level-list">
         {% for tk in profile.tools %}
@@ -106,11 +106,11 @@
 {% if profile.experience %}
 <section class="section section-alt" id="experience">
   <div class="container">
-    <div class="section-label">Experience</div>
-    <h2>경력 사항</h2>
+    <div class="section-label reveal">Experience</div>
+    <h2 class="reveal">경력 사항</h2>
     <div class="timeline">
       {% for exp in profile.experience %}
-      <div class="timeline-item">
+      <div class="timeline-item reveal">
         <div class="timeline-meta">
           <span class="tl-company">{{ exp.company }}</span>
           <span class="tl-period">{{ exp.period }}</span>
@@ -131,8 +131,8 @@
 <!-- ── PROJECTS ───────────────────────────────────────── -->
 <section class="section" id="projects">
   <div class="container">
-    <div class="section-label">Projects</div>
-    <h2>주요 프로젝트</h2>
+    <div class="section-label reveal">Projects</div>
+    <h2 class="reveal">주요 프로젝트</h2>
     <div class="filter-bar" id="projectFilterBar">
       <button class="filter-btn active" data-cat="">전체</button>
     </div>
@@ -140,7 +140,7 @@
       {% for p in projects %}
       {% set imgs = p.images %}
       {% set main_img = p.main_image %}
-      <article class="project-card"
+      <article class="project-card reveal"
         data-title="{{ p.title | e }}"
         data-period="{{ p.period | e }}"
         data-desc="{{ p.description | e }}"
@@ -195,10 +195,10 @@
 {% if gallery_items %}
 <section class="section section-alt" id="gallery">
   <div class="container">
-    <div class="section-label">Gallery</div>
-    <h2>갤러리</h2>
+    <div class="section-label reveal">Gallery</div>
+    <h2 class="reveal">갤러리</h2>
   </div>
-  <div class="gallery-scroll-wrap">
+  <div class="gallery-scroll-wrap reveal">
     <div class="gallery-scroll" id="galleryScroll">
       {% for item in gallery_items %}
       <div class="gallery-card"
@@ -236,40 +236,40 @@
 <!-- ── CONTACT ───────────────────────────────────────── -->
 <section class="section section-alt" id="contact">
   <div class="container">
-    <div class="section-label">Contact</div>
-    <h2>연락처</h2>
-    <p class="contact-sub">새로운 기회나 협업 제안을 언제든 환영합니다.</p>
+    <div class="section-label reveal">Contact</div>
+    <h2 class="reveal">연락처</h2>
+    <p class="contact-sub reveal">새로운 기회나 협업 제안을 언제든 환영합니다.</p>
     <div class="contact-grid">
       {% if profile.email %}
-      <a href="mailto:{{ profile.email }}" class="contact-card">
+      <a href="mailto:{{ profile.email }}" class="contact-card reveal">
         <span class="cc-icon">✉</span>
         <span class="cc-label">이메일</span>
         <span class="cc-value">{{ profile.email }}</span>
       </a>
       {% endif %}
       {% if profile.linkedin_url %}
-      <a href="{{ profile.linkedin_url }}" class="contact-card" target="_blank" rel="noopener">
+      <a href="{{ profile.linkedin_url }}" class="contact-card reveal" target="_blank" rel="noopener">
         <span class="cc-icon">in</span>
         <span class="cc-label">LinkedIn</span>
         <span class="cc-value">{{ profile.linkedin_url | replace('https://', '') }}</span>
       </a>
       {% endif %}
       {% if profile.github_url %}
-      <a href="{{ profile.github_url }}" class="contact-card" target="_blank" rel="noopener">
+      <a href="{{ profile.github_url }}" class="contact-card reveal" target="_blank" rel="noopener">
         <span class="cc-icon">⌥</span>
         <span class="cc-label">GitHub</span>
         <span class="cc-value">{{ profile.github_url | replace('https://', '') }}</span>
       </a>
       {% endif %}
       {% if profile.blog_url %}
-      <a href="{{ profile.blog_url }}" class="contact-card" target="_blank" rel="noopener">
+      <a href="{{ profile.blog_url }}" class="contact-card reveal" target="_blank" rel="noopener">
         <span class="cc-icon">✍</span>
         <span class="cc-label">Blog</span>
         <span class="cc-value">{{ profile.blog_url | replace('https://', '') }}</span>
       </a>
       {% endif %}
       {% if profile.resume_filename %}
-      <a href="{{ url_for('serve_resume') }}" class="contact-card" target="_blank">
+      <a href="{{ url_for('serve_resume') }}" class="contact-card reveal" target="_blank">
         <span class="cc-icon">📄</span>
         <span class="cc-label">이력서</span>
         <span class="cc-value">PDF 다운로드</span>
@@ -311,5 +311,37 @@
     </div>
   </div>
 </div>
+
+<script>
+(function () {
+  const observer = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) {
+        e.target.classList.add('visible');
+        observer.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.12 });
+
+  // 형제 요소에 순서별 딜레이 (timeline, project card, contact card)
+  ['.timeline-item', '.project-card', '.contact-card'].forEach(function (sel) {
+    const groups = {};
+    document.querySelectorAll(sel + '.reveal').forEach(function (el) {
+      const key = el.parentElement;
+      if (!groups.has) groups[key] = groups[key] || [];
+      groups[key].push(el);
+    });
+    Object.values(groups).forEach(function (els) {
+      els.forEach(function (el, i) {
+        el.style.transitionDelay = Math.min(i * 0.1, 0.4) + 's';
+      });
+    });
+  });
+
+  document.querySelectorAll('.reveal').forEach(function (el) {
+    observer.observe(el);
+  });
+})();
+</script>
 
 {% endblock %}
