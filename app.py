@@ -767,6 +767,74 @@ def youtube_info():
         return _json.dumps({'error': str(e)}), 500, {'Content-Type': 'application/json'}
 
 
+# ── YouTube Playlist API Proxy ───────────────────────────
+
+@app.route('/api/youtube/playlist')
+def youtube_playlist_info():
+    import json as _json, urllib.request as _req, urllib.error as _err, re as _re
+    playlist_id = request.args.get('list', '').strip()
+    if not playlist_id:
+        return _json.dumps({'error': 'no playlist id'}), 400, {'Content-Type': 'application/json'}
+    api_key = os.environ.get('YOUTUBE_API_KEY', '')
+    if not api_key:
+        return _json.dumps({'error': 'YOUTUBE_API_KEY not set'}), 503, {'Content-Type': 'application/json'}
+
+    def fetch(url):
+        with _req.urlopen(url, timeout=8) as r:
+            return _json.loads(r.read())
+
+    def parse_duration(d):
+        m = _re.match(r'PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?', d or '')
+        if not m: return 0
+        h, mn, s = (int(x or 0) for x in m.groups())
+        return h * 3600 + mn * 60 + s
+
+    try:
+        items_data = fetch(
+            'https://www.googleapis.com/youtube/v3/playlistItems'
+            f'?part=contentDetails&maxResults=50&playlistId={playlist_id}&key={api_key}'
+        )
+        video_ids = [it['contentDetails']['videoId'] for it in items_data.get('items', [])]
+        if not video_ids:
+            return _json.dumps({'error': 'empty playlist'}), 404, {'Content-Type': 'application/json'}
+
+        vdata = fetch(
+            'https://www.googleapis.com/youtube/v3/videos'
+            f'?part=snippet,statistics,contentDetails&id={",".join(video_ids)}&key={api_key}'
+        )
+        videos = []
+        for v in vdata.get('items', []):
+            dur = parse_duration(v.get('contentDetails', {}).get('duration', ''))
+            views = int(v.get('statistics', {}).get('viewCount', 0) or 0)
+            videos.append((dur, views, v))
+
+        long_form = [(dur, views, v) for dur, views, v in videos if dur > 60]
+        pool = long_form if long_form else videos
+        pool.sort(key=lambda x: x[1], reverse=True)
+        best = pool[0][2]
+
+        snippet = best.get('snippet', {})
+        stats   = best.get('statistics', {})
+        thumb   = (snippet.get('thumbnails', {}).get('high') or
+                   snippet.get('thumbnails', {}).get('medium') or {}).get('url', '')
+        return app.response_class(
+            response=_json.dumps({
+                'videoUrl':    f"https://www.youtube.com/watch?v={best['id']}",
+                'videoId':     best['id'],
+                'title':       snippet.get('title', ''),
+                'thumbnail':   thumb,
+                'viewCount':   stats.get('viewCount', '0'),
+                'likeCount':   stats.get('likeCount', '0'),
+                'commentCount':stats.get('commentCount', '0'),
+            }),
+            mimetype='application/json'
+        )
+    except _err.HTTPError as e:
+        return _json.dumps({'error': f'youtube api {e.code}'}), 502, {'Content-Type': 'application/json'}
+    except Exception as e:
+        return _json.dumps({'error': str(e)}), 500, {'Content-Type': 'application/json'}
+
+
 # ── Entry ────────────────────────────────────────────────
 
 if __name__ == '__main__':

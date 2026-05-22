@@ -106,14 +106,18 @@ if (modal) {
     const linksEl = document.getElementById('modalLinks');
     let links = [];
     try { links = JSON.parse(d.links || '[]'); } catch (e) {}
-    linksEl.innerHTML = links.map(lk =>
-      `<a href="${lk.url}" class="pc-link" target="_blank" rel="noopener">${lk.label} →</a>`
-    ).join('');
+    linksEl.innerHTML = links
+      .filter(lk => !extractYtId(lk.url) && !extractPlaylistId(lk.url))
+      .map(lk => `<a href="${lk.url}" class="pc-link" target="_blank" rel="noopener">${lk.label} →</a>`)
+      .join('');
 
-    // YouTube 카드들
+    // YouTube 카드들 (영상 + 재생목록)
     ytListEl.innerHTML = '';
-    links.filter(lk => extractYtId(lk.url)).forEach(lk => {
-      ytListEl.appendChild(createYtCard(lk.label, lk.url, extractYtId(lk.url)));
+    links.forEach(lk => {
+      const vid = extractYtId(lk.url);
+      const pid = !vid && extractPlaylistId(lk.url);
+      if (vid) ytListEl.appendChild(createYtCard(lk.label, lk.url, vid));
+      else if (pid) ytListEl.appendChild(createPlaylistCard(lk.label, lk.url, pid));
     });
 
     modal.classList.add('active');
@@ -174,6 +178,42 @@ if (modal) {
   function extractYtId(url) {
     const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
     return m ? m[1] : null;
+  }
+  function extractPlaylistId(url) {
+    const m = url.match(/[?&]list=([a-zA-Z0-9_-]+)/);
+    return m ? m[1] : null;
+  }
+  function createPlaylistCard(label, playlistUrl, playlistId) {
+    const item = document.createElement('div');
+    item.className = 'yt-item';
+    item.innerHTML = (label ? `<div class="yt-item-label">${label}</div>` : '')
+      + `<a href="${playlistUrl}" class="yt-card" target="_blank" rel="noopener">
+           <div class="yt-thumb-wrap">
+             <img src="" alt="" />
+             <span class="yt-play">▶</span>
+           </div>
+           <div class="yt-info">
+             <div class="yt-title">로딩 중…</div>
+             <div class="yt-stats">
+               <span class="yt-views"></span>
+               <span class="yt-likes"></span>
+               <span class="yt-comments"></span>
+             </div>
+           </div>
+         </a>`;
+    fetch(`/api/youtube/playlist?list=${playlistId}`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.error) { item.querySelector('.yt-title').textContent = '재생목록'; return; }
+        item.querySelector('.yt-card').href = d.videoUrl;
+        if (d.thumbnail) item.querySelector('.yt-thumb-wrap img').src = d.thumbnail;
+        item.querySelector('.yt-title').textContent = d.title || '';
+        item.querySelector('.yt-views').textContent    = d.viewCount    ? '▶ ' + fmtNum(d.viewCount)    + ' 회' : '';
+        item.querySelector('.yt-likes').textContent    = d.likeCount    ? '👍 ' + fmtNum(d.likeCount)            : '';
+        item.querySelector('.yt-comments').textContent = d.commentCount ? '💬 ' + fmtNum(d.commentCount)       : '';
+      })
+      .catch(() => { item.querySelector('.yt-title').textContent = ''; });
+    return item;
   }
   function fmtNum(n) {
     n = parseInt(n) || 0;

@@ -706,9 +706,9 @@ ul { list-style: none; }
 .yt-item { margin-bottom: 1rem; }
 .yt-item:last-child { margin-bottom: 0; }
 .yt-item-label {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text);
   margin-bottom: 0.35rem;
   letter-spacing: 0.01em;
 }
