@@ -27,7 +27,7 @@
 
       {% if profile.profile_image_filename %}
       <div id="profileImgCurrentWrap" style="margin-bottom:0.75rem;">
-        <img src="{{ url_for('static', filename='uploads/' + profile.profile_image_filename) }}" alt="프로필 이미지" style="max-width:240px; aspect-ratio:4/3; object-fit:cover; border-radius:8px; border:1px solid var(--border);" />
+        <img src="{{ url_for('static', filename='uploads/' + profile.profile_image_filename) }}" alt="프로필 이미지" style="max-width:175px; aspect-ratio:3.5/4.5; object-fit:cover; border-radius:8px; border:1px solid var(--border);" />
         <div class="form-hint" style="margin-top:0.25rem;">현재 설정된 프로필 이미지</div>
       </div>
       {% endif %}
@@ -45,13 +45,13 @@
 
       <!-- 크롭 완료 미리보기 -->
       <div id="profileImgPreviewWrap" style="display:none; margin-bottom:0.75rem;">
-        <img id="profileImgPreview" src="" alt="" style="max-width:240px; aspect-ratio:4/3; object-fit:cover; border-radius:8px; border:1px solid var(--border);" />
-        <div style="margin-top:0.4rem; font-size:0.78rem; color:var(--accent);">✓ 크롭 완료 (4:3 비율)</div>
+        <img id="profileImgPreview" src="" alt="" style="max-width:175px; aspect-ratio:3.5/4.5; object-fit:cover; border-radius:8px; border:1px solid var(--border);" />
+        <div style="margin-top:0.4rem; font-size:0.78rem; color:var(--accent);">✓ 크롭 완료 (3.5:4.5 비율)</div>
       </div>
 
       <label style="font-weight:400; font-size:0.875rem; margin-bottom:0.25rem; display:block;">이미지 파일 업로드</label>
       <input type="file" id="profileImgFileInput" name="profile_image_file" accept="image/*" />
-      <div class="form-hint">JPG · PNG · WebP · 권장 크기: 800×600px (4:3) · 5MB 이하</div>
+      <div class="form-hint">JPG · PNG · WebP · 권장 크기: 700×900px (3.5:4.5) · 5MB 이하</div>
 
       {% if profile.profile_image_filename %}
       <div style="margin-top:1rem;">
@@ -469,13 +469,13 @@ function addAward() {
     if (currentWrap) currentWrap.style.display = 'none';
     cropTarget.onload = function () {
       if (cropper) cropper.destroy();
-      cropper = new Cropper(cropTarget, { aspectRatio: 4/3, viewMode: 1, autoCropArea: 0.9 });
+      cropper = new Cropper(cropTarget, { aspectRatio: 3.5/4.5, viewMode: 1, autoCropArea: 0.9 });
     };
   });
 
   document.getElementById('profileImgApplyCrop').addEventListener('click', function () {
     if (!cropper) return;
-    const canvas = cropper.getCroppedCanvas({ width: 800, height: 600 });
+    const canvas = cropper.getCroppedCanvas({ width: 700, height: 900 });
     croppedData.value = canvas.toDataURL('image/jpeg', 0.88);
     previewImg.src = croppedData.value;
     previewWrap.style.display = '';
