@@ -159,6 +159,8 @@ class Profile(db.Model):
     og_image_url = db.Column(db.String(500), default='')
     # 이직 검토 중 배지
     open_to_work = db.Column(db.Boolean, default=False)
+    # 프로필 이미지 (4:3)
+    profile_image_filename = db.Column(db.String(300), default='')
 
     @property
     def skill_list(self):
@@ -226,6 +228,7 @@ def init_db():
             "ALTER TABLE project ADD COLUMN kpi VARCHAR(300) DEFAULT ''",
             "ALTER TABLE project ADD COLUMN my_role VARCHAR(200) DEFAULT ''",
             "ALTER TABLE project ADD COLUMN category VARCHAR(100) DEFAULT ''",
+            "ALTER TABLE profile ADD COLUMN profile_image_filename VARCHAR(300) DEFAULT ''",
         ]:
             try:
                 conn.execute(db.text(sql))
@@ -402,6 +405,24 @@ def profile_edit():
         profile.github_url = request.form.get('github_url', '')
         profile.blog_url = request.form.get('blog_url', '')
         import base64 as _b64
+        # 프로필 이미지 업로드
+        prof_img_cropped = request.form.get('profile_image_cropped_data', '')
+        prof_img_file = request.files.get('profile_image_file')
+        if prof_img_cropped and ',' in prof_img_cropped:
+            _, _data = prof_img_cropped.split(',', 1)
+            fn = f"profile_{int(time.time())}.jpg"
+            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+            with open(os.path.join(app.config['UPLOAD_FOLDER'], fn), 'wb') as _f:
+                _f.write(_b64.b64decode(_data))
+            profile.profile_image_filename = fn
+        elif prof_img_file and prof_img_file.filename:
+            ext = prof_img_file.filename.rsplit('.', 1)[-1].lower() if '.' in prof_img_file.filename else ''
+            if ext in ALLOWED_EXTENSIONS:
+                fn = f"profile_{int(time.time())}.{ext}"
+                os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+                prof_img_file.save(os.path.join(app.config['UPLOAD_FOLDER'], fn))
+                profile.profile_image_filename = fn
+
         og_cropped = request.form.get('og_cropped_data', '')
         og_file = request.files.get('og_image_file')
         if og_cropped and ',' in og_cropped:
@@ -566,6 +587,20 @@ def profile_resume_delete():
         profile.resume_filename = ''
         db.session.commit()
         flash('이력서가 삭제되었습니다.')
+    return redirect(url_for('profile_edit'))
+
+
+@app.route('/admin/profile/image/delete', methods=['POST'])
+@login_required
+def profile_image_delete():
+    profile = db.session.get(Profile, 1)
+    if profile and profile.profile_image_filename:
+        fpath = os.path.join(app.config['UPLOAD_FOLDER'], profile.profile_image_filename)
+        if os.path.exists(fpath):
+            os.remove(fpath)
+        profile.profile_image_filename = ''
+        db.session.commit()
+        flash('프로필 이미지가 삭제되었습니다.')
     return redirect(url_for('profile_edit'))
 
 

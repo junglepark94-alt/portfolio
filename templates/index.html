@@ -6,21 +6,30 @@
 <!-- ── HERO ─────────────────────────────────────────── -->
 <section class="hero" id="hero">
   <div class="hero-inner">
-    {% if profile.open_to_work %}
-    <div class="otw-badge">
-      <span class="otw-dot"></span>새로운 기회를 검토 중입니다
+    <div class="hero-content">
+      {% if profile.open_to_work %}
+      <div class="otw-badge">
+        <span class="otw-dot"></span>새로운 기회를 검토 중입니다
+      </div>
+      {% endif %}
+      <div class="hero-eyebrow">{{ profile.role }}</div>
+      <h1 class="hero-name">안녕하세요,<br/><span class="accent">{{ profile.name }}</span>입니다.</h1>
+      <p class="hero-sub">{{ profile.tagline | replace('\n', '<br/>') | safe }}</p>
+      <div class="hero-cta">
+        <a href="#projects" class="btn btn-primary">프로젝트 보기</a>
+        <a href="#contact" class="btn btn-ghost">연락하기</a>
+        {% if profile.resume_filename %}
+        <a href="{{ url_for('serve_resume') }}" class="btn btn-resume" target="_blank">이력서 다운로드 ↓</a>
+        {% endif %}
+      </div>
+    </div>
+    {% if profile.profile_image_filename %}
+    <div class="hero-photo">
+      <div class="hero-photo-frame">
+        <img src="{{ url_for('static', filename='uploads/' + profile.profile_image_filename) }}" alt="{{ profile.name }}" />
+      </div>
     </div>
     {% endif %}
-    <div class="hero-eyebrow">{{ profile.role }}</div>
-    <h1 class="hero-name">안녕하세요,<br/><span class="accent">{{ profile.name }}</span>입니다.</h1>
-    <p class="hero-sub">{{ profile.tagline | replace('\n', '<br/>') | safe }}</p>
-    <div class="hero-cta">
-      <a href="#projects" class="btn btn-primary">프로젝트 보기</a>
-      <a href="#contact" class="btn btn-ghost">연락하기</a>
-      {% if profile.resume_filename %}
-      <a href="{{ url_for('serve_resume') }}" class="btn btn-resume" target="_blank">이력서 다운로드 ↓</a>
-      {% endif %}
-    </div>
   </div>
   <div class="hero-line"></div>
 </section>

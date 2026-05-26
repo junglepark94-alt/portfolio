@@ -20,6 +20,47 @@
       <div class="form-hint" style="margin-top:0.5rem;">체크하면 Hero 영역에 초록 배지가 표시됩니다.</div>
     </div>
 
+    <!-- ── 프로필 이미지 ── -->
+    <div class="form-card">
+      <div class="fc-title">프로필 이미지</div>
+      <input type="hidden" name="profile_image_cropped_data" id="profileImgCroppedData" />
+
+      {% if profile.profile_image_filename %}
+      <div id="profileImgCurrentWrap" style="margin-bottom:0.75rem;">
+        <img src="{{ url_for('static', filename='uploads/' + profile.profile_image_filename) }}" alt="프로필 이미지" style="max-width:240px; aspect-ratio:4/3; object-fit:cover; border-radius:8px; border:1px solid var(--border);" />
+        <div class="form-hint" style="margin-top:0.25rem;">현재 설정된 프로필 이미지</div>
+      </div>
+      {% endif %}
+
+      <!-- 크롭 영역 -->
+      <div id="profileImgCropZone" style="display:none; margin-bottom:0.75rem;">
+        <div class="crop-wrap" style="max-height:360px; background:#111; overflow:hidden;">
+          <img id="profileImgCropTarget" src="" alt="" style="display:block; max-width:100%;" />
+        </div>
+        <div style="display:flex; gap:0.75rem; padding:0.75rem 0;">
+          <button type="button" id="profileImgApplyCrop" class="btn btn-primary">크롭 적용</button>
+          <button type="button" id="profileImgSkipCrop" class="btn btn-ghost">크롭 없이 사용</button>
+        </div>
+      </div>
+
+      <!-- 크롭 완료 미리보기 -->
+      <div id="profileImgPreviewWrap" style="display:none; margin-bottom:0.75rem;">
+        <img id="profileImgPreview" src="" alt="" style="max-width:240px; aspect-ratio:4/3; object-fit:cover; border-radius:8px; border:1px solid var(--border);" />
+        <div style="margin-top:0.4rem; font-size:0.78rem; color:var(--accent);">✓ 크롭 완료 (4:3 비율)</div>
+      </div>
+
+      <label style="font-weight:400; font-size:0.875rem; margin-bottom:0.25rem; display:block;">이미지 파일 업로드</label>
+      <input type="file" id="profileImgFileInput" name="profile_image_file" accept="image/*" />
+      <div class="form-hint">JPG · PNG · WebP · 권장 크기: 800×600px (4:3) · 5MB 이하</div>
+
+      {% if profile.profile_image_filename %}
+      <div style="margin-top:1rem;">
+        <button type="button" class="btn-sm btn-danger"
+                onclick="if(confirm('프로필 이미지를 삭제하시겠습니까?')) document.getElementById('profileImgDeleteForm').submit()">이미지 삭제</button>
+      </div>
+      {% endif %}
+    </div>
+
     <!-- ── 기본 정보 ── -->
     <div class="form-card">
       <div class="fc-title">기본 정보</div>
@@ -313,6 +354,9 @@
   {% if profile.resume_filename %}
   <form id="resumeDeleteForm" method="POST" action="{{ url_for('profile_resume_delete') }}" style="display:none;"></form>
   {% endif %}
+  {% if profile.profile_image_filename %}
+  <form id="profileImgDeleteForm" method="POST" action="{{ url_for('profile_image_delete') }}" style="display:none;"></form>
+  {% endif %}
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
@@ -398,6 +442,48 @@ function addAward() {
   });
 
   document.getElementById('ogSkipCrop').addEventListener('click', function () {
+    cropZone.style.display = 'none';
+    croppedData.value = '';
+    if (currentWrap) currentWrap.style.display = '';
+  });
+})();
+
+// ── 프로필 이미지 크롭 (4:3) ──────────────────────────
+(function () {
+  const fileInput   = document.getElementById('profileImgFileInput');
+  const cropZone    = document.getElementById('profileImgCropZone');
+  const cropTarget  = document.getElementById('profileImgCropTarget');
+  const previewWrap = document.getElementById('profileImgPreviewWrap');
+  const previewImg  = document.getElementById('profileImgPreview');
+  const croppedData = document.getElementById('profileImgCroppedData');
+  const currentWrap = document.getElementById('profileImgCurrentWrap');
+  let cropper = null;
+
+  fileInput.addEventListener('change', function () {
+    const file = this.files[0];
+    if (!file) return;
+    cropTarget.src = URL.createObjectURL(file);
+    cropZone.style.display = '';
+    previewWrap.style.display = 'none';
+    croppedData.value = '';
+    if (currentWrap) currentWrap.style.display = 'none';
+    cropTarget.onload = function () {
+      if (cropper) cropper.destroy();
+      cropper = new Cropper(cropTarget, { aspectRatio: 4/3, viewMode: 1, autoCropArea: 0.9 });
+    };
+  });
+
+  document.getElementById('profileImgApplyCrop').addEventListener('click', function () {
+    if (!cropper) return;
+    const canvas = cropper.getCroppedCanvas({ width: 800, height: 600 });
+    croppedData.value = canvas.toDataURL('image/jpeg', 0.88);
+    previewImg.src = croppedData.value;
+    previewWrap.style.display = '';
+    cropZone.style.display = 'none';
+    fileInput.value = '';
+  });
+
+  document.getElementById('profileImgSkipCrop').addEventListener('click', function () {
     cropZone.style.display = 'none';
     croppedData.value = '';
     if (currentWrap) currentWrap.style.display = '';
