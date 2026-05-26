@@ -159,8 +159,18 @@ class Profile(db.Model):
     og_image_url = db.Column(db.String(500), default='')
     # 이직 검토 중 배지
     open_to_work = db.Column(db.Boolean, default=False)
-    # 프로필 이미지 (4:3)
+    # 프로필 이미지 (3.5:4.5)
     profile_image_filename = db.Column(db.String(300), default='')
+    # 어학 성적 [{exam, score, date}]
+    language_scores_json = db.Column(db.Text, default='[]')
+
+    @property
+    def language_scores(self):
+        import json as _j
+        try:
+            return _j.loads(self.language_scores_json or '[]')
+        except Exception:
+            return []
 
     @property
     def skill_list(self):
@@ -229,6 +239,7 @@ def init_db():
             "ALTER TABLE project ADD COLUMN my_role VARCHAR(200) DEFAULT ''",
             "ALTER TABLE project ADD COLUMN category VARCHAR(100) DEFAULT ''",
             "ALTER TABLE profile ADD COLUMN profile_image_filename VARCHAR(300) DEFAULT ''",
+            "ALTER TABLE profile ADD COLUMN language_scores_json TEXT DEFAULT '[]'",
         ]:
             try:
                 conn.execute(db.text(sql))
@@ -452,6 +463,17 @@ def profile_edit():
                 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
                 resume_file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
                 profile.resume_filename = filename
+
+        # 어학 성적
+        lang_exams  = request.form.getlist('lang_exam')
+        lang_scores = request.form.getlist('lang_score')
+        lang_dates  = request.form.getlist('lang_date')
+        language_scores = [
+            {'exam': e.strip(), 'score': lang_scores[i].strip() if i < len(lang_scores) else '',
+             'date': lang_dates[i].strip() if i < len(lang_dates) else ''}
+            for i, e in enumerate(lang_exams) if e.strip()
+        ]
+        profile.language_scores_json = json.dumps(language_scores, ensure_ascii=False)
 
         # 핵심 역량 (단순 목록)
         profile.skills = request.form.get('skills', '')

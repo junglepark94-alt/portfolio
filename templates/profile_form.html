@@ -186,6 +186,50 @@
       <button type="button" class="btn-add-link" onclick="addEdu()" style="margin-top:0.5rem;">+ 학력 추가</button>
     </div>
 
+    <!-- ── 어학 성적 ── -->
+    <div class="form-card">
+      <div class="fc-title">어학 성적</div>
+      <div class="form-hint" style="margin-bottom:1rem;">시험명, 점수/등급, 취득 연월을 입력하세요.</div>
+      <div id="langRows">
+        {% if profile.language_scores %}
+          {% for ls in profile.language_scores %}
+          <div class="lang-item" style="display:flex; gap:0.75rem; align-items:flex-end; margin-bottom:0.75rem;">
+            <div class="form-group" style="flex:2; margin:0;">
+              <label>시험명</label>
+              <input type="text" name="lang_exam" value="{{ ls.exam }}" placeholder="TOEIC / OPIC / JLPT" />
+            </div>
+            <div class="form-group" style="flex:2; margin:0;">
+              <label>점수 / 등급</label>
+              <input type="text" name="lang_score" value="{{ ls.score }}" placeholder="990 / AL / N1" />
+            </div>
+            <div class="form-group" style="flex:2; margin:0;">
+              <label>취득 연월</label>
+              <input type="text" name="lang_date" value="{{ ls.date }}" placeholder="2023.05" />
+            </div>
+            <button type="button" class="link-remove-btn" style="margin-bottom:0.15rem;" onclick="removeRow(this.closest('.lang-item'))">×</button>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="lang-item" style="display:flex; gap:0.75rem; align-items:flex-end; margin-bottom:0.75rem;">
+            <div class="form-group" style="flex:2; margin:0;">
+              <label>시험명</label>
+              <input type="text" name="lang_exam" placeholder="TOEIC / OPIC / JLPT" />
+            </div>
+            <div class="form-group" style="flex:2; margin:0;">
+              <label>점수 / 등급</label>
+              <input type="text" name="lang_score" placeholder="990 / AL / N1" />
+            </div>
+            <div class="form-group" style="flex:2; margin:0;">
+              <label>취득 연월</label>
+              <input type="text" name="lang_date" placeholder="2023.05" />
+            </div>
+            <button type="button" class="link-remove-btn" style="margin-bottom:0.15rem;" onclick="removeRow(this.closest('.lang-item'))">×</button>
+          </div>
+        {% endif %}
+      </div>
+      <button type="button" class="btn-add-link" onclick="addLang()">+ 어학 성적 추가</button>
+    </div>
+
     <!-- ── 수상내역 ── -->
     <div class="form-card">
       <div class="fc-title">수상내역</div>
@@ -391,6 +435,18 @@ function addEdu() {
     </div>
     <button type="button" class="btn-sm btn-danger" onclick="removeRow(this.closest('.edu-item'))">삭제</button>`;
   document.getElementById('eduRows').appendChild(div);
+}
+
+function addLang() {
+  const div = document.createElement('div');
+  div.className = 'lang-item';
+  div.style = 'display:flex; gap:0.75rem; align-items:flex-end; margin-bottom:0.75rem;';
+  div.innerHTML = `
+    <div class="form-group" style="flex:2; margin:0;"><label>시험명</label><input type="text" name="lang_exam" placeholder="TOEIC / OPIC / JLPT" /></div>
+    <div class="form-group" style="flex:2; margin:0;"><label>점수 / 등급</label><input type="text" name="lang_score" placeholder="990 / AL / N1" /></div>
+    <div class="form-group" style="flex:2; margin:0;"><label>취득 연월</label><input type="text" name="lang_date" placeholder="2023.05" /></div>
+    <button type="button" class="link-remove-btn" style="margin-bottom:0.15rem;" onclick="removeRow(this.closest('.lang-item'))">×</button>`;
+  document.getElementById('langRows').appendChild(div);
 }
 
 function addAward() {
