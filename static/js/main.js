@@ -300,9 +300,114 @@ if (galleryModal) {
   galleryModal.addEventListener('click', e => { if (e.target === galleryModal) closeGalleryModal(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeGalleryModal(); });
 
-  document.querySelectorAll('.gallery-card').forEach(card => {
-    card.addEventListener('click', () => openGalleryModal(card));
-  });
+  // ── Cover Flow ────────────────────────────────
+  (function () {
+    const stage = document.getElementById('coverflowStage');
+    if (!stage) return;
+
+    const cards = Array.from(stage.querySelectorAll('.gallery-card'));
+    const dotsWrap = document.getElementById('coverflowDots');
+    const prevBtn = document.getElementById('cfPrev');
+    const nextBtn = document.getElementById('cfNext');
+    if (!cards.length) return;
+
+    let activeIdx = 0;
+
+    // Build dots
+    const dots = cards.map((_, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'cf-dot';
+      btn.setAttribute('aria-label', `슬라이드 ${i + 1}`);
+      btn.addEventListener('click', () => goTo(i));
+      dotsWrap.appendChild(btn);
+      return btn;
+    });
+
+    const SCALE   = [1,    0.78, 0.62, 0.50];
+    const OPACITY = [1,    0.62, 0.36, 0.0 ];
+    const TX      = [0,    250,  360,  450 ];
+    const RY      = [0,    46,   56,   62  ];
+    const ZI      = [10,   8,    6,    4   ];
+
+    function update() {
+      cards.forEach((card, i) => {
+        const off = i - activeIdx;
+        const abs = Math.abs(off);
+        const sign = off < 0 ? -1 : 1;
+
+        if (abs >= SCALE.length) {
+          card.style.opacity = '0';
+          card.style.zIndex  = '1';
+          card.style.pointerEvents = 'none';
+          card.style.transform = `translateX(${sign * 520}px) scale(0.45) rotateY(${-sign * 65}deg)`;
+          card.classList.remove('cf-active');
+          return;
+        }
+
+        card.style.opacity = OPACITY[abs];
+        card.style.zIndex  = ZI[abs];
+        card.style.pointerEvents = 'auto';
+
+        const tx = abs === 0 ? 0 : sign * TX[abs];
+        const ry = abs === 0 ? 0 : -sign * RY[abs];
+        card.style.transform = `translateX(${tx}px) scale(${SCALE[abs]}) rotateY(${ry}deg)`;
+        card.classList.toggle('cf-active', abs === 0);
+      });
+
+      dots.forEach((d, i) => d.classList.toggle('active', i === activeIdx));
+      if (prevBtn) prevBtn.disabled = activeIdx === 0;
+      if (nextBtn) nextBtn.disabled = activeIdx === cards.length - 1;
+    }
+
+    function goTo(idx) {
+      activeIdx = Math.max(0, Math.min(idx, cards.length - 1));
+      update();
+    }
+
+    // Card clicks — side: navigate, center: open modal
+    cards.forEach((card, i) => {
+      card.addEventListener('click', () => {
+        if (i !== activeIdx) { goTo(i); }
+        else { openGalleryModal(card); }
+      });
+    });
+
+    // Arrow buttons
+    if (prevBtn) prevBtn.addEventListener('click', () => goTo(activeIdx - 1));
+    if (nextBtn) nextBtn.addEventListener('click', () => goTo(activeIdx + 1));
+
+    // Keyboard (only when gallery is in view)
+    document.addEventListener('keydown', e => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      const sec = document.getElementById('gallery');
+      if (!sec) return;
+      const r = sec.getBoundingClientRect();
+      if (r.top < window.innerHeight && r.bottom > 0) {
+        e.preventDefault();
+        goTo(activeIdx + (e.key === 'ArrowRight' ? 1 : -1));
+      }
+    });
+
+    // Touch swipe
+    let tx0 = 0;
+    stage.addEventListener('touchstart', e => { tx0 = e.touches[0].clientX; }, { passive: true });
+    stage.addEventListener('touchend', e => {
+      const dx = e.changedTouches[0].clientX - tx0;
+      if (Math.abs(dx) > 40) goTo(activeIdx + (dx < 0 ? 1 : -1));
+    }, { passive: true });
+
+    // Mouse drag
+    let mx0 = 0, dragging = false;
+    stage.addEventListener('mousedown', e => { mx0 = e.clientX; dragging = true; });
+    window.addEventListener('mouseup', e => {
+      if (!dragging) return;
+      dragging = false;
+      const dx = e.clientX - mx0;
+      if (Math.abs(dx) > 40) goTo(activeIdx + (dx < 0 ? 1 : -1));
+    });
+
+    update();
+  })();
 }
 
 // ── Sortable rows (drag-handle based) ───────

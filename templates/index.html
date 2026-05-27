@@ -199,8 +199,9 @@
     <div class="section-label reveal">Gallery</div>
     <h2 class="reveal">갤러리</h2>
   </div>
-  <div class="gallery-scroll-wrap reveal">
-    <div class="gallery-scroll" id="galleryScroll">
+  <div class="coverflow-wrap reveal">
+    <button class="cf-arrow cf-prev" id="cfPrev" aria-label="이전">&#8249;</button>
+    <div class="coverflow-stage" id="coverflowStage">
       {% for item in gallery_items %}
       <div class="gallery-card"
         data-title="{{ item.title | e }}"
@@ -208,13 +209,12 @@
         data-links="{{ item.links | tojson | forceescape }}"
         data-image="{{ url_for('static', filename='uploads/' + item.image_filename) }}"
       >
-        <div class="gallery-thumb">
-          <img src="{{ url_for('static', filename='uploads/' + item.image_filename) }}" alt="{{ item.title }}" loading="lazy" />
-        </div>
-        <div class="gallery-card-title">{{ item.title }}</div>
+        <img src="{{ url_for('static', filename='uploads/' + item.image_filename) }}" alt="{{ item.title }}" loading="lazy" />
       </div>
       {% endfor %}
     </div>
+    <button class="cf-arrow cf-next" id="cfNext" aria-label="다음">&#8250;</button>
+    <div class="coverflow-dots" id="coverflowDots"></div>
   </div>
 </section>
 {% endif %}
