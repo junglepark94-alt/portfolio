@@ -58,7 +58,7 @@
   </main>
 
   <footer class="site-footer">
-    <p>© 2026 {{ profile.name if profile else '' }}. Built with Claude Code</p>
+    <p>© 2026 {{ profile.name if profile else '' }}. All Rights Reserved.</p>
     {% if session.get('logged_in') %}
     <a href="{{ url_for('admin_dashboard') }}" class="footer-admin-btn">관리자</a>
     {% else %}
