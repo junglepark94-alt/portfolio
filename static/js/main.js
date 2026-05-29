@@ -1,3 +1,48 @@
+// ── Hero Orb Animation + Mouse Parallax ─────
+(function () {
+  const hero = document.getElementById('hero');
+  if (!hero) return;
+
+  const orb3 = hero.querySelector('.hero-orb-3');
+  const orb4 = hero.querySelector('.hero-orb-4');
+  if (!orb3 || !orb4) return;
+
+  // 자체 부유 애니메이션 파라미터
+  const floats = [
+    { el: orb3, period: 26000, ax: 38, ay: 62, mouseF: 0.028 },
+    { el: orb4, period: 20000, ax: -46, ay: -52, mouseF: 0.018 },
+  ];
+
+  let mouseX = 0, mouseY = 0;
+  let curMX = 0, curMY = 0;
+
+  document.addEventListener('mousemove', function (e) {
+    const cx = window.innerWidth / 2;
+    const cy = window.innerHeight / 2;
+    mouseX = (e.clientX - cx);
+    mouseY = (e.clientY - cy);
+  });
+
+  function animate(ts) {
+    // 마우스 smooth follow
+    curMX += (mouseX - curMX) * 0.05;
+    curMY += (mouseY - curMY) * 0.05;
+
+    floats.forEach(function (o) {
+      const t = ts / o.period;
+      const fx = Math.sin(t * Math.PI * 2) * o.ax;
+      const fy = Math.cos(t * Math.PI * 2 * 0.7) * o.ay;
+      const mx = curMX * o.mouseF;
+      const my = curMY * o.mouseF;
+      o.el.style.transform = 'translate(' + (fx + mx) + 'px, ' + (fy + my) + 'px)';
+    });
+
+    requestAnimationFrame(animate);
+  }
+
+  requestAnimationFrame(animate);
+})();
+
 // ── Hamburger Menu ───────────────────────────
 (function () {
   const hamburger = document.getElementById('navHamburger');
