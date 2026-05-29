@@ -265,44 +265,9 @@ if (modal) {
   });
 }
 
-// ── Gallery Modal ────────────────────────────
-const galleryModal = document.getElementById('galleryModal');
-if (galleryModal) {
-  const gClose = document.getElementById('galleryModalClose');
-
-  function openGalleryModal(card) {
-    const d = card.dataset;
-    document.getElementById('galleryModalImg').src = d.image || '';
-    document.getElementById('galleryModalImg').alt = d.title || '';
-    document.getElementById('galleryModalTitle').textContent = d.title || '';
-    document.getElementById('galleryModalDesc').textContent = d.desc || '';
-    document.getElementById('galleryModalImgWrap').style.display = d.image ? '' : 'none';
-
-    const linksEl = document.getElementById('galleryModalLinks');
-    let links = [];
-    try { links = JSON.parse(d.links || '[]'); } catch(e) {}
-    linksEl.innerHTML = links.map(lk =>
-      `<a href="${lk.url}" class="pc-link" target="_blank" rel="noopener">${lk.label} →</a>`
-    ).join('');
-
-    galleryModal.classList.add('active');
-    galleryModal.setAttribute('aria-hidden', 'false');
-    document.body.style.overflow = 'hidden';
-  }
-
-  function closeGalleryModal() {
-    galleryModal.classList.remove('active');
-    galleryModal.setAttribute('aria-hidden', 'true');
-    document.body.style.overflow = '';
-  }
-
-  gClose.addEventListener('click', closeGalleryModal);
-  galleryModal.addEventListener('click', e => { if (e.target === galleryModal) closeGalleryModal(); });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeGalleryModal(); });
-
-  // ── Cover Flow ────────────────────────────────
-  (function () {
-    const stage = document.getElementById('coverflowStage');
+// ── Cover Flow ────────────────────────────────
+(function () {
+  const stage = document.getElementById('coverflowStage');
     if (!stage) return;
 
     const cards = Array.from(stage.querySelectorAll('.gallery-card'));
@@ -329,9 +294,14 @@ if (galleryModal) {
     const RY      = [0,    46,   56,   62  ];
     const ZI      = [10,   8,    6,    4   ];
 
+    const titleDisplay = document.getElementById('cfTitleDisplay');
+
     function update() {
       cards.forEach((card, i) => {
-        const off = i - activeIdx;
+        let off = i - activeIdx;
+        // wrap offset for looping display
+        if (off > cards.length / 2) off -= cards.length;
+        if (off < -cards.length / 2) off += cards.length;
         const abs = Math.abs(off);
         const sign = off < 0 ? -1 : 1;
 
@@ -355,20 +325,20 @@ if (galleryModal) {
       });
 
       dots.forEach((d, i) => d.classList.toggle('active', i === activeIdx));
-      if (prevBtn) prevBtn.disabled = activeIdx === 0;
-      if (nextBtn) nextBtn.disabled = activeIdx === cards.length - 1;
+      if (prevBtn) prevBtn.disabled = false;
+      if (nextBtn) nextBtn.disabled = false;
+      if (titleDisplay) titleDisplay.textContent = cards[activeIdx].dataset.title || '';
     }
 
     function goTo(idx) {
-      activeIdx = Math.max(0, Math.min(idx, cards.length - 1));
+      activeIdx = ((idx % cards.length) + cards.length) % cards.length;
       update();
     }
 
-    // Card clicks — side: navigate, center: open modal
+    // Card clicks — side: navigate, center: show title (already shown)
     cards.forEach((card, i) => {
       card.addEventListener('click', () => {
-        if (i !== activeIdx) { goTo(i); }
-        else { openGalleryModal(card); }
+        if (i !== activeIdx) goTo(i);
       });
     });
 
@@ -408,7 +378,6 @@ if (galleryModal) {
 
     update();
   })();
-}
 
 // ── Sortable rows (drag-handle based) ───────
 function makeSortable(container, itemSelector) {

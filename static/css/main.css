@@ -689,6 +689,18 @@ ul { list-style: none; }
   width: 22px;
   border-radius: 4px;
 }
+.cf-title-display {
+  position: absolute;
+  bottom: 0.1rem;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 0.95rem;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+  min-height: 1.4em;
+  pointer-events: none;
+}
 
 /* ── Contact ────────────────────────────────── */
 .contact-sub {

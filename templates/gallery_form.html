@@ -14,11 +14,6 @@
       <input type="text" name="title" value="{{ item.title if item else '' }}" required />
     </div>
 
-    <div class="form-group">
-      <label>설명</label>
-      <textarea name="description" rows="5" placeholder="사진에 대한 설명을 입력하세요.">{{ item.description if item else '' }}</textarea>
-    </div>
-
     <!-- 이미지 업로드 & 크롭 -->
     <div class="form-group">
       <label>이미지 {% if not item %}*{% endif %}</label>
@@ -49,29 +44,6 @@
 
       <input type="file" id="fileInput" name="image" accept="image/*" style="margin-top:0.25rem;" />
       <small style="color:var(--muted); display:block; margin-top:0.3rem;">PNG, JPG, WEBP 등 최대 5MB · 4:3 비율로 크롭됩니다</small>
-    </div>
-
-    <!-- 관련 링크 -->
-    <div class="form-group">
-      <label>관련 링크</label>
-      <div id="linkRows">
-        {% if item and item.links %}
-          {% for lk in item.links %}
-          <div class="link-row">
-            <input type="text" name="link_label" placeholder="링크 이름" value="{{ lk.label }}" />
-            <input type="url"  name="link_url"   placeholder="https://..." value="{{ lk.url }}" />
-            <button type="button" class="link-remove-btn" aria-label="삭제">×</button>
-          </div>
-          {% endfor %}
-        {% else %}
-          <div class="link-row">
-            <input type="text" name="link_label" placeholder="링크 이름 (예: 자세히 보기)" />
-            <input type="url"  name="link_url"   placeholder="https://..." />
-            <button type="button" class="link-remove-btn" aria-label="삭제">×</button>
-          </div>
-        {% endif %}
-      </div>
-      <button type="button" id="addLinkBtn" class="btn-add-link">+ 링크 추가</button>
     </div>
 
     <div class="form-group">

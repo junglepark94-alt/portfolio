@@ -658,15 +658,11 @@ def gallery_new():
         if not filename:
             flash('이미지를 선택해주세요.')
             return redirect(request.url)
-        labels = request.form.getlist('link_label')
-        urls   = request.form.getlist('link_url')
-        links  = [{'label': l.strip(), 'url': u.strip()}
-                  for l, u in zip(labels, urls) if l.strip() and u.strip()]
         item = GalleryItem(
             title=request.form['title'],
-            description=request.form.get('description', ''),
+            description='',
             image_filename=filename,
-            links_json=_j.dumps(links, ensure_ascii=False),
+            links_json='[]',
             sort_order=int(request.form.get('sort_order', 0)),
         )
         db.session.add(item)
@@ -681,13 +677,7 @@ def gallery_edit(gid):
     import json as _j
     item = GalleryItem.query.get_or_404(gid)
     if request.method == 'POST':
-        labels = request.form.getlist('link_label')
-        urls   = request.form.getlist('link_url')
-        links  = [{'label': l.strip(), 'url': u.strip()}
-                  for l, u in zip(labels, urls) if l.strip() and u.strip()]
         item.title = request.form['title']
-        item.description = request.form.get('description', '')
-        item.links_json = _j.dumps(links, ensure_ascii=False)
         item.sort_order = int(request.form.get('sort_order', 0))
         new_img = _save_gallery_image(request)
         if new_img:
