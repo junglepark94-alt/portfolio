@@ -343,6 +343,10 @@
           <input type="url" name="linkedin_url" value="{{ profile.linkedin_url }}" placeholder="https://linkedin.com/in/..." />
         </div>
         <div class="form-group">
+          <label>리멤버 URL</label>
+          <input type="url" name="remember_url" value="{{ profile.remember_url or '' }}" placeholder="https://rememberapp.co.kr/..." />
+        </div>
+        <div class="form-group">
           <label>GitHub URL</label>
           <input type="url" name="github_url" value="{{ profile.github_url }}" placeholder="https://github.com/..." />
         </div>

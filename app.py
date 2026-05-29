@@ -140,6 +140,7 @@ class Profile(db.Model):
     email = db.Column(db.String(200), default='')
     linkedin_url = db.Column(db.String(300), default='')
     github_url = db.Column(db.String(300), default='')
+    remember_url = db.Column(db.String(300), default='')
     # Experience (자유 텍스트 JSON 대신 간단히 YAML-like 문자열)
     # 추가 SNS
     blog_url = db.Column(db.String(300), default='')
@@ -240,6 +241,7 @@ def init_db():
             "ALTER TABLE project ADD COLUMN category VARCHAR(100) DEFAULT ''",
             "ALTER TABLE profile ADD COLUMN profile_image_filename VARCHAR(300) DEFAULT ''",
             "ALTER TABLE profile ADD COLUMN language_scores_json TEXT DEFAULT '[]'",
+            "ALTER TABLE profile ADD COLUMN remember_url VARCHAR(300) DEFAULT ''",
         ]:
             try:
                 conn.execute(db.text(sql))
@@ -414,6 +416,7 @@ def profile_edit():
         profile.email = request.form.get('email', '')
         profile.linkedin_url = request.form.get('linkedin_url', '')
         profile.github_url = request.form.get('github_url', '')
+        profile.remember_url = request.form.get('remember_url', '')
         profile.blog_url = request.form.get('blog_url', '')
         import base64 as _b64
         # 프로필 이미지 업로드

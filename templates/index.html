@@ -242,6 +242,13 @@
         <span class="cc-value">{{ profile.linkedin_url | replace('https://', '') }}</span>
       </a>
       {% endif %}
+      {% if profile.remember_url %}
+      <a href="{{ profile.remember_url }}" class="contact-card reveal" target="_blank" rel="noopener">
+        <span class="cc-icon">R</span>
+        <span class="cc-label">리멤버</span>
+        <span class="cc-value">{{ profile.remember_url | replace('https://', '') }}</span>
+      </a>
+      {% endif %}
       {% if profile.github_url %}
       <a href="{{ profile.github_url }}" class="contact-card reveal" target="_blank" rel="noopener">
         <span class="cc-icon">⌥</span>
