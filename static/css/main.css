@@ -667,7 +667,7 @@ ul { list-style: none; }
 /* Dots */
 .coverflow-dots {
   position: absolute;
-  bottom: 1.5rem;
+  bottom: 3.2rem;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -691,13 +691,14 @@ ul { list-style: none; }
 }
 .cf-title-display {
   position: absolute;
-  bottom: 0.1rem;
+  bottom: 0.6rem;
   left: 0;
   right: 0;
   text-align: center;
-  font-size: 0.95rem;
-  color: var(--muted);
-  letter-spacing: 0.02em;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--fg);
+  letter-spacing: 0.01em;
   min-height: 1.4em;
   pointer-events: none;
 }
