@@ -414,10 +414,16 @@ def profile_edit():
         profile.tagline = request.form.get('tagline', '')
         profile.about_text = request.form.get('about_text', '')
         profile.email = request.form.get('email', '')
-        profile.linkedin_url = request.form.get('linkedin_url', '')
-        profile.github_url = request.form.get('github_url', '')
-        profile.remember_url = request.form.get('remember_url', '')
-        profile.blog_url = request.form.get('blog_url', '')
+        def fix_url(u):
+            u = u.strip()
+            if u and not u.startswith(('http://', 'https://')):
+                u = 'https://' + u
+            return u
+
+        profile.linkedin_url = fix_url(request.form.get('linkedin_url', ''))
+        profile.github_url = fix_url(request.form.get('github_url', ''))
+        profile.remember_url = fix_url(request.form.get('remember_url', ''))
+        profile.blog_url = fix_url(request.form.get('blog_url', ''))
         import base64 as _b64
         # 프로필 이미지 업로드
         prof_img_cropped = request.form.get('profile_image_cropped_data', '')
