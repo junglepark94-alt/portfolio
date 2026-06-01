@@ -132,25 +132,21 @@
       <textarea name="detail_text_en" id="detail_text_en" rows="6" placeholder="Background, approach, process in English">{{ project.detail_text_en if project else '' }}</textarea>
     </div>
     <div class="form-group">
-      <label>Related Links (English)</label>
-      <div id="linkRowsEn">
-        {% if project and project.links_en %}
-          {% for lk in project.links_en %}
-          <div class="link-row">
-            <input type="text" name="link_label_en" placeholder="Link name (e.g. GitHub, Demo)" value="{{ lk.label }}" />
-            <input type="text" name="link_url_en" placeholder="https://..." value="{{ lk.url }}" />
-            <button type="button" class="link-remove-btn" aria-label="삭제">×</button>
+      <label>Related Links — English label only (URL is shared with Korean)</label>
+      {% if project and project.links %}
+        <div style="margin-top:0.5rem;">
+          {% for lk in project.links %}
+          {% set en_label = project.links_en[loop.index0].label if project.links_en and loop.index0 < project.links_en|length else '' %}
+          <div style="display:flex; gap:0.75rem; align-items:center; margin-bottom:0.6rem;">
+            <span style="flex:1.4; font-size:0.82rem; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:0.5rem 0.6rem; background:var(--bg-alt); border-radius:4px; border:1px solid var(--border);" title="{{ lk.url }}">{{ lk.url }}</span>
+            <input type="text" name="link_label_en" value="{{ en_label }}" placeholder="English label (e.g. View Details)" style="flex:1;" />
           </div>
           {% endfor %}
-        {% else %}
-          <div class="link-row">
-            <input type="text" name="link_label_en" placeholder="Link name (e.g. GitHub, Demo)" />
-            <input type="text" name="link_url_en" placeholder="https://..." />
-            <button type="button" class="link-remove-btn" aria-label="삭제">×</button>
-          </div>
-        {% endif %}
-      </div>
-      <button type="button" id="addLinkBtnEn" class="btn-add-link">+ Add Link</button>
+        </div>
+        <div class="form-hint">URL은 한국어 탭과 동일하게 사용됩니다. 영문 링크명만 입력하세요.</div>
+      {% else %}
+        <div class="form-hint" style="margin-top:0.5rem;">한국어 탭에서 링크를 먼저 저장하면 영문 라벨을 입력할 수 있습니다.</div>
+      {% endif %}
     </div>
     </div><!-- end .lang-en -->
 

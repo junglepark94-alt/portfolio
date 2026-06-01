@@ -187,7 +187,16 @@
         data-desc="{{ p_desc | e }}"
         data-detail="{{ p_detail | e }}"
         data-tags="{{ p.tech_stack | e }}"
-        {% set p_links = (p.links_en if en and p.links_en else p.links) %}
+        {% if en and p.links_en %}
+          {% set p_links = [] %}
+          {% for lk in p.links %}
+            {% set en_lk = p.links_en[loop.index0] if loop.index0 < p.links_en|length else none %}
+            {% set en_label = (en_lk.label if en_lk and en_lk.label else lk.label) %}
+            {% set _ = p_links.append({'label': en_label, 'url': lk.url}) %}
+          {% endfor %}
+        {% else %}
+          {% set p_links = p.links %}
+        {% endif %}
         data-links="{{ p_links | tojson | forceescape }}"
         data-images="{{ imgs | map(attribute='filename') | list | tojson | forceescape }}"
         data-kpi="{{ p_kpi | e }}"

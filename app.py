@@ -676,9 +676,8 @@ def project_new():
         links  = [{'label': l.strip(), 'url': u.strip()}
                   for l, u in zip(labels, urls) if l.strip() and u.strip()]
         en_labels = request.form.getlist('link_label_en')
-        en_urls   = request.form.getlist('link_url_en')
-        links_en  = [{'label': l.strip(), 'url': u.strip()}
-                     for l, u in zip(en_labels, en_urls) if l.strip() and u.strip()]
+        links_en  = [{'label': en_labels[i].strip() if i < len(en_labels) else '', 'url': lk['url']}
+                     for i, lk in enumerate(links)]
         kpi_items = request.form.getlist('kpi_item')
         kpi = '\n'.join(i.strip() for i in kpi_items if i.strip())
         img = save_uploaded_image(request.files.get('image'))
@@ -730,9 +729,9 @@ def project_edit(pid):
         p.detail_text = request.form.get('detail_text', '')
         p.links_json = _json.dumps(links, ensure_ascii=False)
         en_labels = request.form.getlist('link_label_en')
-        en_urls   = request.form.getlist('link_url_en')
         p.links_en_json = _json.dumps(
-            [{'label': l.strip(), 'url': u.strip()} for l, u in zip(en_labels, en_urls) if l.strip() and u.strip()],
+            [{'label': en_labels[i].strip() if i < len(en_labels) else '', 'url': lk['url']}
+             for i, lk in enumerate(links)],
             ensure_ascii=False)
         kpi_items = request.form.getlist('kpi_item')
         p.kpi = '\n'.join(i.strip() for i in kpi_items if i.strip())
