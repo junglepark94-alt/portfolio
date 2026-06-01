@@ -66,6 +66,7 @@ class Project(db.Model):
     my_role = db.Column(db.String(200), default='')
     category = db.Column(db.String(100), default='')
     # English
+    links_en_json = db.Column(db.Text, default='[]')
     title_en = db.Column(db.String(120), default='')
     description_en = db.Column(db.Text, default='')
     detail_text_en = db.Column(db.Text, default='')
@@ -87,6 +88,14 @@ class Project(db.Model):
         import json as _json
         try:
             return _json.loads(self.links_json or '[]')
+        except Exception:
+            return []
+
+    @property
+    def links_en(self):
+        import json as _json
+        try:
+            return _json.loads(self.links_en_json or '[]')
         except Exception:
             return []
 
@@ -302,6 +311,7 @@ def init_db():
             "ALTER TABLE profile ADD COLUMN awards_en_json TEXT DEFAULT '[]'",
             "ALTER TABLE profile ADD COLUMN skills_en VARCHAR(500) DEFAULT ''",
             "ALTER TABLE profile ADD COLUMN tools_en_json TEXT DEFAULT '[]'",
+            "ALTER TABLE project ADD COLUMN links_en_json TEXT DEFAULT '[]'",
             "ALTER TABLE project ADD COLUMN title_en VARCHAR(120) DEFAULT ''",
             "ALTER TABLE project ADD COLUMN description_en TEXT DEFAULT ''",
             "ALTER TABLE project ADD COLUMN detail_text_en TEXT DEFAULT ''",
@@ -665,6 +675,10 @@ def project_new():
         urls   = request.form.getlist('link_url')
         links  = [{'label': l.strip(), 'url': u.strip()}
                   for l, u in zip(labels, urls) if l.strip() and u.strip()]
+        en_labels = request.form.getlist('link_label_en')
+        en_urls   = request.form.getlist('link_url_en')
+        links_en  = [{'label': l.strip(), 'url': u.strip()}
+                     for l, u in zip(en_labels, en_urls) if l.strip() and u.strip()]
         kpi_items = request.form.getlist('kpi_item')
         kpi = '\n'.join(i.strip() for i in kpi_items if i.strip())
         img = save_uploaded_image(request.files.get('image'))
@@ -680,6 +694,7 @@ def project_new():
             detail_text=request.form.get('detail_text', ''),
             image_filename=img or '',
             links_json=_json.dumps(links, ensure_ascii=False),
+            links_en_json=_json.dumps(links_en, ensure_ascii=False),
             kpi=kpi,
             my_role=request.form.get('my_role', ''),
             category=request.form.get('category', ''),
@@ -714,6 +729,11 @@ def project_edit(pid):
         p.order = int(request.form.get('order', 0))
         p.detail_text = request.form.get('detail_text', '')
         p.links_json = _json.dumps(links, ensure_ascii=False)
+        en_labels = request.form.getlist('link_label_en')
+        en_urls   = request.form.getlist('link_url_en')
+        p.links_en_json = _json.dumps(
+            [{'label': l.strip(), 'url': u.strip()} for l, u in zip(en_labels, en_urls) if l.strip() and u.strip()],
+            ensure_ascii=False)
         kpi_items = request.form.getlist('kpi_item')
         p.kpi = '\n'.join(i.strip() for i in kpi_items if i.strip())
         p.my_role = request.form.get('my_role', '')

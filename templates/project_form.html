@@ -131,6 +131,27 @@
       <label>Detail (English)</label>
       <textarea name="detail_text_en" id="detail_text_en" rows="6" placeholder="Background, approach, process in English">{{ project.detail_text_en if project else '' }}</textarea>
     </div>
+    <div class="form-group">
+      <label>Related Links (English)</label>
+      <div id="linkRowsEn">
+        {% if project and project.links_en %}
+          {% for lk in project.links_en %}
+          <div class="link-row">
+            <input type="text" name="link_label_en" placeholder="Link name (e.g. GitHub, Demo)" value="{{ lk.label }}" />
+            <input type="text" name="link_url_en" placeholder="https://..." value="{{ lk.url }}" />
+            <button type="button" class="link-remove-btn" aria-label="삭제">×</button>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="link-row">
+            <input type="text" name="link_label_en" placeholder="Link name (e.g. GitHub, Demo)" />
+            <input type="text" name="link_url_en" placeholder="https://..." />
+            <button type="button" class="link-remove-btn" aria-label="삭제">×</button>
+          </div>
+        {% endif %}
+      </div>
+      <button type="button" id="addLinkBtnEn" class="btn-add-link">+ Add Link</button>
+    </div>
     </div><!-- end .lang-en -->
 
     <!-- ── 공통 필드 (항상 표시) ── -->

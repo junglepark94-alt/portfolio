@@ -544,6 +544,28 @@ if (linkRows && addLinkBtn) {
   makeSortable(linkRows, '.link-row');
 }
 
+// ── Project Form: EN Links ───────────────────
+const linkRowsEn = document.getElementById('linkRowsEn');
+const addLinkBtnEn = document.getElementById('addLinkBtnEn');
+if (linkRowsEn && addLinkBtnEn) {
+  function wireRemoveBtnEn(row) {
+    row.querySelector('.link-remove-btn').addEventListener('click', () => {
+      if (linkRowsEn.querySelectorAll('.link-row').length > 1) row.remove();
+    });
+  }
+  linkRowsEn.querySelectorAll('.link-row').forEach(wireRemoveBtnEn);
+  addLinkBtnEn.addEventListener('click', () => {
+    const row = document.createElement('div');
+    row.className = 'link-row';
+    row.innerHTML = '<input type="text" name="link_label_en" placeholder="Link name (e.g. GitHub, Demo)" />'
+      + '<input type="text" name="link_url_en" placeholder="https://..." />'
+      + '<button type="button" class="link-remove-btn" aria-label="삭제">×</button>';
+    linkRowsEn.appendChild(row);
+    wireRemoveBtnEn(row);
+    row.querySelector('input').focus();
+  });
+}
+
 // ── Project Category Filter ──────────────────
 const filterBar = document.getElementById('projectFilterBar');
 if (filterBar) {

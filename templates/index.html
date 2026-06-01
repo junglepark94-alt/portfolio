@@ -122,10 +122,11 @@
     <div class="about-skills-wrap reveal">
       <h4 class="about-block-title">{{ 'Skills' if en else '스킬' }}</h4>
       <ul class="skill-level-list">
+        {% set level_map = {'상': 'High', '중': 'Mid', '하': 'Low'} %}
         {% for tk in tools_display %}
         <li>
           <span class="skill-tag">{{ tk.name }}</span>
-          <span class="level-badge level-{{ tk.level }}">{{ tk.level }}</span>
+          <span class="level-badge level-{{ tk.level }}">{{ level_map[tk.level] if en and tk.level in level_map else tk.level }}</span>
         </li>
         {% endfor %}
       </ul>
@@ -186,7 +187,8 @@
         data-desc="{{ p_desc | e }}"
         data-detail="{{ p_detail | e }}"
         data-tags="{{ p.tech_stack | e }}"
-        data-links="{{ p.links | tojson | forceescape }}"
+        {% set p_links = (p.links_en if en and p.links_en else p.links) %}
+        data-links="{{ p_links | tojson | forceescape }}"
         data-images="{{ imgs | map(attribute='filename') | list | tojson | forceescape }}"
         data-kpi="{{ p_kpi | e }}"
         data-myrole="{{ p_role | e }}"
