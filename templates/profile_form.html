@@ -406,16 +406,16 @@
           <input type="text" value="{{ profile.name }}" disabled style="opacity:0.5;" title="이름은 공통입니다" />
         </div>
         <div class="form-group">
-          <label>Role / Title <button type="button" class="translate-btn" data-src-field="role" data-target="role_en">✦ AI 번역</button></label>
+          <label>Role / Title</label>
           <input type="text" name="role_en" id="role_en" value="{{ profile.role_en or '' }}" placeholder="e.g. Marketing & Content Strategist" />
         </div>
       </div>
       <div class="form-group">
-        <label>Tagline (Hero text) <button type="button" class="translate-btn" data-src-field="tagline" data-target="tagline_en">✦ AI 번역</button></label>
+        <label>Tagline (Hero text)</label>
         <textarea name="tagline_en" id="tagline_en" rows="2" placeholder="e.g. Data-driven content strategist connecting brands and consumers.">{{ profile.tagline_en or '' }}</textarea>
       </div>
       <div class="form-group">
-        <label>About <button type="button" class="translate-btn" data-src-field="about_text" data-target="about_text_en">✦ AI 번역</button></label>
+        <label>About</label>
         <textarea name="about_text_en" id="about_text_en" rows="4" placeholder="About text in English">{{ profile.about_text_en or '' }}</textarea>
       </div>
     </div>
@@ -424,7 +424,7 @@
     <div class="form-card lang-en">
       <div class="fc-title">Core Competencies <span class="en-badge" style="font-size:0.7rem; vertical-align:middle;">ENG</span></div>
       <div class="form-group">
-        <label><button type="button" class="translate-btn" data-src-field="skills" data-target="skills_en">✦ AI 번역</button></label>
+        <label>Core Competencies (comma-separated)</label>
         <input type="text" name="skills_en" id="skills_en" value="{{ profile.skills_en or '' }}" placeholder="Content Planning, Marketing Strategy, Data Analysis" />
         <div class="form-hint">Comma-separated</div>
       </div>
@@ -487,7 +487,7 @@
             <input type="text" name="en_exp_role" value="{{ exp.role }}" placeholder="Marketing / Content Planning" />
           </div>
           <div class="form-group">
-            <label>Key Responsibilities <button type="button" class="translate-btn" data-src-exp-idx="{{ loop.index0 }}" data-target-exp-en="{{ loop.index0 }}">✦ AI 번역</button></label>
+            <label>Key Responsibilities</label>
             <textarea name="en_exp_bullets" rows="4" placeholder="One item per line">{{ exp.bullets | join('\n') }}</textarea>
           </div>
         </div>

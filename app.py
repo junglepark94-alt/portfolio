@@ -475,36 +475,6 @@ def admin_dashboard():
                            gallery_items=gallery_items, db_info=db_info)
 
 
-@app.route('/api/translate', methods=['POST'])
-@login_required
-def api_translate():
-    import json as _j, urllib.request as _ur, urllib.error as _ue
-    data = _j.loads(request.data or '{}')
-    text = (data.get('text') or '').strip()
-    if not text:
-        return app.response_class(_j.dumps({'error': 'no text'}), mimetype='application/json'), 400
-    api_key = os.environ.get('ANTHROPIC_API_KEY', '')
-    if not api_key:
-        return app.response_class(_j.dumps({'error': 'ANTHROPIC_API_KEY not set'}), mimetype='application/json'), 503
-    payload = _j.dumps({
-        'model': 'claude-3-5-haiku-20241022',
-        'max_tokens': 2048,
-        'messages': [{'role': 'user', 'content':
-            f'Translate the following Korean text to natural English. '
-            f'Return ONLY the translated text with no explanation:\n\n{text}'}]
-    }).encode()
-    req = _ur.Request('https://api.anthropic.com/v1/messages',
-        data=payload,
-        headers={'x-api-key': api_key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json'})
-    try:
-        with _ur.urlopen(req, timeout=30) as resp:
-            result = _j.loads(resp.read())
-            translated = result['content'][0]['text']
-            return app.response_class(_j.dumps({'translated': translated}), mimetype='application/json')
-    except Exception as e:
-        return app.response_class(_j.dumps({'error': str(e)}), mimetype='application/json'), 500
-
-
 @app.route('/admin/profile', methods=['GET', 'POST'])
 @login_required
 def profile_edit():
