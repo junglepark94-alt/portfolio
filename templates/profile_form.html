@@ -391,10 +391,39 @@
       <button type="button" class="btn-add-link" onclick="addExp()" style="margin-top:0.5rem;">+ 이력 추가</button>
     </div>
 
+    <!-- ── English Section ── -->
+    <div class="form-card">
+      <div class="en-section-title" style="padding:1.25rem 1.5rem; border-bottom:1px solid var(--border); background:var(--bg-alt);">
+        <span class="en-badge">ENG</span> 영문 버전 정보
+      </div>
+      <div style="padding:1.5rem;">
+        <div class="form-group">
+          <label>Role (English) <button type="button" class="translate-btn" data-src-field="role" data-target="role_en">✦ AI 번역</button></label>
+          <input type="text" name="role_en" id="role_en" value="{{ profile.role_en or '' }}" placeholder="e.g. Marketing & Content Strategist" />
+        </div>
+        <div class="form-group">
+          <label>Tagline (English) <button type="button" class="translate-btn" data-src-field="tagline" data-target="tagline_en">✦ AI 번역</button></label>
+          <textarea name="tagline_en" id="tagline_en" rows="3" placeholder="Tagline in English">{{ profile.tagline_en or '' }}</textarea>
+        </div>
+        <div class="form-group">
+          <label>About (English) <button type="button" class="translate-btn" data-src-field="about_text" data-target="about_text_en">✦ AI 번역</button></label>
+          <textarea name="about_text_en" id="about_text_en" rows="8" placeholder="About text in English">{{ profile.about_text_en or '' }}</textarea>
+        </div>
+        <div class="form-group">
+          <label>Core Competencies (English, comma-separated) <button type="button" class="translate-btn" data-src-field="skills" data-target="skills_en">✦ AI 번역</button></label>
+          <input type="text" name="skills_en" id="skills_en" value="{{ profile.skills_en or '' }}" placeholder="Content Planning, Marketing Strategy, Data Analysis" />
+        </div>
+        <div class="form-group" style="margin-top:1.5rem;">
+          <label style="color:var(--muted); font-size:0.82rem;">경력/학력/수상/스킬 영문 정보는 각 항목 아래 영문 탭에서 입력하거나, 저장 후 <a href="{{ url_for('index_en') }}" target="_blank" style="color:var(--accent);">/en 미리보기</a>에서 확인하세요.</label>
+        </div>
+      </div>
+    </div>
+
     <div class="form-actions">
       <button type="submit" class="btn btn-primary">저장</button>
       <a href="{{ url_for('admin_dashboard') }}" class="btn btn-ghost">취소</a>
-      <a href="{{ url_for('index') }}" class="btn btn-ghost" target="_blank">미리보기 →</a>
+      <a href="{{ url_for('index') }}" class="btn btn-ghost" target="_blank">KOR 미리보기 →</a>
+      <a href="{{ url_for('index_en') }}" class="btn btn-ghost" target="_blank">ENG 미리보기 →</a>
     </div>
 
   </form>

@@ -1227,6 +1227,73 @@ ul { list-style: none; }
 .btn-sm:hover { opacity: 0.75; }
 .btn-danger { background: #fde8e8; color: #b91c1c; }
 
+/* ── Lang Toggle ────────────────────────────── */
+.lang-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.lang-btn {
+  padding: 0.28rem 0.7rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  background: transparent;
+  text-decoration: none;
+  transition: background 0.18s, color 0.18s;
+}
+.lang-btn:first-child { border-right: 1px solid var(--border); }
+.lang-btn.active {
+  background: var(--accent);
+  color: #fff;
+}
+.lang-btn:not(.active):hover { background: var(--bg-alt); color: var(--accent); }
+
+/* ── EN section in admin forms ──────────────── */
+.en-section {
+  margin-top: 2.5rem;
+  border-top: 2px dashed var(--border);
+  padding-top: 1.5rem;
+}
+.en-section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--accent);
+  margin-bottom: 1.25rem;
+}
+.en-section-title .en-badge {
+  font-size: 0.72rem;
+  background: var(--accent);
+  color: #fff;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+}
+.translate-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--accent-2);
+  background: rgba(200,135,58,0.08);
+  border: 1px solid rgba(200,135,58,0.25);
+  border-radius: 5px;
+  padding: 0.3rem 0.75rem;
+  cursor: pointer;
+  transition: background 0.18s;
+  margin-left: auto;
+}
+.translate-btn:hover { background: rgba(200,135,58,0.16); }
+.translate-btn:disabled { opacity: 0.5; cursor: default; }
+
 /* ── Hamburger ──────────────────────────────── */
 .nav-hamburger {
   display: none;

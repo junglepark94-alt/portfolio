@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="{{ lang if lang is defined else 'ko' }}">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -30,6 +30,10 @@
         <li><a href="#gallery">Gallery</a></li>
         <li><a href="#contact">Contact</a></li>
       </ul>
+      <div class="lang-toggle">
+        <a href="{{ url_for('index') }}" class="lang-btn {% if not request.path.startswith('/en') %}active{% endif %}">KOR</a>
+        <a href="{{ url_for('index_en') }}" class="lang-btn {% if request.path.startswith('/en') %}active{% endif %}">ENG</a>
+      </div>
       <button class="nav-hamburger" id="navHamburger" aria-label="메뉴" aria-expanded="false">
         <span></span><span></span><span></span>
       </button>

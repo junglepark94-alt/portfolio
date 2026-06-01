@@ -65,6 +65,13 @@ class Project(db.Model):
     kpi = db.Column(db.String(300), default='')
     my_role = db.Column(db.String(200), default='')
     category = db.Column(db.String(100), default='')
+    # English
+    title_en = db.Column(db.String(120), default='')
+    description_en = db.Column(db.Text, default='')
+    detail_text_en = db.Column(db.Text, default='')
+    kpi_en = db.Column(db.Text, default='')
+    my_role_en = db.Column(db.String(200), default='')
+    category_en = db.Column(db.String(100), default='')
     images = db.relationship('ProjectImage', backref='project',
                              cascade='all, delete-orphan',
                              order_by='ProjectImage.sort_order, ProjectImage.id',
@@ -101,6 +108,7 @@ class GalleryItem(db.Model):
     __tablename__ = 'gallery_item'
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
+    title_en = db.Column(db.String(200), default='')
     description = db.Column(db.Text, default='')
     image_filename = db.Column(db.String(300), nullable=False)
     links_json = db.Column(db.Text, default='[]')
@@ -164,6 +172,15 @@ class Profile(db.Model):
     profile_image_filename = db.Column(db.String(300), default='')
     # 어학 성적 [{exam, score, date}]
     language_scores_json = db.Column(db.Text, default='[]')
+    # English
+    role_en = db.Column(db.String(120), default='')
+    tagline_en = db.Column(db.Text, default='')
+    about_text_en = db.Column(db.Text, default='')
+    experience_en_json = db.Column(db.Text, default='[]')
+    education_en_json = db.Column(db.Text, default='[]')
+    awards_en_json = db.Column(db.Text, default='[]')
+    skills_en = db.Column(db.String(500), default='')
+    tools_en_json = db.Column(db.Text, default='[]')
 
     @property
     def language_scores(self):
@@ -194,10 +211,26 @@ class Profile(db.Model):
             return []
 
     @property
+    def tools_en(self):
+        import json as _j
+        try:
+            return _j.loads(self.tools_en_json or '[]')
+        except Exception:
+            return []
+
+    @property
     def experience(self):
         import json
         try:
             return json.loads(self.experience_json or '[]')
+        except Exception:
+            return []
+
+    @property
+    def experience_en(self):
+        import json as _j
+        try:
+            return _j.loads(self.experience_en_json or '[]')
         except Exception:
             return []
 
@@ -210,10 +243,26 @@ class Profile(db.Model):
             return []
 
     @property
+    def education_en(self):
+        import json as _j
+        try:
+            return _j.loads(self.education_en_json or '[]')
+        except Exception:
+            return []
+
+    @property
     def awards(self):
         import json as _j
         try:
             return _j.loads(self.awards_json or '[]')
+        except Exception:
+            return []
+
+    @property
+    def awards_en(self):
+        import json as _j
+        try:
+            return _j.loads(self.awards_en_json or '[]')
         except Exception:
             return []
 
@@ -242,6 +291,22 @@ def init_db():
             "ALTER TABLE profile ADD COLUMN profile_image_filename VARCHAR(300) DEFAULT ''",
             "ALTER TABLE profile ADD COLUMN language_scores_json TEXT DEFAULT '[]'",
             "ALTER TABLE profile ADD COLUMN remember_url VARCHAR(300) DEFAULT ''",
+            # English columns
+            "ALTER TABLE profile ADD COLUMN role_en VARCHAR(120) DEFAULT ''",
+            "ALTER TABLE profile ADD COLUMN tagline_en TEXT DEFAULT ''",
+            "ALTER TABLE profile ADD COLUMN about_text_en TEXT DEFAULT ''",
+            "ALTER TABLE profile ADD COLUMN experience_en_json TEXT DEFAULT '[]'",
+            "ALTER TABLE profile ADD COLUMN education_en_json TEXT DEFAULT '[]'",
+            "ALTER TABLE profile ADD COLUMN awards_en_json TEXT DEFAULT '[]'",
+            "ALTER TABLE profile ADD COLUMN skills_en VARCHAR(500) DEFAULT ''",
+            "ALTER TABLE profile ADD COLUMN tools_en_json TEXT DEFAULT '[]'",
+            "ALTER TABLE project ADD COLUMN title_en VARCHAR(120) DEFAULT ''",
+            "ALTER TABLE project ADD COLUMN description_en TEXT DEFAULT ''",
+            "ALTER TABLE project ADD COLUMN detail_text_en TEXT DEFAULT ''",
+            "ALTER TABLE project ADD COLUMN kpi_en TEXT DEFAULT ''",
+            "ALTER TABLE project ADD COLUMN my_role_en VARCHAR(200) DEFAULT ''",
+            "ALTER TABLE project ADD COLUMN category_en VARCHAR(100) DEFAULT ''",
+            "ALTER TABLE gallery_item ADD COLUMN title_en VARCHAR(200) DEFAULT ''",
         ]:
             try:
                 conn.execute(db.text(sql))
@@ -355,7 +420,14 @@ def index():
     projects = Project.query.order_by(Project.order, Project.created_at.desc()).all()
     gallery_items = GalleryItem.query.order_by(GalleryItem.sort_order, GalleryItem.created_at).all()
     profile = db.session.get(Profile, 1)
-    return render_template('index.html', projects=projects, gallery_items=gallery_items, profile=profile)
+    return render_template('index.html', projects=projects, gallery_items=gallery_items, profile=profile, lang='ko')
+
+@app.route('/en')
+def index_en():
+    projects = Project.query.order_by(Project.order, Project.created_at.desc()).all()
+    gallery_items = GalleryItem.query.order_by(GalleryItem.sort_order, GalleryItem.created_at).all()
+    profile = db.session.get(Profile, 1)
+    return render_template('index.html', projects=projects, gallery_items=gallery_items, profile=profile, lang='en')
 
 
 # ── Admin Auth ───────────────────────────────────────────
@@ -401,6 +473,36 @@ def admin_dashboard():
     }
     return render_template('admin.html', projects=projects, profile=profile,
                            gallery_items=gallery_items, db_info=db_info)
+
+
+@app.route('/api/translate', methods=['POST'])
+@login_required
+def api_translate():
+    import json as _j, urllib.request as _ur, urllib.error as _ue
+    data = _j.loads(request.data or '{}')
+    text = (data.get('text') or '').strip()
+    if not text:
+        return app.response_class(_j.dumps({'error': 'no text'}), mimetype='application/json'), 400
+    api_key = os.environ.get('ANTHROPIC_API_KEY', '')
+    if not api_key:
+        return app.response_class(_j.dumps({'error': 'ANTHROPIC_API_KEY not set'}), mimetype='application/json'), 503
+    payload = _j.dumps({
+        'model': 'claude-3-5-haiku-20241022',
+        'max_tokens': 2048,
+        'messages': [{'role': 'user', 'content':
+            f'Translate the following Korean text to natural English. '
+            f'Return ONLY the translated text with no explanation:\n\n{text}'}]
+    }).encode()
+    req = _ur.Request('https://api.anthropic.com/v1/messages',
+        data=payload,
+        headers={'x-api-key': api_key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json'})
+    try:
+        with _ur.urlopen(req, timeout=30) as resp:
+            result = _j.loads(resp.read())
+            translated = result['content'][0]['text']
+            return app.response_class(_j.dumps({'translated': translated}), mimetype='application/json')
+    except Exception as e:
+        return app.response_class(_j.dumps({'error': str(e)}), mimetype='application/json'), 500
 
 
 @app.route('/admin/profile', methods=['GET', 'POST'])
@@ -462,6 +564,51 @@ def profile_edit():
         else:
             profile.og_image_url = request.form.get('og_image_url', '')
         profile.open_to_work = bool(request.form.get('open_to_work'))
+
+        # English fields
+        profile.role_en = request.form.get('role_en', '')
+        profile.tagline_en = request.form.get('tagline_en', '')
+        profile.about_text_en = request.form.get('about_text_en', '')
+        profile.skills_en = request.form.get('skills_en', '')
+        # EN experience
+        en_companies = request.form.getlist('en_exp_company')
+        en_periods   = request.form.getlist('en_exp_period')
+        en_roles     = request.form.getlist('en_exp_role')
+        en_bullets   = request.form.getlist('en_exp_bullets')
+        experience_en = []
+        for i, c in enumerate(en_companies):
+            if c.strip():
+                experience_en.append({'company': c.strip(),
+                    'period': en_periods[i].strip() if i < len(en_periods) else '',
+                    'role': en_roles[i].strip() if i < len(en_roles) else '',
+                    'bullets': [b.strip() for b in en_bullets[i].split('\n') if b.strip()] if i < len(en_bullets) else []})
+        profile.experience_en_json = json.dumps(experience_en, ensure_ascii=False)
+        # EN education
+        en_edu_schools  = request.form.getlist('en_edu_school')
+        en_edu_majors   = request.form.getlist('en_edu_major')
+        en_edu_degrees  = request.form.getlist('en_edu_degree')
+        en_edu_periods  = request.form.getlist('en_edu_period')
+        education_en = [{'school': s.strip(),
+            'major': en_edu_majors[i].strip() if i < len(en_edu_majors) else '',
+            'degree': en_edu_degrees[i].strip() if i < len(en_edu_degrees) else '',
+            'period': en_edu_periods[i].strip() if i < len(en_edu_periods) else ''}
+            for i, s in enumerate(en_edu_schools) if s.strip()]
+        profile.education_en_json = json.dumps(education_en, ensure_ascii=False)
+        # EN awards
+        en_award_titles = request.form.getlist('en_award_title')
+        en_award_orgs   = request.form.getlist('en_award_org')
+        en_award_years  = request.form.getlist('en_award_year')
+        awards_en = [{'title': t.strip(),
+            'org': en_award_orgs[i].strip() if i < len(en_award_orgs) else '',
+            'year': en_award_years[i].strip() if i < len(en_award_years) else ''}
+            for i, t in enumerate(en_award_titles) if t.strip()]
+        profile.awards_en_json = json.dumps(awards_en, ensure_ascii=False)
+        # EN tools
+        en_tool_names  = request.form.getlist('en_tool_name')
+        en_tool_levels = request.form.getlist('en_tool_level')
+        tools_en = [{'name': n.strip(), 'level': l}
+            for n, l in zip(en_tool_names, en_tool_levels) if n.strip()]
+        profile.tools_en_json = json.dumps(tools_en, ensure_ascii=False)
 
         # 이력서 PDF 업로드
         resume_file = request.files.get('resume_file')
@@ -548,6 +695,7 @@ def project_new():
         kpi_items = request.form.getlist('kpi_item')
         kpi = '\n'.join(i.strip() for i in kpi_items if i.strip())
         img = save_uploaded_image(request.files.get('image'))
+        en_kpi_items = request.form.getlist('kpi_item_en')
         p = Project(
             title=request.form['title'],
             description=request.form['description'],
@@ -562,6 +710,12 @@ def project_new():
             kpi=kpi,
             my_role=request.form.get('my_role', ''),
             category=request.form.get('category', ''),
+            title_en=request.form.get('title_en', ''),
+            description_en=request.form.get('description_en', ''),
+            detail_text_en=request.form.get('detail_text_en', ''),
+            kpi_en='\n'.join(i.strip() for i in en_kpi_items if i.strip()),
+            my_role_en=request.form.get('my_role_en', ''),
+            category_en=request.form.get('category_en', ''),
         )
         db.session.add(p)
         db.session.commit()
@@ -591,6 +745,13 @@ def project_edit(pid):
         p.kpi = '\n'.join(i.strip() for i in kpi_items if i.strip())
         p.my_role = request.form.get('my_role', '')
         p.category = request.form.get('category', '')
+        p.title_en = request.form.get('title_en', '')
+        p.description_en = request.form.get('description_en', '')
+        p.detail_text_en = request.form.get('detail_text_en', '')
+        en_kpi_items = request.form.getlist('kpi_item_en')
+        p.kpi_en = '\n'.join(i.strip() for i in en_kpi_items if i.strip())
+        p.my_role_en = request.form.get('my_role_en', '')
+        p.category_en = request.form.get('category_en', '')
         db.session.commit()
         flash('프로젝트가 수정되었습니다.')
         return redirect(url_for('admin_dashboard'))
@@ -669,6 +830,7 @@ def gallery_new():
             return redirect(request.url)
         item = GalleryItem(
             title=request.form['title'],
+            title_en=request.form.get('title_en', ''),
             description='',
             image_filename=filename,
             links_json='[]',
@@ -687,6 +849,7 @@ def gallery_edit(gid):
     item = GalleryItem.query.get_or_404(gid)
     if request.method == 'POST':
         item.title = request.form['title']
+        item.title_en = request.form.get('title_en', '')
         item.sort_order = int(request.form.get('sort_order', 0))
         new_img = _save_gallery_image(request)
         if new_img:

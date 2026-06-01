@@ -14,6 +14,17 @@
       <input type="text" name="title" value="{{ item.title if item else '' }}" required />
     </div>
 
+    <div class="en-section">
+      <div class="en-section-title">
+        <span class="en-badge">ENG</span> 영문 정보
+        <button type="button" class="translate-btn" data-src="title" data-target="title_en">✦ AI 번역</button>
+      </div>
+      <div class="form-group">
+        <label>Title (English)</label>
+        <input type="text" name="title_en" id="title_en" value="{{ item.title_en if item and item.title_en else '' }}" placeholder="Gallery item title in English" />
+      </div>
+    </div>
+
     <!-- 이미지 업로드 & 크롭 -->
     <div class="form-group">
       <label>이미지 {% if not item %}*{% endif %}</label>
