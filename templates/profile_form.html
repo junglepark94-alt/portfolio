@@ -8,7 +8,13 @@
     <a href="{{ url_for('admin_dashboard') }}" class="btn btn-ghost">← 대시보드</a>
   </div>
 
-  <form method="POST" enctype="multipart/form-data">
+  <form method="POST" enctype="multipart/form-data" data-lang="ko">
+
+    <!-- ── 언어 탭 ── -->
+    <div class="form-lang-switcher">
+      <button type="button" class="flang-btn active" data-lang="ko">🇰🇷 한국어</button>
+      <button type="button" class="flang-btn" data-lang="en">🇺🇸 English</button>
+    </div>
 
     <!-- ── 이직 검토 상태 ── -->
     <div class="form-card">
@@ -62,7 +68,7 @@
     </div>
 
     <!-- ── 기본 정보 ── -->
-    <div class="form-card">
+    <div class="form-card lang-ko">
       <div class="fc-title">기본 정보</div>
       <div class="form-row-2">
         <div class="form-group">
@@ -87,7 +93,7 @@
     </div>
 
     <!-- ── 핵심 역량 ── -->
-    <div class="form-card">
+    <div class="form-card lang-ko">
       <div class="fc-title">핵심 역량</div>
       <div class="form-group">
         <input type="text" name="skills" value="{{ profile.skills }}" placeholder="콘텐츠 기획,마케팅 전략,데이터 분석" />
@@ -96,7 +102,7 @@
     </div>
 
     <!-- ── 스킬 ── -->
-    <div class="form-card">
+    <div class="form-card lang-ko">
       <div class="fc-title">스킬</div>
       <div class="form-hint" style="margin-bottom:1rem;">다룰 수 있는 툴·기술과 숙련도를 입력하세요.</div>
       <div id="toolRows">
@@ -128,7 +134,7 @@
     </div>
 
     <!-- ── 학력 ── -->
-    <div class="form-card">
+    <div class="form-card lang-ko">
       <div class="fc-title">학력</div>
       <div id="eduRows">
         {% if profile.education %}
@@ -187,7 +193,7 @@
     </div>
 
     <!-- ── 어학 성적 ── -->
-    <div class="form-card">
+    <div class="form-card lang-ko">
       <div class="fc-title">어학 성적</div>
       <div class="form-hint" style="margin-bottom:1rem;">시험명, 점수/등급, 취득 연월을 입력하세요.</div>
       <div id="langRows">
@@ -231,7 +237,7 @@
     </div>
 
     <!-- ── 수상내역 ── -->
-    <div class="form-card">
+    <div class="form-card lang-ko">
       <div class="fc-title">수상내역</div>
       <div id="awardRows">
         {% if profile.awards %}
@@ -358,7 +364,7 @@
     </div>
 
     <!-- ── 재직 이력 ── -->
-    <div class="form-card">
+    <div class="form-card lang-ko">
       <div class="fc-title">재직 이력</div>
       <div id="exp-list">
         {% for exp in profile.experience %}
@@ -391,32 +397,176 @@
       <button type="button" class="btn-add-link" onclick="addExp()" style="margin-top:0.5rem;">+ 이력 추가</button>
     </div>
 
-    <!-- ── English Section ── -->
-    <div class="form-card">
-      <div class="en-section-title" style="padding:1.25rem 1.5rem; border-bottom:1px solid var(--border); background:var(--bg-alt);">
-        <span class="en-badge">ENG</span> 영문 버전 정보
-      </div>
-      <div style="padding:1.5rem;">
+    <!-- ── [EN] 기본 정보 ── -->
+    <div class="form-card lang-en">
+      <div class="fc-title">Basic Info <span class="en-badge" style="font-size:0.7rem; vertical-align:middle;">ENG</span></div>
+      <div class="form-row-2">
         <div class="form-group">
-          <label>Role (English) <button type="button" class="translate-btn" data-src-field="role" data-target="role_en">✦ AI 번역</button></label>
+          <label>Name</label>
+          <input type="text" value="{{ profile.name }}" disabled style="opacity:0.5;" title="이름은 공통입니다" />
+        </div>
+        <div class="form-group">
+          <label>Role / Title <button type="button" class="translate-btn" data-src-field="role" data-target="role_en">✦ AI 번역</button></label>
           <input type="text" name="role_en" id="role_en" value="{{ profile.role_en or '' }}" placeholder="e.g. Marketing & Content Strategist" />
         </div>
-        <div class="form-group">
-          <label>Tagline (English) <button type="button" class="translate-btn" data-src-field="tagline" data-target="tagline_en">✦ AI 번역</button></label>
-          <textarea name="tagline_en" id="tagline_en" rows="3" placeholder="Tagline in English">{{ profile.tagline_en or '' }}</textarea>
-        </div>
-        <div class="form-group">
-          <label>About (English) <button type="button" class="translate-btn" data-src-field="about_text" data-target="about_text_en">✦ AI 번역</button></label>
-          <textarea name="about_text_en" id="about_text_en" rows="8" placeholder="About text in English">{{ profile.about_text_en or '' }}</textarea>
-        </div>
-        <div class="form-group">
-          <label>Core Competencies (English, comma-separated) <button type="button" class="translate-btn" data-src-field="skills" data-target="skills_en">✦ AI 번역</button></label>
-          <input type="text" name="skills_en" id="skills_en" value="{{ profile.skills_en or '' }}" placeholder="Content Planning, Marketing Strategy, Data Analysis" />
-        </div>
-        <div class="form-group" style="margin-top:1.5rem;">
-          <label style="color:var(--muted); font-size:0.82rem;">경력/학력/수상/스킬 영문 정보는 각 항목 아래 영문 탭에서 입력하거나, 저장 후 <a href="{{ url_for('index_en') }}" target="_blank" style="color:var(--accent);">/en 미리보기</a>에서 확인하세요.</label>
-        </div>
       </div>
+      <div class="form-group">
+        <label>Tagline (Hero text) <button type="button" class="translate-btn" data-src-field="tagline" data-target="tagline_en">✦ AI 번역</button></label>
+        <textarea name="tagline_en" id="tagline_en" rows="2" placeholder="e.g. Data-driven content strategist connecting brands and consumers.">{{ profile.tagline_en or '' }}</textarea>
+      </div>
+      <div class="form-group">
+        <label>About <button type="button" class="translate-btn" data-src-field="about_text" data-target="about_text_en">✦ AI 번역</button></label>
+        <textarea name="about_text_en" id="about_text_en" rows="4" placeholder="About text in English">{{ profile.about_text_en or '' }}</textarea>
+      </div>
+    </div>
+
+    <!-- ── [EN] 핵심 역량 ── -->
+    <div class="form-card lang-en">
+      <div class="fc-title">Core Competencies <span class="en-badge" style="font-size:0.7rem; vertical-align:middle;">ENG</span></div>
+      <div class="form-group">
+        <label><button type="button" class="translate-btn" data-src-field="skills" data-target="skills_en">✦ AI 번역</button></label>
+        <input type="text" name="skills_en" id="skills_en" value="{{ profile.skills_en or '' }}" placeholder="Content Planning, Marketing Strategy, Data Analysis" />
+        <div class="form-hint">Comma-separated</div>
+      </div>
+    </div>
+
+    <!-- ── [EN] 스킬 ── -->
+    <div class="form-card lang-en">
+      <div class="fc-title">Skills <span class="en-badge" style="font-size:0.7rem; vertical-align:middle;">ENG</span></div>
+      <div class="form-hint" style="margin-bottom:1rem;">Enter tool/skill names in English with proficiency level.</div>
+      <div id="toolRowsEn">
+        {% if profile.tools_en %}
+          {% for tk in profile.tools_en %}
+          <div class="skill-row">
+            <input type="text" name="en_tool_name" placeholder="e.g. Figma, Python" value="{{ tk.name }}" />
+            <select name="en_tool_level">
+              <option value="상" {% if tk.level == '상' %}selected{% endif %}>High</option>
+              <option value="중" {% if tk.level == '중' %}selected{% endif %}>Mid</option>
+              <option value="하" {% if tk.level == '하' %}selected{% endif %}>Low</option>
+            </select>
+            <button type="button" class="link-remove-btn" onclick="removeRow(this)">×</button>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="skill-row">
+            <input type="text" name="en_tool_name" placeholder="e.g. Figma, Python" />
+            <select name="en_tool_level">
+              <option value="상">High</option>
+              <option value="중" selected>Mid</option>
+              <option value="하">Low</option>
+            </select>
+            <button type="button" class="link-remove-btn" onclick="removeRow(this)">×</button>
+          </div>
+        {% endif %}
+      </div>
+      <button type="button" class="btn-add-link" onclick="addToolEn()">+ Add Skill</button>
+    </div>
+
+    <!-- ── [EN] 재직 이력 ── -->
+    <div class="form-card lang-en">
+      <div class="fc-title">Work Experience <span class="en-badge" style="font-size:0.7rem; vertical-align:middle;">ENG</span></div>
+      <div id="expListEn">
+        {% for exp in profile.experience_en %}
+        <div class="exp-item">
+          <div class="exp-item-header">
+            <span class="exp-num">Experience {{ loop.index }}</span>
+            <button type="button" class="btn-sm btn-danger" onclick="removeRow(this.closest('.exp-item'))">Delete</button>
+          </div>
+          <div class="form-row-2">
+            <div class="form-group">
+              <label>Company</label>
+              <input type="text" name="en_exp_company" value="{{ exp.company }}" placeholder="Company Name" />
+            </div>
+            <div class="form-group">
+              <label>Period</label>
+              <input type="text" name="en_exp_period" value="{{ exp.period }}" placeholder="2022.03 – Present" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Role / Title</label>
+            <input type="text" name="en_exp_role" value="{{ exp.role }}" placeholder="Marketing / Content Planning" />
+          </div>
+          <div class="form-group">
+            <label>Key Responsibilities <button type="button" class="translate-btn" data-src-exp-idx="{{ loop.index0 }}" data-target-exp-en="{{ loop.index0 }}">✦ AI 번역</button></label>
+            <textarea name="en_exp_bullets" rows="4" placeholder="One item per line">{{ exp.bullets | join('\n') }}</textarea>
+          </div>
+        </div>
+        {% else %}
+        <div class="exp-item">
+          <div class="exp-item-header">
+            <span class="exp-num">Experience 1</span>
+            <button type="button" class="btn-sm btn-danger" onclick="removeRow(this.closest('.exp-item'))">Delete</button>
+          </div>
+          <div class="form-row-2">
+            <div class="form-group"><label>Company</label><input type="text" name="en_exp_company" placeholder="Company Name" /></div>
+            <div class="form-group"><label>Period</label><input type="text" name="en_exp_period" placeholder="2022.03 – Present" /></div>
+          </div>
+          <div class="form-group"><label>Role / Title</label><input type="text" name="en_exp_role" placeholder="Marketing Manager" /></div>
+          <div class="form-group"><label>Key Responsibilities</label><textarea name="en_exp_bullets" rows="4" placeholder="One item per line"></textarea></div>
+        </div>
+        {% endfor %}
+      </div>
+      <button type="button" class="btn-add-link" onclick="addExpEn()" style="margin-top:0.5rem;">+ Add Experience</button>
+    </div>
+
+    <!-- ── [EN] 학력 ── -->
+    <div class="form-card lang-en">
+      <div class="fc-title">Education <span class="en-badge" style="font-size:0.7rem; vertical-align:middle;">ENG</span></div>
+      <div id="eduRowsEn">
+        {% for ed in profile.education_en %}
+        <div class="edu-item">
+          <div class="form-row-2">
+            <div class="form-group"><label>School</label><input type="text" name="en_edu_school" value="{{ ed.school }}" placeholder="University of ..." /></div>
+            <div class="form-group"><label>Period</label><input type="text" name="en_edu_period" value="{{ ed.period }}" placeholder="2018.03 – 2022.02" /></div>
+          </div>
+          <div class="form-row-2">
+            <div class="form-group"><label>Major</label><input type="text" name="en_edu_major" value="{{ ed.major }}" placeholder="Business Administration" /></div>
+            <div class="form-group"><label>Degree</label><input type="text" name="en_edu_degree" value="{{ ed.degree }}" placeholder="Bachelor's" /></div>
+          </div>
+          <button type="button" class="btn-sm btn-danger" onclick="removeRow(this.closest('.edu-item'))">Delete</button>
+        </div>
+        {% else %}
+        <div class="edu-item">
+          <div class="form-row-2">
+            <div class="form-group"><label>School</label><input type="text" name="en_edu_school" placeholder="University of ..." /></div>
+            <div class="form-group"><label>Period</label><input type="text" name="en_edu_period" placeholder="2018.03 – 2022.02" /></div>
+          </div>
+          <div class="form-row-2">
+            <div class="form-group"><label>Major</label><input type="text" name="en_edu_major" placeholder="Business Administration" /></div>
+            <div class="form-group"><label>Degree</label><input type="text" name="en_edu_degree" placeholder="Bachelor's" /></div>
+          </div>
+          <button type="button" class="btn-sm btn-danger" onclick="removeRow(this.closest('.edu-item'))">Delete</button>
+        </div>
+        {% endfor %}
+      </div>
+      <button type="button" class="btn-add-link" onclick="addEduEn()" style="margin-top:0.5rem;">+ Add Education</button>
+    </div>
+
+    <!-- ── [EN] 수상내역 ── -->
+    <div class="form-card lang-en">
+      <div class="fc-title">Awards <span class="en-badge" style="font-size:0.7rem; vertical-align:middle;">ENG</span></div>
+      <div id="awardRowsEn">
+        {% for aw in profile.awards_en %}
+        <div class="award-item">
+          <div class="form-row-3">
+            <div class="form-group"><label>Award Name</label><input type="text" name="en_award_title" value="{{ aw.title }}" placeholder="Best Employee Award" /></div>
+            <div class="form-group"><label>Org</label><input type="text" name="en_award_org" value="{{ aw.org }}" placeholder="Binggrae" /></div>
+            <div class="form-group"><label>Year</label><input type="text" name="en_award_year" value="{{ aw.year }}" placeholder="2023" /></div>
+          </div>
+          <button type="button" class="btn-sm btn-danger" onclick="removeRow(this.closest('.award-item'))">Delete</button>
+        </div>
+        {% else %}
+        <div class="award-item">
+          <div class="form-row-3">
+            <div class="form-group"><label>Award Name</label><input type="text" name="en_award_title" placeholder="Best Employee Award" /></div>
+            <div class="form-group"><label>Org</label><input type="text" name="en_award_org" placeholder="Company Name" /></div>
+            <div class="form-group"><label>Year</label><input type="text" name="en_award_year" placeholder="2023" /></div>
+          </div>
+          <button type="button" class="btn-sm btn-danger" onclick="removeRow(this.closest('.award-item'))">Delete</button>
+        </div>
+        {% endfor %}
+      </div>
+      <button type="button" class="btn-add-link" onclick="addAwardEn()" style="margin-top:0.5rem;">+ Add Award</button>
     </div>
 
     <div class="form-actions">
@@ -493,6 +643,55 @@ function addAward() {
     </div>
     <button type="button" class="btn-sm btn-danger" onclick="removeRow(this.closest('.award-item'))">삭제</button>`;
   document.getElementById('awardRows').appendChild(div);
+}
+
+function addToolEn() {
+  const row = document.createElement('div');
+  row.className = 'skill-row';
+  row.innerHTML = '<input type="text" name="en_tool_name" placeholder="e.g. Figma, Python" />'
+    + '<select name="en_tool_level"><option value="상">High</option><option value="중" selected>Mid</option><option value="하">Low</option></select>'
+    + '<button type="button" class="link-remove-btn" onclick="removeRow(this)">×</button>';
+  document.getElementById('toolRowsEn').appendChild(row);
+}
+
+let expEnCount = {{ profile.experience_en | length }};
+function addExpEn() {
+  expEnCount++;
+  const div = document.createElement('div');
+  div.className = 'exp-item';
+  div.innerHTML = '<div class="exp-item-header"><span class="exp-num">Experience ' + expEnCount + '</span>'
+    + '<button type="button" class="btn-sm btn-danger" onclick="removeRow(this.closest(\'.exp-item\'))">Delete</button></div>'
+    + '<div class="form-row-2">'
+    + '<div class="form-group"><label>Company</label><input type="text" name="en_exp_company" placeholder="Company Name" /></div>'
+    + '<div class="form-group"><label>Period</label><input type="text" name="en_exp_period" placeholder="2022.03 – Present" /></div>'
+    + '</div>'
+    + '<div class="form-group"><label>Role / Title</label><input type="text" name="en_exp_role" placeholder="Marketing Manager" /></div>'
+    + '<div class="form-group"><label>Key Responsibilities</label><textarea name="en_exp_bullets" rows="4" placeholder="One item per line"></textarea></div>';
+  document.getElementById('expListEn').appendChild(div);
+}
+
+function addEduEn() {
+  const div = document.createElement('div');
+  div.className = 'edu-item';
+  div.innerHTML = '<div class="form-row-2">'
+    + '<div class="form-group"><label>School</label><input type="text" name="en_edu_school" placeholder="University of ..." /></div>'
+    + '<div class="form-group"><label>Period</label><input type="text" name="en_edu_period" placeholder="2018.03 – 2022.02" /></div>'
+    + '</div><div class="form-row-2">'
+    + '<div class="form-group"><label>Major</label><input type="text" name="en_edu_major" placeholder="Business Administration" /></div>'
+    + '<div class="form-group"><label>Degree</label><input type="text" name="en_edu_degree" placeholder="Bachelor\'s" /></div>'
+    + '</div><button type="button" class="btn-sm btn-danger" onclick="removeRow(this.closest(\'.edu-item\'))">Delete</button>';
+  document.getElementById('eduRowsEn').appendChild(div);
+}
+
+function addAwardEn() {
+  const div = document.createElement('div');
+  div.className = 'award-item';
+  div.innerHTML = '<div class="form-row-3">'
+    + '<div class="form-group"><label>Award Name</label><input type="text" name="en_award_title" placeholder="Best Employee Award" /></div>'
+    + '<div class="form-group"><label>Org</label><input type="text" name="en_award_org" placeholder="Company Name" /></div>'
+    + '<div class="form-group"><label>Year</label><input type="text" name="en_award_year" placeholder="2023" /></div>'
+    + '</div><button type="button" class="btn-sm btn-danger" onclick="removeRow(this.closest(\'.award-item\'))">Delete</button>';
+  document.getElementById('awardRowsEn').appendChild(div);
 }
 
 // ── OG 이미지 크롭 ──────────────────────────

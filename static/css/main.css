@@ -1254,6 +1254,35 @@ ul { list-style: none; }
 }
 .lang-btn:not(.active):hover { background: var(--bg-alt); color: var(--accent); }
 
+/* ── Form Language Tab Switcher ─────────────── */
+.form-lang-switcher {
+  display: flex;
+  gap: 0;
+  margin-bottom: 1.75rem;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  width: fit-content;
+}
+.flang-btn {
+  padding: 0.55rem 1.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  background: var(--surface);
+  border: none;
+  cursor: pointer;
+  transition: background 0.18s, color 0.18s;
+}
+.flang-btn:first-child { border-right: 1.5px solid var(--border); }
+.flang-btn.active { background: var(--accent); color: #fff; }
+.flang-btn:not(.active):hover { background: var(--bg-alt); color: var(--text); }
+
+/* Show/hide lang sections */
+form[data-lang="ko"] .lang-en { display: none !important; }
+form[data-lang="en"] .lang-ko { display: none !important; }
+
 /* ── EN section in admin forms ──────────────── */
 .en-section {
   margin-top: 2.5rem;

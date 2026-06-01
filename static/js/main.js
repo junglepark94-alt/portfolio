@@ -573,6 +573,18 @@ if (filterBar) {
   });
 }
 
+// ── Form Language Switcher ───────────────────
+(function () {
+  document.querySelectorAll('.form-lang-switcher .flang-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const switcher = this.closest('.form-lang-switcher');
+      switcher.querySelectorAll('.flang-btn').forEach(function (b) { b.classList.toggle('active', b === btn); });
+      const form = this.closest('form') || document.querySelector('form');
+      form.dataset.lang = this.dataset.lang;
+    });
+  });
+})();
+
 // ── EN KPI rows (project form) ───────────────
 const kpiRowsEn = document.getElementById('kpiRowsEn');
 const addKpiBtnEn = document.getElementById('addKpiBtnEn');

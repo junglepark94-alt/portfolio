@@ -6,23 +6,27 @@
 <div class="container" style="padding-top:6rem; max-width:640px;">
   <h2>{{ '갤러리 항목 수정' if item else '갤러리 항목 추가' }}</h2>
 
-  <form method="POST" enctype="multipart/form-data" style="margin-top:2rem;" id="galleryForm">
+  <form method="POST" enctype="multipart/form-data" style="margin-top:2rem;" id="galleryForm" data-lang="ko">
     <input type="hidden" name="cropped_data" id="croppedData" />
 
+    <!-- 언어 탭 -->
+    <div class="form-lang-switcher">
+      <button type="button" class="flang-btn active" data-lang="ko">🇰🇷 한국어</button>
+      <button type="button" class="flang-btn" data-lang="en">🇺🇸 English</button>
+    </div>
+
+    <div class="lang-ko">
     <div class="form-group">
       <label>제목 *</label>
       <input type="text" name="title" value="{{ item.title if item else '' }}" required />
     </div>
+    </div>
 
-    <div class="en-section">
-      <div class="en-section-title">
-        <span class="en-badge">ENG</span> 영문 정보
-        <button type="button" class="translate-btn" data-src="title" data-target="title_en">✦ AI 번역</button>
-      </div>
-      <div class="form-group">
-        <label>Title (English)</label>
-        <input type="text" name="title_en" id="title_en" value="{{ item.title_en if item and item.title_en else '' }}" placeholder="Gallery item title in English" />
-      </div>
+    <div class="lang-en">
+    <div class="form-group">
+      <label>Title (English) <button type="button" class="translate-btn" data-src="title" data-target="title_en">✦ AI 번역</button></label>
+      <input type="text" name="title_en" id="title_en" value="{{ item.title_en if item and item.title_en else '' }}" placeholder="Gallery item title in English" />
+    </div>
     </div>
 
     <!-- 이미지 업로드 & 크롭 -->

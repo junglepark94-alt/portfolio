@@ -37,7 +37,16 @@
   {% endif %}
 
   <!-- ── 프로젝트 정보 폼 ── -->
-  <form method="POST" style="margin-top:1.5rem;">
+  <form method="POST" style="margin-top:1.5rem;" data-lang="ko">
+
+    <!-- 언어 탭 -->
+    <div class="form-lang-switcher">
+      <button type="button" class="flang-btn active" data-lang="ko">🇰🇷 한국어</button>
+      <button type="button" class="flang-btn" data-lang="en">🇺🇸 English</button>
+    </div>
+
+    <!-- ── KOR 콘텐츠 필드 ── -->
+    <div class="lang-ko">
     <div class="form-group">
       <label>제목 *</label>
       <input type="text" name="title" value="{{ project.title if project else '' }}" required />
@@ -79,6 +88,52 @@
       <label>상세 설명</label>
       <textarea name="detail_text" rows="6" placeholder="문제 배경, 접근 방법, 과정 등 추가 맥락을 입력하세요.">{{ project.detail_text if project else '' }}</textarea>
     </div>
+    </div><!-- end .lang-ko -->
+
+    <!-- ── EN 콘텐츠 필드 ── -->
+    <div class="lang-en">
+    <div class="form-group">
+      <label>Title (English) <button type="button" class="translate-btn" data-src="title" data-target="title_en">✦ AI 번역</button></label>
+      <input type="text" name="title_en" id="title_en" value="{{ project.title_en if project else '' }}" placeholder="Project title in English" />
+    </div>
+    <div class="form-group">
+      <label>Description (English) <button type="button" class="translate-btn" data-src="description" data-target="description_en">✦ AI 번역</button></label>
+      <textarea name="description_en" id="description_en" rows="4" placeholder="Project description in English">{{ project.description_en if project else '' }}</textarea>
+    </div>
+    <div class="form-group">
+      <label>Key Results (English) <button type="button" class="translate-btn" data-src-kpi="true" data-target="kpi_en_rows">✦ AI 번역</button></label>
+      <div id="kpiRowsEn">
+        {% if project and project.kpi_en %}
+          {% for item in project.kpi_en.split('\n') if item.strip() %}
+          <div class="kpi-row">
+            <input type="text" name="kpi_item_en" value="{{ item.strip() }}" placeholder="e.g. 70% reduction in processing time" />
+            <button type="button" class="kpi-remove-btn" aria-label="삭제">×</button>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="kpi-row">
+            <input type="text" name="kpi_item_en" placeholder="e.g. 70% reduction in processing time" />
+            <button type="button" class="kpi-remove-btn" aria-label="삭제">×</button>
+          </div>
+        {% endif %}
+      </div>
+      <button type="button" id="addKpiBtnEn" class="btn-add-link">+ Add Result</button>
+    </div>
+    <div class="form-group">
+      <label>Role (English) <button type="button" class="translate-btn" data-src="my_role" data-target="my_role_en">✦ AI 번역</button></label>
+      <input type="text" name="my_role_en" id="my_role_en" value="{{ project.my_role_en if project else '' }}" placeholder="e.g. Solo Project / Team (3 people, Planning & Content)" />
+    </div>
+    <div class="form-group">
+      <label>Category (English) <button type="button" class="translate-btn" data-src="category" data-target="category_en">✦ AI 번역</button></label>
+      <input type="text" name="category_en" id="category_en" value="{{ project.category_en if project else '' }}" placeholder="e.g. Content Planning / Campaign" />
+    </div>
+    <div class="form-group">
+      <label>Detail (English) <button type="button" class="translate-btn" data-src="detail_text" data-target="detail_text_en">✦ AI 번역</button></label>
+      <textarea name="detail_text_en" id="detail_text_en" rows="6" placeholder="Background, approach, process in English">{{ project.detail_text_en if project else '' }}</textarea>
+    </div>
+    </div><!-- end .lang-en -->
+
+    <!-- ── 공통 필드 (항상 표시) ── -->
     <div class="form-group">
       <label>기술 스택 (쉼표로 구분)</label>
       <input type="text" name="tech_stack" placeholder="Python, Flask, SQLite" value="{{ project.tech_stack if project else '' }}" />
@@ -113,52 +168,6 @@
     <div class="form-group">
       <label>정렬 순서 (숫자가 낮을수록 먼저 표시)</label>
       <input type="number" name="order" value="{{ project.order if project else 0 }}" />
-    </div>
-
-    <!-- ── English Section ── -->
-    <div class="en-section">
-      <div class="en-section-title">
-        <span class="en-badge">ENG</span> 영문 정보 (English Version)
-      </div>
-      <div class="form-group">
-        <label>Title (English) <button type="button" class="translate-btn" data-src="title" data-target="title_en">✦ AI 번역</button></label>
-        <input type="text" name="title_en" id="title_en" value="{{ project.title_en if project else '' }}" placeholder="Project title in English" />
-      </div>
-      <div class="form-group">
-        <label>Description (English) <button type="button" class="translate-btn" data-src="description" data-target="description_en">✦ AI 번역</button></label>
-        <textarea name="description_en" id="description_en" rows="4" placeholder="Project description in English">{{ project.description_en if project else '' }}</textarea>
-      </div>
-      <div class="form-group">
-        <label>Role (English) <button type="button" class="translate-btn" data-src="my_role" data-target="my_role_en">✦ AI 번역</button></label>
-        <input type="text" name="my_role_en" id="my_role_en" value="{{ project.my_role_en if project else '' }}" placeholder="e.g. Solo Project / Team (3 people, Planning & Content)" />
-      </div>
-      <div class="form-group">
-        <label>Category (English) <button type="button" class="translate-btn" data-src="category" data-target="category_en">✦ AI 번역</button></label>
-        <input type="text" name="category_en" id="category_en" value="{{ project.category_en if project else '' }}" placeholder="e.g. Content Planning / Campaign" />
-      </div>
-      <div class="form-group">
-        <label>Key Results (English) <button type="button" class="translate-btn" data-src-kpi="true" data-target="kpi_en_rows">✦ AI 번역</button></label>
-        <div id="kpiRowsEn">
-          {% if project and project.kpi_en %}
-            {% for item in project.kpi_en.split('\n') if item.strip() %}
-            <div class="kpi-row">
-              <input type="text" name="kpi_item_en" value="{{ item.strip() }}" placeholder="e.g. 70% reduction in processing time" />
-              <button type="button" class="kpi-remove-btn" aria-label="삭제">×</button>
-            </div>
-            {% endfor %}
-          {% else %}
-            <div class="kpi-row">
-              <input type="text" name="kpi_item_en" placeholder="e.g. 70% reduction in processing time" />
-              <button type="button" class="kpi-remove-btn" aria-label="삭제">×</button>
-            </div>
-          {% endif %}
-        </div>
-        <button type="button" id="addKpiBtnEn" class="btn-add-link">+ Add Result</button>
-      </div>
-      <div class="form-group">
-        <label>Detail (English) <button type="button" class="translate-btn" data-src="detail_text" data-target="detail_text_en">✦ AI 번역</button></label>
-        <textarea name="detail_text_en" id="detail_text_en" rows="6" placeholder="Background, approach, process in English">{{ project.detail_text_en if project else '' }}</textarea>
-      </div>
     </div>
 
     <div style="display:flex; gap:1rem; margin-top:2rem;">
