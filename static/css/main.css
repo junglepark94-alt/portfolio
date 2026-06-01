@@ -1503,7 +1503,9 @@ form[data-lang="en"] .lang-ko { display: none !important; }
   border: 1px solid #fde8bb;
   border-radius: 3px;
   padding: 0.12rem 0.45rem;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
+  max-width: 100%;
 }
 .pc-kpi {
   font-size: 0.83rem;
