@@ -173,6 +173,7 @@ class Profile(db.Model):
     # 어학 성적 [{exam, score, date}]
     language_scores_json = db.Column(db.Text, default='[]')
     # English
+    name_en = db.Column(db.String(80), default='')
     role_en = db.Column(db.String(120), default='')
     tagline_en = db.Column(db.Text, default='')
     about_text_en = db.Column(db.Text, default='')
@@ -292,6 +293,7 @@ def init_db():
             "ALTER TABLE profile ADD COLUMN language_scores_json TEXT DEFAULT '[]'",
             "ALTER TABLE profile ADD COLUMN remember_url VARCHAR(300) DEFAULT ''",
             # English columns
+            "ALTER TABLE profile ADD COLUMN name_en VARCHAR(80) DEFAULT ''",
             "ALTER TABLE profile ADD COLUMN role_en VARCHAR(120) DEFAULT ''",
             "ALTER TABLE profile ADD COLUMN tagline_en TEXT DEFAULT ''",
             "ALTER TABLE profile ADD COLUMN about_text_en TEXT DEFAULT ''",
@@ -536,6 +538,7 @@ def profile_edit():
         profile.open_to_work = bool(request.form.get('open_to_work'))
 
         # English fields
+        profile.name_en = request.form.get('name_en', '')
         profile.role_en = request.form.get('role_en', '')
         profile.tagline_en = request.form.get('tagline_en', '')
         profile.about_text_en = request.form.get('about_text_en', '')

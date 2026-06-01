@@ -402,8 +402,8 @@
       <div class="fc-title">Basic Info <span class="en-badge" style="font-size:0.7rem; vertical-align:middle;">ENG</span></div>
       <div class="form-row-2">
         <div class="form-group">
-          <label>Name</label>
-          <input type="text" value="{{ profile.name }}" disabled style="opacity:0.5;" title="이름은 공통입니다" />
+          <label>Name (English)</label>
+          <input type="text" name="name_en" value="{{ profile.name_en or '' }}" placeholder="e.g. Gildong Hong" />
         </div>
         <div class="form-group">
           <label>Role / Title</label>
