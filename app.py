@@ -2,9 +2,14 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 import os
 import time
+
+KST = timezone(timedelta(hours=9))
+
+def _today_kst():
+    return datetime.now(KST).strftime('%Y-%m-%d')
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-change-in-prod')
@@ -129,6 +134,32 @@ class GalleryItem(db.Model):
         import json as _j
         try: return _j.loads(self.links_json or '[]')
         except: return []
+
+
+class DailyVisit(db.Model):
+    """일별 방문수 집계 (KST 기준, 세션당 하루 1회)"""
+    __tablename__ = 'daily_visit'
+    id = db.Column(db.Integer, primary_key=True)
+    date = db.Column(db.String(10), unique=True, index=True, nullable=False)  # YYYY-MM-DD
+    count = db.Column(db.Integer, default=0)
+
+
+def track_visit():
+    """공개 페이지 방문 기록. 같은 세션은 하루 1회만 카운트."""
+    try:
+        today = _today_kst()
+        key = f'v_{today}'
+        if session.get(key):
+            return
+        session[key] = True
+        rec = DailyVisit.query.filter_by(date=today).first()
+        if rec is None:
+            rec = DailyVisit(date=today, count=0)
+            db.session.add(rec)
+        rec.count = (rec.count or 0) + 1
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
 
 
 class Admin(db.Model):
@@ -429,6 +460,7 @@ def inject_globals():
 
 @app.route('/')
 def index():
+    track_visit()
     projects = Project.query.order_by(Project.order, Project.created_at.desc()).all()
     gallery_items = GalleryItem.query.order_by(GalleryItem.sort_order, GalleryItem.created_at).all()
     profile = db.session.get(Profile, 1)
@@ -436,6 +468,7 @@ def index():
 
 @app.route('/en')
 def index_en():
+    track_visit()
     projects = Project.query.order_by(Project.order, Project.created_at.desc()).all()
     gallery_items = GalleryItem.query.order_by(GalleryItem.sort_order, GalleryItem.created_at).all()
     profile = db.session.get(Profile, 1)
@@ -483,8 +516,26 @@ def admin_dashboard():
         'engine': 'SQLite ⚠️ (재배포 시 데이터 소멸)' if _using_sqlite else 'PostgreSQL ✅',
         'warning': _using_sqlite and _is_production,
     }
+
+    # 방문 통계: 최근 30일 (KST 기준)
+    today = datetime.now(KST).date()
+    rows = {r.date: r.count for r in DailyVisit.query.all()}
+    days = []
+    for i in range(29, -1, -1):
+        d = today - timedelta(days=i)
+        ds = d.strftime('%Y-%m-%d')
+        days.append({'date': ds, 'label': d.strftime('%m/%d'), 'count': rows.get(ds, 0)})
+    visit_stats = {
+        'days': days,
+        'max': max((d['count'] for d in days), default=0),
+        'today': rows.get(today.strftime('%Y-%m-%d'), 0),
+        'last7': sum(d['count'] for d in days[-7:]),
+        'last30': sum(d['count'] for d in days),
+        'total': sum(rows.values()),
+    }
     return render_template('admin.html', projects=projects, profile=profile,
-                           gallery_items=gallery_items, db_info=db_info)
+                           gallery_items=gallery_items, db_info=db_info,
+                           visit_stats=visit_stats)
 
 
 @app.route('/admin/profile', methods=['GET', 'POST'])

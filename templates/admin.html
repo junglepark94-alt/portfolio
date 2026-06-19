@@ -20,6 +20,48 @@
   </div>
   {% endif %}
 
+  <!-- 방문 통계 -->
+  <div class="admin-section-card">
+    <div class="asc-header">
+      <div>
+        <div class="asc-label">방문 통계</div>
+        <div class="asc-summary">일별 방문수 (KST · 세션당 하루 1회)</div>
+      </div>
+    </div>
+    <div class="visit-stat-grid">
+      <div class="visit-stat"><span class="vs-num">{{ visit_stats.today }}</span><span class="vs-lbl">오늘</span></div>
+      <div class="visit-stat"><span class="vs-num">{{ visit_stats.last7 }}</span><span class="vs-lbl">최근 7일</span></div>
+      <div class="visit-stat"><span class="vs-num">{{ visit_stats.last30 }}</span><span class="vs-lbl">최근 30일</span></div>
+      <div class="visit-stat"><span class="vs-num">{{ visit_stats.total }}</span><span class="vs-lbl">전체</span></div>
+    </div>
+    <div class="visit-chart" title="최근 30일">
+      {% for d in visit_stats.days %}
+      <div class="vc-col" title="{{ d.date }} · {{ d.count }}회">
+        <div class="vc-bar-wrap">
+          <div class="vc-bar" style="height: {{ ((d.count / visit_stats.max * 100) if visit_stats.max else 0) | round(1) }}%;">
+            {% if d.count %}<span class="vc-val">{{ d.count }}</span>{% endif %}
+          </div>
+        </div>
+        <div class="vc-label">{{ d.label }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <style>
+    .visit-stat-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:0.75rem; margin-bottom:1.25rem; }
+    .visit-stat { background:var(--bg, #fff); border:1px solid var(--border); border-radius:8px; padding:0.85rem 0.5rem; text-align:center; }
+    .visit-stat .vs-num { display:block; font-size:1.5rem; font-weight:700; color:var(--accent); line-height:1.1; }
+    .visit-stat .vs-lbl { display:block; font-size:0.78rem; color:var(--muted); margin-top:0.2rem; }
+    .visit-chart { display:flex; align-items:flex-end; gap:3px; height:160px; overflow-x:auto; padding-top:0.5rem; }
+    .vc-col { flex:1 0 18px; display:flex; flex-direction:column; align-items:center; height:100%; }
+    .vc-bar-wrap { flex:1; width:100%; display:flex; align-items:flex-end; justify-content:center; }
+    .vc-bar { width:70%; min-height:2px; background:var(--accent); border-radius:3px 3px 0 0; position:relative; transition:opacity .2s; }
+    .vc-bar:hover { opacity:0.75; }
+    .vc-val { position:absolute; top:-1.1rem; left:50%; transform:translateX(-50%); font-size:0.65rem; color:var(--muted); }
+    .vc-label { font-size:0.6rem; color:var(--muted); margin-top:0.25rem; white-space:nowrap; transform:rotate(-45deg); transform-origin:center; height:1.1rem; }
+  </style>
+
   <!-- 프로필 카드 -->
   <div class="admin-section-card">
     <div class="asc-header">
