@@ -25,42 +25,176 @@
     <div class="asc-header">
       <div>
         <div class="asc-label">방문 통계</div>
-        <div class="asc-summary">일별 방문수 (KST · 세션당 하루 1회)</div>
+        <div class="asc-summary">일별 순방문수 · KST 기준 (세션당 하루 1회 집계)</div>
       </div>
     </div>
-    <div class="visit-stat-grid">
-      <div class="visit-stat"><span class="vs-num">{{ visit_stats.today }}</span><span class="vs-lbl">오늘</span></div>
-      <div class="visit-stat"><span class="vs-num">{{ visit_stats.last7 }}</span><span class="vs-lbl">최근 7일</span></div>
-      <div class="visit-stat"><span class="vs-num">{{ visit_stats.last30 }}</span><span class="vs-lbl">최근 30일</span></div>
-      <div class="visit-stat"><span class="vs-num">{{ visit_stats.total }}</span><span class="vs-lbl">전체</span></div>
-    </div>
-    <div class="visit-chart" title="최근 30일">
-      {% for d in visit_stats.days %}
-      <div class="vc-col" title="{{ d.date }} · {{ d.count }}회">
-        <div class="vc-bar-wrap">
-          <div class="vc-bar" style="height: {{ ((d.count / visit_stats.max * 100) if visit_stats.max else 0) | round(1) }}%;">
-            {% if d.count %}<span class="vc-val">{{ d.count }}</span>{% endif %}
-          </div>
-        </div>
-        <div class="vc-label">{{ d.label }}</div>
+
+    <div class="visit-kpis">
+      <div class="kpi kpi-primary">
+        <div class="kpi-val">{{ visit_stats.today }}</div>
+        <div class="kpi-lbl">오늘</div>
       </div>
-      {% endfor %}
+      <div class="kpi">
+        <div class="kpi-val">{{ visit_stats.last7 }}</div>
+        <div class="kpi-lbl">최근 7일</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-val">{{ visit_stats.last30 }}</div>
+        <div class="kpi-lbl">최근 30일</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-val">{{ visit_stats.total }}</div>
+        <div class="kpi-lbl">전체 누적</div>
+      </div>
     </div>
+
+    <div class="chart-toolbar">
+      <span class="chart-title">방문 추이</span>
+      <div class="chart-range" role="group" aria-label="기간 선택">
+        <button type="button" class="range-btn" data-range="7">7일</button>
+        <button type="button" class="range-btn is-active" data-range="30">30일</button>
+      </div>
+    </div>
+    <div id="visitChart" class="visit-chart-wrap"
+         data-visits='{{ visit_stats.days | tojson }}'></div>
   </div>
 
   <style>
-    .visit-stat-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:0.75rem; margin-bottom:1.25rem; }
-    .visit-stat { background:var(--bg, #fff); border:1px solid var(--border); border-radius:8px; padding:0.85rem 0.5rem; text-align:center; }
-    .visit-stat .vs-num { display:block; font-size:1.5rem; font-weight:700; color:var(--accent); line-height:1.1; }
-    .visit-stat .vs-lbl { display:block; font-size:0.78rem; color:var(--muted); margin-top:0.2rem; }
-    .visit-chart { display:flex; align-items:flex-end; gap:3px; height:160px; overflow-x:auto; padding-top:0.5rem; }
-    .vc-col { flex:1 0 18px; display:flex; flex-direction:column; align-items:center; height:100%; }
-    .vc-bar-wrap { flex:1; width:100%; display:flex; align-items:flex-end; justify-content:center; }
-    .vc-bar { width:70%; min-height:2px; background:var(--accent); border-radius:3px 3px 0 0; position:relative; transition:opacity .2s; }
-    .vc-bar:hover { opacity:0.75; }
-    .vc-val { position:absolute; top:-1.1rem; left:50%; transform:translateX(-50%); font-size:0.65rem; color:var(--muted); }
-    .vc-label { font-size:0.6rem; color:var(--muted); margin-top:0.25rem; white-space:nowrap; transform:rotate(-45deg); transform-origin:center; height:1.1rem; }
+    .visit-kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:0.75rem; margin-bottom:1.5rem; }
+    .kpi { background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:1rem 0.75rem; }
+    .kpi-primary { background:var(--accent-light); border-color:rgba(26,58,92,0.18); }
+    .kpi-val { font-size:1.9rem; font-weight:700; color:var(--text); line-height:1; letter-spacing:-0.02em; }
+    .kpi-primary .kpi-val { color:var(--accent); }
+    .kpi-lbl { font-size:0.8rem; color:var(--muted); margin-top:0.4rem; }
+    .chart-toolbar { display:flex; align-items:center; justify-content:space-between; margin-bottom:0.5rem; }
+    .chart-title { font-size:0.9rem; font-weight:600; color:var(--text-2); }
+    .chart-range { display:inline-flex; border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+    .range-btn { background:var(--bg); border:none; padding:0.32rem 0.7rem; font-size:0.78rem; color:var(--muted); cursor:pointer; transition:all .15s; }
+    .range-btn + .range-btn { border-left:1px solid var(--border); }
+    .range-btn:hover { color:var(--accent); }
+    .range-btn.is-active { background:var(--accent); color:#fff; }
+    .visit-chart-wrap { position:relative; width:100%; }
+    .visit-chart-wrap svg { display:block; width:100%; height:auto; }
+    .vchart-grid { stroke:var(--border); stroke-width:1; }
+    .vchart-line { fill:none; stroke:var(--accent); stroke-width:2; stroke-linejoin:round; stroke-linecap:round; }
+    .vchart-dot { fill:var(--accent); }
+    .vchart-axis { fill:var(--muted); font-size:11px; }
+    .vchart-hit { fill:transparent; cursor:pointer; }
+    .vchart-cursor { stroke:var(--accent-2); stroke-width:1; stroke-dasharray:3 3; opacity:0; }
+    .vchart-focus { fill:var(--accent-2); opacity:0; }
+    .vchart-tip { position:absolute; pointer-events:none; background:var(--text); color:#fff; font-size:0.72rem;
+                  padding:0.35rem 0.55rem; border-radius:6px; white-space:nowrap; opacity:0; transform:translate(-50%,-120%);
+                  transition:opacity .12s; z-index:5; }
+    .vchart-tip b { font-weight:700; }
+    .vchart-empty { text-align:center; color:var(--muted); font-size:0.85rem; padding:2.5rem 0; }
   </style>
+
+  <script>
+  (function () {
+    var el = document.getElementById('visitChart');
+    if (!el) return;
+    var all = JSON.parse(el.dataset.visits || '[]');
+    var tip = document.createElement('div');
+    tip.className = 'vchart-tip';
+    el.appendChild(tip);
+
+    var W = 760, H = 240, padL = 34, padR = 14, padT = 14, padB = 26;
+    var range = 30;
+
+    function niceMax(m) {
+      if (m <= 5) return 5;
+      var pow = Math.pow(10, String(Math.floor(m)).length - 1);
+      return Math.ceil(m / pow) * pow;
+    }
+
+    function render() {
+      var data = all.slice(-range);
+      if (!data.length) { el.innerHTML = '<div class="vchart-empty">데이터가 없습니다.</div>'; el.appendChild(tip); return; }
+      var n = data.length;
+      var maxVal = niceMax(Math.max.apply(null, data.map(function (d) { return d.count; })) || 0);
+      var plotW = W - padL - padR, plotH = H - padT - padB;
+      var x = function (i) { return padL + (n === 1 ? plotW / 2 : plotW * i / (n - 1)); };
+      var y = function (v) { return padT + plotH * (1 - v / maxVal); };
+
+      // gridlines + y labels (0, mid, max)
+      var grid = '';
+      [0, maxVal / 2, maxVal].forEach(function (v) {
+        var gy = y(v);
+        grid += '<line class="vchart-grid" x1="' + padL + '" y1="' + gy + '" x2="' + (W - padR) + '" y2="' + gy + '"/>';
+        grid += '<text class="vchart-axis" x="' + (padL - 6) + '" y="' + (gy + 3) + '" text-anchor="end">' + Math.round(v) + '</text>';
+      });
+
+      // x labels: ~6 evenly spaced
+      var step = Math.max(1, Math.round(n / 6));
+      var xlabels = '';
+      for (var i = 0; i < n; i += step) {
+        xlabels += '<text class="vchart-axis" x="' + x(i) + '" y="' + (H - 8) + '" text-anchor="middle">' + data[i].label + '</text>';
+      }
+      xlabels += '<text class="vchart-axis" x="' + x(n - 1) + '" y="' + (H - 8) + '" text-anchor="middle">' + data[n - 1].label + '</text>';
+
+      // area + line
+      var linePts = data.map(function (d, i) { return x(i) + ',' + y(d.count); });
+      var area = 'M' + padL + ',' + y(0) + ' L' + linePts.join(' L') + ' L' + x(n - 1) + ',' + y(0) + ' Z';
+      var line = 'M' + linePts.join(' L');
+
+      // hit areas
+      var hits = '';
+      var bw = plotW / n;
+      for (var j = 0; j < n; j++) {
+        hits += '<rect class="vchart-hit" data-i="' + j + '" x="' + (x(j) - bw / 2) + '" y="' + padT + '" width="' + bw + '" height="' + plotH + '"/>';
+      }
+
+      el.innerHTML =
+        '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" role="img" aria-label="방문 추이 차트">' +
+        '<defs><linearGradient id="vcFill" x1="0" y1="0" x2="0" y2="1">' +
+        '<stop offset="0%" stop-color="var(--accent)" stop-opacity="0.18"/>' +
+        '<stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>' +
+        grid +
+        '<path d="' + area + '" fill="url(#vcFill)"/>' +
+        '<path class="vchart-line" d="' + line + '"/>' +
+        '<line class="vchart-cursor" id="vcCursor" x1="0" y1="' + padT + '" x2="0" y2="' + (padT + plotH) + '"/>' +
+        '<circle class="vchart-focus" id="vcFocus" r="4"/>' +
+        xlabels + hits +
+        '</svg>';
+      el.appendChild(tip);
+
+      var svg = el.querySelector('svg');
+      var cursor = el.querySelector('#vcCursor');
+      var focus = el.querySelector('#vcFocus');
+
+      function show(i) {
+        var d = data[i];
+        var px = x(i), py = y(d.count);
+        cursor.setAttribute('x1', px); cursor.setAttribute('x2', px); cursor.style.opacity = 1;
+        focus.setAttribute('cx', px); focus.setAttribute('cy', py); focus.style.opacity = 1;
+        var rect = svg.getBoundingClientRect();
+        tip.style.left = (px / W * rect.width) + 'px';
+        tip.style.top = (py / H * rect.height) + 'px';
+        tip.innerHTML = '<b>' + d.count + '명</b> · ' + d.date;
+        tip.style.opacity = 1;
+      }
+      function hide() { cursor.style.opacity = 0; focus.style.opacity = 0; tip.style.opacity = 0; }
+
+      svg.querySelectorAll('.vchart-hit').forEach(function (r) {
+        r.addEventListener('mouseenter', function () { show(parseInt(r.dataset.i)); });
+      });
+      svg.addEventListener('mouseleave', hide);
+    }
+
+    document.querySelectorAll('.range-btn').forEach(function (b) {
+      b.addEventListener('click', function () {
+        document.querySelectorAll('.range-btn').forEach(function (x) { x.classList.remove('is-active'); });
+        b.classList.add('is-active');
+        range = parseInt(b.dataset.range);
+        render();
+      });
+    });
+
+    render();
+    var rt;
+    window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(render, 150); });
+  })();
+  </script>
 
   <!-- 프로필 카드 -->
   <div class="admin-section-card">
