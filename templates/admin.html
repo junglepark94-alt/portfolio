@@ -29,38 +29,41 @@
       </div>
     </div>
 
-    <div class="visit-kpis">
-      <div class="kpi kpi-primary">
-        <div class="kpi-val">{{ visit_stats.today }}</div>
-        <div class="kpi-lbl">오늘</div>
+    <div class="visit-body">
+      <div class="visit-kpis">
+        <div class="kpi kpi-primary">
+          <div class="kpi-val">{{ visit_stats.today }}</div>
+          <div class="kpi-lbl">오늘</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-val">{{ visit_stats.last7 }}</div>
+          <div class="kpi-lbl">최근 7일</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-val">{{ visit_stats.last30 }}</div>
+          <div class="kpi-lbl">최근 30일</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-val">{{ visit_stats.total }}</div>
+          <div class="kpi-lbl">전체 누적</div>
+        </div>
       </div>
-      <div class="kpi">
-        <div class="kpi-val">{{ visit_stats.last7 }}</div>
-        <div class="kpi-lbl">최근 7일</div>
-      </div>
-      <div class="kpi">
-        <div class="kpi-val">{{ visit_stats.last30 }}</div>
-        <div class="kpi-lbl">최근 30일</div>
-      </div>
-      <div class="kpi">
-        <div class="kpi-val">{{ visit_stats.total }}</div>
-        <div class="kpi-lbl">전체 누적</div>
-      </div>
-    </div>
 
-    <div class="chart-toolbar">
-      <span class="chart-title">방문 추이</span>
-      <div class="chart-range" role="group" aria-label="기간 선택">
-        <button type="button" class="range-btn" data-range="7">7일</button>
-        <button type="button" class="range-btn is-active" data-range="30">30일</button>
+      <div class="chart-toolbar">
+        <span class="chart-title">방문 추이</span>
+        <div class="chart-range" role="group" aria-label="기간 선택">
+          <button type="button" class="range-btn" data-range="7">7일</button>
+          <button type="button" class="range-btn is-active" data-range="30">30일</button>
+        </div>
       </div>
+      <div id="visitChart" class="visit-chart-wrap"
+           data-visits='{{ visit_stats.days | tojson }}'></div>
     </div>
-    <div id="visitChart" class="visit-chart-wrap"
-         data-visits='{{ visit_stats.days | tojson }}'></div>
   </div>
 
   <style>
-    .visit-kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:0.75rem; margin-bottom:1.5rem; }
+    .visit-body { padding:1.5rem; }
+    .visit-kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:0.75rem; margin-bottom:1.75rem; }
     .kpi { background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:1rem 0.75rem; }
     .kpi-primary { background:var(--accent-light); border-color:rgba(26,58,92,0.18); }
     .kpi-val { font-size:1.9rem; font-weight:700; color:var(--text); line-height:1; letter-spacing:-0.02em; }
