@@ -239,6 +239,7 @@
           <td>
             <a href="{{ url_for('project_edit', pid=p.id) }}" class="btn-sm">수정</a>
             <form method="POST" action="{{ url_for('project_delete', pid=p.id) }}" style="display:inline" onsubmit="return confirm('삭제하시겠습니까?')">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
               <button type="submit" class="btn-sm btn-danger">삭제</button>
             </form>
           </td>
@@ -273,6 +274,7 @@
           <td>
             <a href="{{ url_for('gallery_edit', gid=g.id) }}" class="btn-sm">수정</a>
             <form method="POST" action="{{ url_for('gallery_delete', gid=g.id) }}" style="display:inline" onsubmit="return confirm('삭제하시겠습니까?')">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
               <button type="submit" class="btn-sm btn-danger">삭제</button>
             </form>
           </td>
@@ -287,6 +289,7 @@
 </div>
 
 <script>
+const CSRF = document.querySelector('meta[name="csrf-token"]')?.content || '';
 (function () {
   const tbody = document.getElementById('projectTbody');
   if (!tbody) return;
@@ -324,7 +327,7 @@
     const ids = [...tbody.querySelectorAll('tr[data-id]')].map(function (r) { return parseInt(r.dataset.id); });
     fetch('/admin/projects/reorder', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
       body: JSON.stringify({ ids: ids })
     }).then(function (r) { return r.json(); }).then(function (d) {
       if (d.ok) {
@@ -372,7 +375,7 @@
     const ids = [...tbody.querySelectorAll('tr[data-id]')].map(function (r) { return parseInt(r.dataset.id); });
     fetch('/admin/gallery/reorder', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
       body: JSON.stringify({ ids: ids })
     }).then(function (r) { return r.json(); }).then(function (d) {
       if (d.ok) {

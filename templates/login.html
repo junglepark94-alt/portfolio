@@ -4,6 +4,7 @@
 <div class="auth-wrap">
   <div class="auth-box">
     <form method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
       <div class="form-group">
         <label>아이디</label>
         <input type="text" name="username" required autofocus />

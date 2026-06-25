@@ -16,7 +16,10 @@ python wsgi.py
 
 브라우저에서 http://localhost:8080 접속  
 관리자 페이지: http://localhost:8080/admin/login  
-기본 계정: admin / changeme123!
+기본 계정(로컬 개발 전용): admin / changeme123!
+
+> 프로덕션(`PORT` 환경변수 존재)에서는 `ADMIN_PASSWORD`를 설정하지 않으면
+> 첫 기동 시 무작위 비밀번호가 생성되어 **로그에 출력**됩니다.
 
 ---
 
@@ -40,8 +43,8 @@ git push -u origin main
 
 | 키 | 값 |
 |---|---|
-| `SECRET_KEY` | (무작위 긴 문자열, 예: `openssl rand -hex 32` 결과) |
-| `ADMIN_PASSWORD` | 관리자 비밀번호 (변경 필수!) |
+| `SECRET_KEY` | **(필수)** 무작위 긴 문자열, 예: `openssl rand -hex 32` 결과. 미설정 시 프로덕션 기동이 거부됩니다. |
+| `ADMIN_PASSWORD` | 관리자 비밀번호 (미설정 시 무작위 생성 후 로그 출력) |
 
 > Railway는 `PORT` 환경 변수를 자동 주입합니다.  
 > `DATABASE_URL`을 설정하지 않으면 SQLite가 사용됩니다.  

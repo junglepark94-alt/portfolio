@@ -38,6 +38,7 @@
 
   <!-- ── 프로젝트 정보 폼 ── -->
   <form method="POST" style="margin-top:1.5rem;" data-lang="ko">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
 
     <!-- 언어 탭 -->
     <div class="form-lang-switcher">
@@ -216,6 +217,7 @@
 <script>
 (function () {
   const PID = {{ project.id }};
+  const CSRF = document.querySelector('meta[name="csrf-token"]')?.content || '';
   const grid = document.getElementById('imgGrid');
   const addTile = document.getElementById('addTile');
   const fileInput = document.getElementById('fileInput');
@@ -278,7 +280,7 @@
     } else {
       fd.append('image', file);
     }
-    fetch(`/admin/project/${PID}/images/upload`, { method: 'POST', body: fd })
+    fetch(`/admin/project/${PID}/images/upload`, { method: 'POST', headers: { 'X-CSRFToken': CSRF }, body: fd })
       .then(r => r.json())
       .then(data => {
         if (data.error) { alert(data.error); return; }
@@ -315,7 +317,7 @@
   grid.querySelectorAll('.img-tile[data-id]').forEach(wireButtons);
 
   function setMain(tile, id) {
-    fetch(`/admin/project/images/${id}/set-main`, { method: 'POST' })
+    fetch(`/admin/project/images/${id}/set-main`, { method: 'POST', headers: { 'X-CSRFToken': CSRF } })
       .then(r => r.json()).then(() => {
         // 모든 타일에서 대표 배지 제거
         grid.querySelectorAll('.img-tile[data-id]').forEach(t => {
@@ -334,7 +336,7 @@
 
   function deleteTile(tile, id) {
     if (!confirm('이 이미지를 삭제하시겠습니까?')) return;
-    fetch(`/admin/project/images/${id}/delete`, { method: 'POST' })
+    fetch(`/admin/project/images/${id}/delete`, { method: 'POST', headers: { 'X-CSRFToken': CSRF } })
       .then(r => r.json()).then(d => {
         if (d.ok) tile.remove();
       });

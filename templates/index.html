@@ -351,13 +351,13 @@
 
   // 형제 요소에 순서별 딜레이 (timeline, project card, contact card)
   ['.timeline-item', '.project-card', '.contact-card'].forEach(function (sel) {
-    const groups = {};
+    const groups = new Map();
     document.querySelectorAll(sel + '.reveal').forEach(function (el) {
       const key = el.parentElement;
-      if (!groups.has) groups[key] = groups[key] || [];
-      groups[key].push(el);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(el);
     });
-    Object.values(groups).forEach(function (els) {
+    groups.forEach(function (els) {
       els.forEach(function (el, i) {
         el.style.transitionDelay = Math.min(i * 0.1, 0.4) + 's';
       });

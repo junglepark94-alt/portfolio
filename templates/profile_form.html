@@ -9,6 +9,7 @@
   </div>
 
   <form method="POST" enctype="multipart/form-data" data-lang="ko">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
 
     <!-- ── 언어 탭 ── -->
     <div class="form-lang-switcher">
@@ -579,10 +580,14 @@
   </form>
 
   {% if profile.resume_filename %}
-  <form id="resumeDeleteForm" method="POST" action="{{ url_for('profile_resume_delete') }}" style="display:none;"></form>
+  <form id="resumeDeleteForm" method="POST" action="{{ url_for('profile_resume_delete') }}" style="display:none;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+  </form>
   {% endif %}
   {% if profile.profile_image_filename %}
-  <form id="profileImgDeleteForm" method="POST" action="{{ url_for('profile_image_delete') }}" style="display:none;"></form>
+  <form id="profileImgDeleteForm" method="POST" action="{{ url_for('profile_image_delete') }}" style="display:none;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+  </form>
   {% endif %}
 </div>
 

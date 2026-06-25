@@ -7,6 +7,7 @@
   <h2>{{ '갤러리 항목 수정' if item else '갤러리 항목 추가' }}</h2>
 
   <form method="POST" enctype="multipart/form-data" style="margin-top:2rem;" id="galleryForm" data-lang="ko">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
     <input type="hidden" name="cropped_data" id="croppedData" />
 
     <!-- 언어 탭 -->

@@ -1,10 +1,14 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory, abort
 from flask_sqlalchemy import SQLAlchemy
+from flask_wtf import CSRFProtect
 from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.utils import secure_filename
 from datetime import datetime, timezone, timedelta
 import os
 import time
+import re
+import json
+import base64
+import threading
 
 KST = timezone(timedelta(hours=9))
 
@@ -12,14 +16,27 @@ def _today_kst():
     return datetime.now(KST).strftime('%Y-%m-%d')
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-change-in-prod')
+
+_is_production = bool(os.environ.get('PORT'))  # Railway는 PORT를 주입함
+
+# SECRET_KEY: 프로덕션에서는 반드시 환경변수로 주입해야 함.
+# 기본값으로 세션을 서명하면 공격자가 쿠키를 위조해 관리자 인증을 우회할 수 있음.
+_secret_key = os.environ.get('SECRET_KEY')
+if not _secret_key:
+    if _is_production:
+        raise RuntimeError(
+            "SECRET_KEY 환경변수가 설정되지 않았습니다. "
+            "프로덕션에서는 반드시 무작위 키를 설정하세요 (예: openssl rand -hex 32)."
+        )
+    _secret_key = 'dev-secret-change-in-prod'  # 로컬 개발 전용
+app.config['SECRET_KEY'] = _secret_key
+app.config['WTF_CSRF_TIME_LIMIT'] = None  # CSRF 토큰을 세션 수명 동안 유효하게 (관리자 UX)
 
 _db_url = os.environ.get('DATABASE_URL', '')
 # Railway/Heroku는 postgres:// 를 제공하지만 SQLAlchemy 1.4+는 postgresql:// 필요
 if _db_url.startswith('postgres://'):
     _db_url = _db_url.replace('postgres://', 'postgresql://', 1)
 
-_is_production = bool(os.environ.get('PORT'))  # Railway는 PORT를 주입함
 _using_sqlite = not _db_url or _db_url.startswith('sqlite')
 
 if _using_sqlite:
@@ -39,16 +56,82 @@ app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5MB
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 
-def save_uploaded_image(file):
+csrf = CSRFProtect(app)
+
+
+def _looks_like_image(head):
+    """매직 바이트로 실제 이미지 여부를 검사 (확장자 위조 방지)."""
+    if head[:3] == b'\xff\xd8\xff':                       # JPEG
+        return True
+    if head[:8] == b'\x89PNG\r\n\x1a\n':                  # PNG
+        return True
+    if head[:6] in (b'GIF87a', b'GIF89a'):               # GIF
+        return True
+    if head[:4] == b'RIFF' and head[8:12] == b'WEBP':    # WEBP
+        return True
+    return False
+
+
+def save_uploaded_image(file, prefix='project'):
     if not file or not file.filename:
         return None
     ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
     if ext not in ALLOWED_EXTENSIONS:
         return None
-    filename = f"project_{int(time.time())}.{ext}"
+    head = file.stream.read(16)
+    file.stream.seek(0)
+    if not _looks_like_image(head):
+        return None
+    filename = f"{prefix}_{int(time.time())}.{ext}"
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
     file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
     return filename
+
+
+def _save_data_uri(data_uri, filename):
+    """data URI(base64 크롭 이미지)를 검증 후 저장. 성공 시 filename, 실패 시 None."""
+    if not data_uri or ',' not in data_uri:
+        return None
+    try:
+        raw = base64.b64decode(data_uri.split(',', 1)[1])
+    except Exception:
+        return None
+    if not _looks_like_image(raw[:16]):
+        return None
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    with open(os.path.join(app.config['UPLOAD_FOLDER'], filename), 'wb') as f:
+        f.write(raw)
+    return filename
+
+
+# ── 간단한 인메모리 레이트리밋 (YouTube 프록시 쿼터 어뷰징 방지) ──
+# gunicorn 워커마다 독립적이므로 분산 환경에서는 워커 수만큼 한도가 곱해짐.
+# 외부 의존성 없이 캐주얼한 남용을 막는 수준의 방어임.
+_RATE_LOCK = threading.Lock()
+_RATE_HITS = {}  # client_ip -> [timestamps]
+
+
+def _client_ip():
+    xff = request.headers.get('X-Forwarded-For', '')
+    if xff:
+        return xff.split(',')[0].strip()
+    return request.remote_addr or 'unknown'
+
+
+def _rate_limited(key, max_hits=30, window=60):
+    now = time.time()
+    with _RATE_LOCK:
+        if len(_RATE_HITS) > 2000:  # 키 무한 증가 방지
+            for k in [k for k, v in _RATE_HITS.items() if not v or now - v[-1] > window]:
+                _RATE_HITS.pop(k, None)
+        hits = [t for t in _RATE_HITS.get(key, []) if now - t < window]
+        if len(hits) >= max_hits:
+            _RATE_HITS[key] = hits
+            return True
+        hits.append(now)
+        _RATE_HITS[key] = hits
+        return False
+
 
 db = SQLAlchemy(app)
 
@@ -106,7 +189,7 @@ class Project(db.Model):
 
     @property
     def tech_list(self):
-        return [t.strip() for t in self.tech_stack.split(',') if t.strip()]
+        return [t.strip() for t in (self.tech_stack or '').split(',') if t.strip()]
 
 
 class ProjectImage(db.Model):
@@ -131,9 +214,10 @@ class GalleryItem(db.Model):
 
     @property
     def links(self):
-        import json as _j
-        try: return _j.loads(self.links_json or '[]')
-        except: return []
+        try:
+            return json.loads(self.links_json or '[]')
+        except Exception:
+            return []
 
 
 class DailyVisit(db.Model):
@@ -405,11 +489,23 @@ def init_db():
                              {'sj': sj, 'id': row[0]})
         conn.commit()
     if not Admin.query.first():
+        _admin_pw = os.environ.get('ADMIN_PASSWORD')
+        if not _admin_pw:
+            if _is_production:
+                import secrets
+                _admin_pw = secrets.token_urlsafe(12)
+                print("=" * 60)
+                print("WARNING: ADMIN_PASSWORD is not set.")
+                print("Generated a random admin password (set ADMIN_PASSWORD to control it):")
+                print("  admin /", _admin_pw)
+                print("=" * 60)
+            else:
+                _admin_pw = 'changeme123!'  # 로컬 개발 전용
         admin = Admin(username='admin')
-        admin.set_password(os.environ.get('ADMIN_PASSWORD', 'changeme123!'))
+        admin.set_password(_admin_pw)
         db.session.add(admin)
         db.session.commit()
-        print("Admin created. Password:", os.environ.get('ADMIN_PASSWORD', 'changeme123!'))
+        print("Admin account created (username: admin).")
 
     if not Profile.query.first():
         p = Profile(
@@ -458,21 +554,21 @@ def inject_globals():
 
 # ── Public Routes ────────────────────────────────────────
 
-@app.route('/')
-def index():
+def _render_index(lang):
     track_visit()
     projects = Project.query.order_by(Project.order, Project.created_at.desc()).all()
     gallery_items = GalleryItem.query.order_by(GalleryItem.sort_order, GalleryItem.created_at).all()
     profile = db.session.get(Profile, 1)
-    return render_template('index.html', projects=projects, gallery_items=gallery_items, profile=profile, lang='ko')
+    return render_template('index.html', projects=projects, gallery_items=gallery_items,
+                           profile=profile, lang=lang)
+
+@app.route('/')
+def index():
+    return _render_index('ko')
 
 @app.route('/en')
 def index_en():
-    track_visit()
-    projects = Project.query.order_by(Project.order, Project.created_at.desc()).all()
-    gallery_items = GalleryItem.query.order_by(GalleryItem.sort_order, GalleryItem.created_at).all()
-    profile = db.session.get(Profile, 1)
-    return render_template('index.html', projects=projects, gallery_items=gallery_items, profile=profile, lang='en')
+    return _render_index('en')
 
 
 # ── Admin Auth ───────────────────────────────────────────
@@ -559,40 +655,27 @@ def profile_edit():
         profile.github_url = fix_url(request.form.get('github_url', ''))
         profile.remember_url = fix_url(request.form.get('remember_url', ''))
         profile.blog_url = fix_url(request.form.get('blog_url', ''))
-        import base64 as _b64
-        # 프로필 이미지 업로드
+        # 프로필 이미지 업로드 (크롭 base64 우선, 없으면 일반 파일)
         prof_img_cropped = request.form.get('profile_image_cropped_data', '')
         prof_img_file = request.files.get('profile_image_file')
         if prof_img_cropped and ',' in prof_img_cropped:
-            _, _data = prof_img_cropped.split(',', 1)
-            fn = f"profile_{int(time.time())}.jpg"
-            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-            with open(os.path.join(app.config['UPLOAD_FOLDER'], fn), 'wb') as _f:
-                _f.write(_b64.b64decode(_data))
-            profile.profile_image_filename = fn
+            fn = _save_data_uri(prof_img_cropped, f"profile_{int(time.time())}.jpg")
+            if fn:
+                profile.profile_image_filename = fn
         elif prof_img_file and prof_img_file.filename:
-            ext = prof_img_file.filename.rsplit('.', 1)[-1].lower() if '.' in prof_img_file.filename else ''
-            if ext in ALLOWED_EXTENSIONS:
-                fn = f"profile_{int(time.time())}.{ext}"
-                os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-                prof_img_file.save(os.path.join(app.config['UPLOAD_FOLDER'], fn))
+            fn = save_uploaded_image(prof_img_file, 'profile')
+            if fn:
                 profile.profile_image_filename = fn
 
         og_cropped = request.form.get('og_cropped_data', '')
         og_file = request.files.get('og_image_file')
         if og_cropped and ',' in og_cropped:
-            _, _data = og_cropped.split(',', 1)
-            fn = f"og_{int(time.time())}.jpg"
-            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-            with open(os.path.join(app.config['UPLOAD_FOLDER'], fn), 'wb') as _f:
-                _f.write(_b64.b64decode(_data))
-            profile.og_image_url = url_for('static', filename='uploads/' + fn, _external=True)
+            fn = _save_data_uri(og_cropped, f"og_{int(time.time())}.jpg")
+            if fn:
+                profile.og_image_url = url_for('static', filename='uploads/' + fn, _external=True)
         elif og_file and og_file.filename:
-            ext = og_file.filename.rsplit('.', 1)[-1].lower() if '.' in og_file.filename else ''
-            if ext in ALLOWED_EXTENSIONS:
-                fn = f"og_{int(time.time())}.{ext}"
-                os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-                og_file.save(os.path.join(app.config['UPLOAD_FOLDER'], fn))
+            fn = save_uploaded_image(og_file, 'og')
+            if fn:
                 profile.og_image_url = url_for('static', filename='uploads/' + fn, _external=True)
         else:
             profile.og_image_url = request.form.get('og_image_url', '')
@@ -805,6 +888,14 @@ def project_edit(pid):
 @login_required
 def project_delete(pid):
     p = Project.query.get_or_404(pid)
+    # 연결된 이미지 파일도 디스크에서 제거 (cascade는 DB 행만 삭제함)
+    for img in p.images:
+        fpath = os.path.join(app.config['UPLOAD_FOLDER'], img.filename)
+        if os.path.exists(fpath):
+            try:
+                os.remove(fpath)
+            except OSError:
+                pass
     db.session.delete(p)
     db.session.commit()
     flash('프로젝트가 삭제되었습니다.')
@@ -851,16 +942,11 @@ def serve_resume():
 # ── Gallery CRUD ────────────────────────────────────────
 
 def _save_gallery_image(request):
-    import base64 as _b64, json as _j
     cropped = request.form.get('cropped_data')
-    if cropped and ',' in cropped:
-        _, data = cropped.split(',', 1)
-        filename = f"gallery_{int(time.time())}.jpg"
-        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-        with open(os.path.join(app.config['UPLOAD_FOLDER'], filename), 'wb') as f:
-            f.write(_b64.b64decode(data))
-        return filename
-    return save_uploaded_image(request.files.get('image'))
+    fn = _save_data_uri(cropped, f"gallery_{int(time.time())}.jpg")
+    if fn:
+        return fn
+    return save_uploaded_image(request.files.get('image'), 'gallery')
 
 @app.route('/admin/gallery/new', methods=['GET', 'POST'])
 @login_required
@@ -920,26 +1006,20 @@ def gallery_delete(gid):
 @app.route('/admin/project/<int:pid>/images/upload', methods=['POST'])
 @login_required
 def project_image_upload(pid):
-    import base64 as _b64, json as _json
     p = Project.query.get_or_404(pid)
     cropped = request.form.get('cropped_data')
-    if cropped and ',' in cropped:
-        _, data = cropped.split(',', 1)
-        filename = f"proj{pid}_{int(time.time())}.jpg"
-        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-        with open(os.path.join(app.config['UPLOAD_FOLDER'], filename), 'wb') as f:
-            f.write(_b64.b64decode(data))
-    else:
-        filename = save_uploaded_image(request.files.get('image'))
-        if not filename:
-            return _json.dumps({'error': 'invalid file'}), 400, {'Content-Type': 'application/json'}
+    filename = _save_data_uri(cropped, f"proj{pid}_{int(time.time())}.jpg")
+    if not filename:
+        filename = save_uploaded_image(request.files.get('image'), f"proj{pid}")
+    if not filename:
+        return json.dumps({'error': 'invalid file'}), 400, {'Content-Type': 'application/json'}
     has_any = ProjectImage.query.filter_by(project_id=pid).first() is not None
     img = ProjectImage(project_id=pid, filename=filename, is_main=not has_any)
     db.session.add(img)
     db.session.commit()
     return app.response_class(
-        response=_json.dumps({'id': img.id, 'is_main': img.is_main,
-                              'url': url_for('static', filename='uploads/' + filename)}),
+        response=json.dumps({'id': img.id, 'is_main': img.is_main,
+                             'url': url_for('static', filename='uploads/' + filename)}),
         mimetype='application/json'
     )
 
@@ -1007,9 +1087,13 @@ def gallery_reorder():
 @app.route('/api/youtube')
 def youtube_info():
     import json as _json, urllib.request as _req, urllib.error as _err
+    if _rate_limited(f"yt:{_client_ip()}"):
+        return _json.dumps({'error': 'rate limited'}), 429, {'Content-Type': 'application/json'}
     video_id = request.args.get('v', '').strip()
     if not video_id:
         return _json.dumps({'error': 'no video id'}), 400, {'Content-Type': 'application/json'}
+    if not re.fullmatch(r'[A-Za-z0-9_-]{11}', video_id):
+        return _json.dumps({'error': 'invalid video id'}), 400, {'Content-Type': 'application/json'}
     api_key = os.environ.get('YOUTUBE_API_KEY', '')
     if not api_key:
         return _json.dumps({'error': 'YOUTUBE_API_KEY not set'}), 503, {'Content-Type': 'application/json'}
@@ -1048,9 +1132,13 @@ def youtube_info():
 @app.route('/api/youtube/playlist')
 def youtube_playlist_info():
     import json as _json, urllib.request as _req, urllib.error as _err, re as _re
+    if _rate_limited(f"yt:{_client_ip()}"):
+        return _json.dumps({'error': 'rate limited'}), 429, {'Content-Type': 'application/json'}
     playlist_id = request.args.get('list', '').strip()
     if not playlist_id:
         return _json.dumps({'error': 'no playlist id'}), 400, {'Content-Type': 'application/json'}
+    if not re.fullmatch(r'[A-Za-z0-9_-]{10,64}', playlist_id):
+        return _json.dumps({'error': 'invalid playlist id'}), 400, {'Content-Type': 'application/json'}
     api_key = os.environ.get('YOUTUBE_API_KEY', '')
     if not api_key:
         return _json.dumps({'error': 'YOUTUBE_API_KEY not set'}), 503, {'Content-Type': 'application/json'}
