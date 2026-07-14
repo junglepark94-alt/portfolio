@@ -1,82 +1,3 @@
-// ── Hero Canvas Mesh Gradient ────────────────
-(function () {
-  const canvas = document.getElementById('heroCanvas');
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  const hero = canvas.parentElement;
-
-  let W, H;
-  function resize() {
-    W = canvas.width  = hero.offsetWidth;
-    H = canvas.height = hero.offsetHeight;
-  }
-  resize();
-  window.addEventListener('resize', resize);
-
-  // 마우스 (0~1 비율)
-  let mxT = 0.5, myT = 0.35, mxC = 0.5, myC = 0.35;
-  document.addEventListener('mousemove', function (e) {
-    const r = hero.getBoundingClientRect();
-    mxT = Math.max(0, Math.min(1, (e.clientX - r.left) / W));
-    myT = Math.max(0, Math.min(1, (e.clientY - r.top)  / H));
-  });
-
-  // 색상 포인트 정의
-  // x, y: 기준 위치(비율), ax/ay: 진폭(비율), sp: 속도, ph: 위상
-  // r,g,b: 색상, a: 최대 불투명도, rad: 반지름 비율
-  var pts = [
-    { x:.82, y:.08, ax:.12, ay:.10, sp:.00028, ph:0.0, r:210,g:150,b:80,  a:.32, rad:.58 },
-    { x:.65, y:.75, ax:.10, ay:.14, sp:.00035, ph:1.8, r:220,g:170,b:100, a:.22, rad:.48 },
-    { x:.08, y:.82, ax:.14, ay:.10, sp:.00022, ph:3.2, r:90, g:130,b:180, a:.22, rad:.55 },
-    { x:.18, y:.10, ax:.08, ay:.13, sp:.00030, ph:2.0, r:100,g:145,b:200, a:.16, rad:.44 },
-    { x:.45, y:.50, ax:.09, ay:.08, sp:.00042, ph:0.9, r:230,g:185,b:120, a:.14, rad:.40 },
-    { x:.30, y:.60, ax:.11, ay:.09, sp:.00018, ph:4.1, r:90, g:130,b:180, a:.12, rad:.38 },
-  ];
-
-  function draw(ts) {
-    // 마우스 부드럽게 따라오기
-    mxC += (mxT - mxC) * 0.04;
-    myC += (myT - myC) * 0.04;
-
-    // 베이스
-    ctx.fillStyle = '#f4f1ed';
-    ctx.fillRect(0, 0, W, H);
-
-    pts.forEach(function (p, i) {
-      // 사인파로 위치 계산
-      var px = (p.x + Math.sin(ts * p.sp + p.ph)         * p.ax) * W;
-      var py = (p.y + Math.cos(ts * p.sp * 0.73 + p.ph)  * p.ay) * H;
-
-      // 마우스 인력 (포인트마다 강도 다르게)
-      var mf = (i % 2 === 0) ? 0.10 : 0.06;
-      px += (mxC - 0.5) * W * mf;
-      py += (myC - 0.35) * H * mf;
-
-      var rad = p.rad * Math.max(W, H);
-      var g = ctx.createRadialGradient(px, py, 0, px, py, rad);
-      g.addColorStop(0,    'rgba('+p.r+','+p.g+','+p.b+','+p.a+')');
-      g.addColorStop(0.45, 'rgba('+p.r+','+p.g+','+p.b+','+(p.a*0.28)+')');
-      g.addColorStop(1,    'rgba('+p.r+','+p.g+','+p.b+',0)');
-
-      ctx.fillStyle = g;
-      ctx.fillRect(0, 0, W, H);
-    });
-
-    // 마우스 추적 포인트 — 커서 근처 amber 빛
-    var mx = mxC * W, my = myC * H;
-    var mg = ctx.createRadialGradient(mx, my, 0, mx, my, Math.max(W,H) * 0.28);
-    mg.addColorStop(0,   'rgba(200,135,58,0.18)');
-    mg.addColorStop(0.5, 'rgba(200,135,58,0.05)');
-    mg.addColorStop(1,   'rgba(200,135,58,0)');
-    ctx.fillStyle = mg;
-    ctx.fillRect(0, 0, W, H);
-
-    requestAnimationFrame(draw);
-  }
-
-  requestAnimationFrame(draw);
-})();
-
 // ── Hamburger Menu ───────────────────────────
 (function () {
   const hamburger = document.getElementById('navHamburger');
@@ -150,7 +71,7 @@ if (modal) {
     const kpiItems = (d.kpi || '').split('\n').filter(function (s) { return s.trim(); });
     if (kpiItems.length) {
       kpiEl.innerHTML = kpiItems.map(function (item) {
-        return '<div class="modal-kpi-item">📊 ' + item.trim() + '</div>';
+        return '<div class="modal-kpi-item">' + item.trim() + '</div>';
       }).join('');
       kpiBlock.style.display = '';
     } else {
