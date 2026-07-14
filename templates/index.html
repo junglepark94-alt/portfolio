@@ -7,38 +7,65 @@
 <!-- ── HERO ─────────────────────────────────────────── -->
 <section class="hero" id="hero">
   <div class="hero-inner">
-    <div class="hero-content">
-      {% if profile.open_to_work %}
-      <div class="otw-badge">
-        <span class="otw-dot"></span>{{ 'Open to new opportunities' if en else '새로운 기회를 검토 중입니다' }}
-      </div>
-      {% endif %}
-      <div class="hero-eyebrow">{{ (profile.role_en if profile.role_en else profile.role) if en else profile.role }}</div>
-      {% if en %}
-      {% set display_name = profile.name_en if profile.name_en else profile.name %}
-      <h1 class="hero-name">Hello, I'm<br/><span class="accent">{{ display_name }}</span>.</h1>
-      {% else %}
-      <h1 class="hero-name">안녕하세요,<br/><span class="accent">{{ profile.name }}</span>입니다.</h1>
-      {% endif %}
-      {% set tagline_display = (profile.tagline_en if profile.tagline_en else profile.tagline) if en else profile.tagline %}
-      <p class="hero-sub">{{ tagline_display | replace('\n', '<br/>') | safe }}</p>
-      <div class="hero-cta">
-        <a href="#projects" class="btn btn-primary">{{ 'View Projects' if en else '프로젝트 보기' }}</a>
-        <a href="#contact" class="btn btn-ghost">{{ 'Contact' if en else '연락하기' }}</a>
-        {% if profile.resume_filename %}
-        <a href="{{ url_for('serve_resume') }}" class="btn btn-resume" target="_blank">{{ 'Download Resume ↓' if en else '이력서 다운로드 ↓' }}</a>
+    {% set role_display = (profile.role_en if profile.role_en else profile.role) if en else profile.role %}
+
+    <!-- Masthead — top meta bar -->
+    <div class="hero-topbar">
+      <span class="hero-role">{{ role_display }}</span>
+      <span class="hero-status">
+        {% if profile.open_to_work %}
+        <span class="otw-dot"></span>{{ 'Open to work' if en else '새로운 기회 검토 중' }}
+        {% else %}
+        Portfolio — 2026
         {% endif %}
-      </div>
+      </span>
     </div>
-    {% if profile.profile_image_filename %}
-    <div class="hero-photo">
-      <div class="hero-photo-frame">
-        <img src="{{ url_for('static', filename='uploads/' + profile.profile_image_filename) }}" alt="{{ profile.name }}" />
+
+    <!-- Masthead — main -->
+    <div class="hero-main">
+      <div class="hero-content">
+        {% if en %}
+        {% set display_name = profile.name_en if profile.name_en else profile.name %}
+        <h1 class="hero-name hero-name-en">
+          <span class="hn-greet">Hello, I'm</span>
+          <span class="hn-line"><span class="hn-name">{{ display_name }}</span><span class="hn-mark">.</span></span>
+        </h1>
+        {% else %}
+        <h1 class="hero-name">
+          <span class="hn-greet">안녕하세요,</span>
+          <span class="hn-line"><span class="hn-name">{{ profile.name }}</span><span class="hn-suffix">입니다</span><span class="hn-mark">.</span></span>
+        </h1>
+        {% endif %}
+        {% set tagline_display = (profile.tagline_en if profile.tagline_en else profile.tagline) if en else profile.tagline %}
+        <p class="hero-sub">{{ tagline_display | replace('\n', '<br/>') | safe }}</p>
+        <div class="hero-cta">
+          <a href="#projects" class="btn btn-primary">{{ 'View Projects' if en else '프로젝트 보기' }}</a>
+          <a href="#contact" class="btn btn-ghost">{{ 'Contact' if en else '연락하기' }}</a>
+          {% if profile.resume_filename %}
+          <a href="{{ url_for('serve_resume') }}" class="btn btn-resume" target="_blank">{{ 'Download Resume ↓' if en else '이력서 다운로드 ↓' }}</a>
+          {% endif %}
+        </div>
       </div>
+      {% if profile.profile_image_filename %}
+      <figure class="hero-photo">
+        <div class="hero-photo-frame">
+          <img src="{{ url_for('static', filename='uploads/' + profile.profile_image_filename) }}" alt="{{ profile.name }}" />
+        </div>
+        <figcaption class="hero-photo-cap">{{ (profile.name_en if en and profile.name_en else profile.name) }} — Portfolio</figcaption>
+      </figure>
+      {% endif %}
+    </div>
+
+    <!-- Masthead — numbered competency index -->
+    {% set hero_skills = ((profile.skills_en.split(',') | map('trim') | select | list) if en and profile.skills_en else profile.skill_list) %}
+    {% if hero_skills %}
+    <div class="hero-index">
+      {% for s in hero_skills[:3] %}
+      <span class="hero-index-item"><span class="hi-num">{{ '%02d' % loop.index }}</span>{{ s }}</span>
+      {% endfor %}
     </div>
     {% endif %}
   </div>
-  <div class="hero-line"></div>
 </section>
 
 <!-- ── ABOUT ────────────────────────────────────────── -->
