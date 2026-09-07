@@ -11,3 +11,4 @@ backups/
 pdf/assets/
 tmp/
 .claude/launch.json
+static/uploads/seed_*.jpg
