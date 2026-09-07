@@ -51,7 +51,7 @@ def test_public_content_normalization_is_targeted_and_idempotent(portfolio_app):
         project = Project.query.first()
         project.title = "tvN 예능 프로그램 제작 – 사이니의 빛돌기획"
         project.category_en = "Contents Planning"
-        project.kpi = "오가닉 유입의 6782%가 구독 피드에서 발생"
+        project.my_role = "오가닉 유입의 6782%가 구독 피드에서 발생"
         project.period = "2026.07 ~ 진행 중"
         db.session.commit()
 
@@ -63,7 +63,7 @@ def test_public_content_normalization_is_targeted_and_idempotent(portfolio_app):
         assert profile.skills_en == "Content Strategy & Production,Digital Content,Data Analysis"
         assert project.title == "tvN 예능 ‘샤이니의 빛돌기획’ 제작"
         assert project.category_en == "Content Strategy & Production"
-        assert "67–82%" in project.kpi
+        assert "67–82%" in project.my_role
         assert project.period == "2026.07 – 진행 중"
 
 
@@ -100,8 +100,8 @@ def test_public_content_normalization_fixes_deployed_profile_copy(portfolio_app)
         project.title = "빙그레X더현대서울 팝업스토어 기획·운영"
         project.title_en = "tvN Variety Program Production – City girls on the climb"
         project.period = "2025.05 – 2025. 11"
-        project.description_en = "Winner of the 2025 Korea Pop-Up Store Awards Grand Prize – Grand Prize"
-        project.detail_text_en = "It won the Grand Prize at the 2025 Korea Pop-Up Store Awards Grand Prize, receiving recognition."
+        project.my_role = "Winner of the 2025 Korea Pop-Up Store Awards Grand Prize – Grand Prize"
+        profile.about_text_en = "It won the Grand Prize at the 2025 Korea Pop-Up Store Awards Grand Prize, receiving recognition."
         db.session.commit()
 
         normalize_public_content()
@@ -116,5 +116,41 @@ def test_public_content_normalization_fixes_deployed_profile_copy(portfolio_app)
         assert project.title == "빙그레×더현대서울 팝업스토어 기획·운영"
         assert project.title_en == "tvN Variety Program Production – City Girls on the Climb"
         assert project.period == "2025.05 – 2025.11"
-        assert project.description_en == "Winner of the 2025 Korea Pop-Up Store Awards – Grand Prize"
-        assert project.detail_text_en == "It won the Grand Prize at the 2025 Korea Pop-Up Store Awards, receiving recognition."
+        assert project.my_role == "Winner of the 2025 Korea Pop-Up Store Awards – Grand Prize"
+        assert profile.about_text_en == "It won the Grand Prize at the 2025 Korea Pop-Up Store Awards, receiving recognition."
+
+
+def test_project_copy_overrides_apply_canonical_modal_content(portfolio_app):
+    import json
+
+    with portfolio_app.app_context():
+        project = Project.query.first()
+        project.kpi = "본편 8편 누적 조회수 568만회"
+        project.detail_text = "줄글 설명"
+        project.links_json = json.dumps([{"label": "영상 링크", "url": "https://youtu.be/x"}], ensure_ascii=False)
+        project.links_en_json = json.dumps([{"label": "Introduction Video", "url": "https://youtu.be/x"}], ensure_ascii=False)
+        db.session.commit()
+
+        normalize_public_content()
+        normalize_public_content()
+
+        assert project.kpi.startswith("568만 | ")
+        assert project.detail_text.startswith("## 배경과 과제")
+        assert project.kpi_en.startswith("5.68M | ")
+        assert "## Background & Challenge" in project.detail_text_en
+        assert "67–82%" in project.kpi and "67–82%" in project.kpi_en
+        # Banana Salon entry defines no link relabels, so links stay as they were
+        assert json.loads(project.links_json)[0]["label"] == "영상 링크"
+
+
+def test_site_projects_file_is_well_formed():
+    import json
+
+    data = json.load(open("data/site_projects.json", encoding="utf-8"))
+    matches = [p["match"] for p in data["projects"]]
+    assert len(matches) == 10 and len(set(matches)) == 10
+    for entry in data["projects"]:
+        for field in ("description", "kpi", "detail_text", "description_en", "kpi_en", "detail_text_en"):
+            assert entry[field].strip(), (entry["match"], field)
+        assert "## " in entry["detail_text"] and "## " in entry["detail_text_en"]
+        assert "|" in entry["kpi"] and "|" in entry["kpi_en"]

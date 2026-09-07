@@ -91,7 +91,9 @@ if _db_url.startswith('postgres://'):
 _using_sqlite = not _db_url or _db_url.startswith('sqlite')
 
 if _using_sqlite:
-    _db_url = 'sqlite:///portfolio.db'
+    # 명시적인 sqlite URL(예: 테스트의 sqlite:///:memory:)은 그대로 쓰고, 미설정일 때만 로컬 파일을 사용
+    if not _db_url:
+        _db_url = 'sqlite:///portfolio.db'
     if _is_production:
         print("=" * 60)
         print("WARNING: DATABASE_URL is not set. Using SQLite.")
@@ -462,6 +464,8 @@ def _normalize_copy(value):
         ('City girls on the climb', 'City Girls on the Climb'),
         ('SHINee Inc. - tvN', 'SHINee Inc. — tvN'),
         ('빙그레X더현대서울', '빙그레×더현대서울'),
+        ('Social Eye Awards', 'Social i Awards'),
+        ('Social I Award', 'Social i Awards'),
     ]:
         normalized = normalized.replace(old, new)
     # 이전 규칙이 만든 'Grand Prize' 중복 표기 복구
@@ -571,7 +575,45 @@ def normalize_public_content():
         if 'Banana Salon' in project.title or 'Banana Salon' in project.title_en:
             project.period = '2026.07 – 진행 중'
 
+    _apply_project_copy_overrides()
     db.session.commit()
+
+
+def _relabel_links(raw, label_map):
+    """Rename link labels in a links JSON list; leave unparsable input untouched."""
+    if not label_map:
+        return raw
+    try:
+        links = json.loads(raw or '[]')
+    except (TypeError, ValueError):
+        return raw
+    if not isinstance(links, list):
+        return raw
+    for link in links:
+        if isinstance(link, dict) and link.get('label') in label_map:
+            link['label'] = label_map[link['label']]
+    return json.dumps(links, ensure_ascii=False)
+
+
+def _apply_project_copy_overrides():
+    """Sync project modal copy (summary, key results, detail, link labels) from data/site_projects.json."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'site_projects.json')
+    try:
+        with open(path, encoding='utf-8') as fh:
+            overrides = json.load(fh).get('projects', [])
+    except (OSError, ValueError):
+        return
+    fields = ('description', 'kpi', 'detail_text', 'description_en', 'kpi_en', 'detail_text_en')
+    for project in Project.query.all():
+        title = project.title or ''
+        entry = next((o for o in overrides if o.get('match') and o['match'] in title), None)
+        if not entry:
+            continue
+        for field in fields:
+            if entry.get(field) is not None:
+                setattr(project, field, entry[field])
+        project.links_json = _relabel_links(project.links_json, entry.get('link_labels'))
+        project.links_en_json = _relabel_links(project.links_en_json, entry.get('link_labels_en'))
 
 
 # ── DB Init ─────────────────────────────────────────────

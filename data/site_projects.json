@@ -1,0 +1,103 @@
+{
+  "_readme": "Canonical public copy for project detail modals. Matched against the Korean project title (substring). Applied idempotently at startup by normalize_public_content(). Key results: 'value | label' lines render as stat tiles. Detail text: '## ' lines render as sub-headings, '- ' lines as bullets.",
+  "projects": [
+    {
+      "match": "Banana Salon",
+      "description": "수출용 바나나맛우유를 소구하는 국가별 크로스컬처 토크쇼. 본편 8편과 숏츠 8편을 기획·운영 중입니다.",
+      "kpi": "568만 | 본편 8편 누적 조회수 (공개 2개월)\n100만 | 최고 회차 조회수 (인도네시아 편)\n72% | 타깃 국가 시청 비중 최대 (현지어 자막 회차)\n67–82% | 오가닉 유입 중 구독 피드 비중\n8만 | 시리즈 운영 중 채널 구독자 돌파\n광고 도달 대비 오가닉 증분 최대 +67%",
+      "detail_text": "## 배경과 과제\n챌린지·요리 대결 포맷을 이어 온 글로벌 채널의 다음 축으로 '교양 있는 크로스컬처 예능'을 설정하고, 수출용 바나나맛우유를 자연스럽게 소구할 시리즈를 기획했습니다.\n## 기획과 실행\n나라를 하나씩 정해 그 나라 게스트를 초대하고 연애·결혼·가족을 주제로 대화하는 토크쇼 <Banana Salon>을 고안했습니다. MC는 글로벌 팬덤을 가진 K-pop 아이돌(모모랜드 낸시), 게스트는 타깃 국가의 아이돌·유튜버·틱톡커로 구성하고 회차마다 현지어 자막을 붙였습니다.\n## 제품 결합\n매회 'Welcome Banana Flavored Milk Drink' 코너에서 게스트가 자국 과자와 함께 제품을 맛보고 현지 방식으로 음료를 만듭니다. 제품 소개로 시작하지 않고 토크 중간에 제품을 만나는 순서를 처음부터 설계했고, 이 코너를 1분 내외 숏츠 8편으로 분리 유통했습니다.\n## 데이터 기반 재편성\n- 1~4화 실측 결과 동남아 타깃 회차가 미국 타깃 회차 대비 조회 2.1배, 참여율 2.2배\n- 오가닉 유입의 67–82%가 구독 피드에서 발생하는 '타깃 국가 구독자 → 다음 회차 자동 도달' 복리 구조 확인\n- 9~11화를 인도네시아·베트남·필리핀 타깃으로 재편성하고, 검증된 포맷을 수출용 메로나 <Melona Salon>으로 확장",
+      "description_en": "A country-by-country cross-cultural talk show promoting export Banana Flavored Milk. 8 episodes and 8 Shorts, currently in production.",
+      "kpi_en": "5.68M | Cumulative views, 8 episodes (first 2 months)\n1M | Top episode views (Indonesia)\n72% | Peak share of views from the target country (localized-subtitle episodes)\n67–82% | Organic traffic from the subscription feed\n80K | Channel subscribers passed during the series\nOrganic uplift on top of paid reach up to +67%",
+      "detail_text_en": "## Background & Challenge\nFollowing the channel's challenge and cooking-battle formats, I set \"cultured cross-cultural entertainment\" as its next pillar and planned a series that would promote export Banana Flavored Milk naturally.\n## Planning & Execution\n<Banana Salon> picks one country per episode, invites a guest from that country, and talks about dating, marriage, and family. The host is a K-pop idol with a global fandom (Nancy of MOMOLAND); guests are idols, YouTubers, and TikTokers from the target country, and every episode carries subtitles in the local language.\n## Product Integration\nIn each episode's \"Welcome Banana Flavored Milk Drink\" segment, guests pair snacks from home with the product and mix the drink the way locals do. The show is built so viewers come for the conversation and meet the product midway rather than as an opening pitch, and the segment was cut into 8 one-minute Shorts for extra distribution.\n## Data-driven Rescheduling\n- Episodes 1–4 showed Southeast Asia-targeted episodes delivering 2.1x views and 2.2x engagement versus the US-targeted episode\n- 67–82% of organic traffic came from the subscription feed, revealing a compounding loop: build subscribers in a target country and the next episode reaches them automatically\n- Episodes 9–11 were rescheduled for Indonesia, Vietnam, and the Philippines, and the proven format was extended to export Melona as <Melona Salon>"
+    },
+    {
+      "match": "캐릭터 IP 유튜브",
+      "description": "정보성 콘텐츠 채널을 캐릭터 IP '빙그레우스' 기반 버추얼 유튜버 채널로 전환했습니다. 국내 기업 최초 사례입니다.",
+      "kpi": "3,255% | 순 시청자 수 증가\n3,617% | 재방문 시청자 수 증가\n87.8% | 평균 영상 재생률\n3.2만 | 신규 구독자\n98% | 키워드 검색 유입 증가\n38.6% | 인터랙션 증가\n2023 YouTube Works 2개 부문(Best Brand Fandom, Best Shorts) Finalist\n2023 소셜아이어워드 식품브랜드 유튜브 채널 부문 대상\n전 세계 버튜버 순위 25위 (플레이보드, 2022년 7월 기준)",
+      "detail_text": "## 배경과 과제\n빙그레 유튜브 채널은 인포그래픽 위주의 정보성 콘텐츠로 운영돼 자사 인스타그램 대비 조회수와 참여가 낮았습니다. 매체비 확대 대신 '시청자가 다음 편을 기다릴 이유가 없다'는 점을 핵심 문제로 정의했습니다.\n## 기획과 실행\n대중화되던 버추얼 유튜버 포맷과 Unity 기반 제작 방식에 주목해, 자사 캐릭터 IP '빙그레우스'를 기업형 버추얼 유튜버로 전환하는 기획을 제안했습니다. 전례가 없다는 우려에는 소규모 테스트 콘텐츠와 제작비 시뮬레이션으로 답했고, 채널 브랜딩·콘텐츠 포맷·에이전시 선정과 운영을 총괄했습니다.\n## 결과\n단편 정보 전달을 연속된 세계관과 캐릭터 서사로 바꿔 재방문 시청자가 3,617% 늘었고, 기업 브랜드 최초의 버튜버 마케팅 사례로 2023 YouTube Works 2개 부문 Finalist와 소셜아이어워드 대상으로 이어졌습니다.",
+      "link_labels": {"영상 링크": "채널 소개 영상"},
+      "description_en": "Turned an informational YouTube channel into a virtual YouTuber channel built on the character IP 'Binggraeus', the first such case by a Korean corporation.",
+      "kpi_en": "3,255% | Increase in unique viewers\n3,617% | Increase in returning viewers\n87.8% | Average video completion rate\n32K | New subscribers\n98% | Increase in keyword search traffic\n38.6% | Increase in interactions\n2023 YouTube Works Finalist in 2 categories (Best Brand Fandom, Best Shorts)\n2023 Social i Awards Grand Prize, Food Brand YouTube Channel category\nRanked #25 among VTubers worldwide (Playboard, July 2022)",
+      "detail_text_en": "## Background & Challenge\nBinggrae's YouTube channel ran on infographic-style informational content and lagged far behind its Instagram channel in views and engagement. Rather than adding media spend, I defined the core problem as \"viewers have no reason to wait for the next episode.\"\n## Planning & Execution\nNoting the rise of the virtual YouTuber format and Unity-based production, I proposed turning the company's character IP 'Binggraeus' into a corporate VTuber. Concerns about the lack of precedent were answered with small test content and production-cost simulations, and I led channel branding, content formats, agency selection, and operations end to end.\n## Results\nReplacing one-off information with a continuous universe and character narrative grew returning viewers by 3,617%, and as the first VTuber marketing case by a corporate brand the channel earned two 2023 YouTube Works Finalist nominations and the Social i Awards Grand Prize.",
+      "link_labels_en": {"Introduction Video": "Channel introduction video"}
+    },
+    {
+      "match": "캐릭터 IP 인스타그램",
+      "description": "3년간 이어 온 '빙그레 왕국' 세계관을 실제 판매 공간과 제품에 연결하는 시즌4 '슈퍼 빙그레'로 채널을 리뉴얼했습니다.",
+      "kpi": "21만 | 팔로워 (17만→19만→21만, 3년 연속 성장)\n15만 | 제품 콘텐츠 평균 도달\n100건 | 신제품·주력제품 콘텐츠 발행\n1위 | 식품업계 인스타그램 팔로워 순위\n인스타그램 종합식품업계 경쟁력 1위 (한국인터넷소통협회 선정)\n2024 소셜아이어워드 식품브랜드 부문 통합대상",
+      "detail_text": "## 배경과 과제\n3년간 이어 온 빙그레 왕국 세계관은 팬덤을 만들었지만, 트렌드 변화에 맞춰 현실 공간과 제품과의 연결을 강화할 필요가 있었습니다. 기존 팬에게는 친밀감을 높이고 신규 유입에게는 거리감을 낮추는 것을 목표로 잡았습니다.\n## 기획과 실행\n빙그레 제품이 실제로 판매되는 채널(장소)을 콘셉트로 한 시즌4 '슈퍼 빙그레' 연간 운영 계획을 수립하고 채널 브랜딩과 콘텐츠 기획·운영을 담당했습니다. 제품을 PPL처럼 노출하는 데 그치지 않고 스토리텔링의 주요 소재로 활용해 제품 노출과 소비자 소통을 동시에 실현했습니다.",
+      "description_en": "Renewed the channel as Season 4 'Super Binggrae', connecting the three-year 'Binggrae Kingdom' universe to real retail spaces and products.",
+      "kpi_en": "210K | Followers (170K → 190K → 210K, three years of growth)\n150K | Average reach per product post\n100 | Posts for new and flagship products\n#1 | Follower ranking among food-industry Instagram channels\nRanked #1 in competitiveness among integrated food brands on Instagram (Korea Internet Communication Association)\n2024 Social i Awards Grand Prize (Integrated), Food Brand category",
+      "detail_text_en": "## Background & Challenge\nThe Binggrae Kingdom universe had built a fandom over three years, but shifting trends called for a stronger connection to real-world spaces and products. The goals were deeper familiarity for existing fans and a lower barrier for new audiences.\n## Planning & Execution\nI built the annual Season 4 'Super Binggrae' plan around the retail channels where Binggrae products are actually sold, and handled channel branding, content planning, and operations. Products were woven into the core storytelling rather than placed as passive placements, delivering product visibility and genuine engagement at once.",
+      "link_labels_en": {"Instagram Link": "Instagram channel", "View Details (1)": "Post 1", "View Details (2)": "Post 2", "View Details (3)": "Post 3", "View Details (4)": "Post 4"}
+    },
+    {
+      "match": "더현대서울 팝업스토어",
+      "description": "온라인 캐릭터 세계관을 더현대 서울 팝업 <빙그레 소원왕국>으로 확장하고, 현장 콘텐츠가 다시 SNS로 확산되는 구조를 설계했습니다.",
+      "kpi": "3.3만 | 방문객 수\n8,544건 | 굿즈 판매\n3.2억 원 | 연계 커머스 매출 (네이버 쇼핑 라이브)\n82건 | 언론 보도\n305건 | 자발적 SNS 후기\n대상 | 2025 대한민국 팝업스토어 어워즈",
+      "detail_text": "## 배경과 과제\n온라인에서 형성된 빙그레우스 팬덤을 오프라인 공간으로 확장하는 것이 핵심 과제였습니다. 제품 홍보 부스가 아니라, SNS에서 쌓아 온 세계관과 스토리텔링을 공간 전체에 녹인 콘텐츠형 팝업을 목표로 했습니다.\n## 기획과 실행\n방문객이 세계관에 몰입하도록 공간 구성과 체험 요소를 설계하고, 굿즈와 네이버 쇼핑 라이브를 연계해 경험이 구매로 이어지게 했습니다. 현장에서 생성된 콘텐츠가 자연스럽게 SNS로 확산되는 순환 구조를 처음부터 의도했습니다.\n## 결과\n방문객 약 3만 3천 명과 자발적 후기 305건이 다시 온라인 화제로 이어졌고, 2025 대한민국 팝업스토어 어워즈 대상을 수상하며 기획력을 대외적으로 인정받았습니다.",
+      "description_en": "Extended the online character universe into the <Binggrae Wish Kingdom> pop-up at The Hyundai Seoul, with on-site content designed to flow back to social media.",
+      "kpi_en": "33K | Visitors\n8,544 | Merchandise transactions\n₩320M | Linked commerce sales (Naver Shopping Live)\n82 | Press articles\n305 | Organic social media reviews\nGrand Prize | 2025 Korea Pop-Up Store Awards",
+      "detail_text_en": "## Background & Challenge\nThe core challenge was to extend the Binggraeus fandom built online into a physical space. Instead of a product-promotion booth, the goal was a content-driven pop-up that carried the universe and storytelling from social media through the entire space.\n## Planning & Execution\nSpatial layout and interactive elements were designed to immerse visitors in the universe, and merchandise plus Naver Shopping Live turned the experience into purchases. The structure was built from the start so that content created on site would spread organically to social media.\n## Results\nAbout 33,000 visitors and 305 organic reviews fed back into online buzz, and the pop-up won the Grand Prize at the 2025 Korea Pop-Up Store Awards."
+    },
+    {
+      "match": "비밀학기",
+      "description": "2025 캐릭터 라이선싱 페어와 서울 일러스트레이션 페어에서 1020 타깃의 여름방학 콘셉트 부스 <빙그레 비밀학기>를 기획·운영했습니다.",
+      "kpi": "최다 | 방문객 (주최 사무국 추산)\n500만 원 | 일 평균 매출\n완판 | MD 전 물량 소진",
+      "detail_text": "## 배경과 과제\n7월 성수기에 맞춰 제품·브랜드 인지도 제고와 MD 판매를 목표로 박람회 참가를 기획했습니다. 핵심 타깃인 1020에게 7월은 1학기와 2학기 사이 여름방학이라는 점에 착안했습니다.\n## 기획과 실행\n'빙그레 왕국에서 비밀스럽게 열리는 특별한 학기'라는 콘셉트로 부스 공간, MD 기획·제작, 온·오프라인 홍보를 통합 설계했습니다. 브랜드 세계관을 체험 공간으로 구현해 타깃의 몰입과 참여를 이끌었습니다.",
+      "description_en": "Planned and ran the <Binggrae Secret Semester> booth, a summer-break concept for teens and twenties, at the 2025 Character Licensing Fair and Seoul Illustration Fair.",
+      "kpi_en": "Highest | Visitor count at the fair (organizer estimate)\n₩5M | Average daily sales\nSold out | Entire merchandise inventory",
+      "detail_text_en": "## Background & Challenge\nThe fair appearance was planned for the July peak season to raise product and brand awareness and drive merchandise sales. For the core teen and twenties target, July is the summer break between semesters, which became the insight behind the concept.\n## Planning & Execution\nUnder the concept of \"a secret semester held inside the Binggrae Kingdom,\" I designed the booth space, merchandise planning and production, and online and offline promotion as one package. The brand universe became an immersive space that drew engagement and participation from the target."
+    },
+    {
+      "match": "K SPICIEST CUP",
+      "description": "'매운 음식 뒤 바나나맛우유' 공식으로 글로벌 소비자를 겨냥한 브랜디드 콘텐츠 14편을 기획·운영했습니다.",
+      "kpi": "1,300만 | 누적 조회수\n26만 | 인터랙션\n1.1만 | 신규 구독자\n82% | 수출국 시청자 비중",
+      "detail_text": "## 배경과 과제\n글로벌 소비자에게 바나나맛우유 인지도를 확장하는 것이 목표였습니다. 매운 음식 챌린지가 글로벌 콘텐츠 시장에서 검증된 스테디 트렌드라는 점에 착안해 '매운 음식 후 바나나맛우유'라는 소구 공식을 세웠습니다.\n## 기획과 실행\n바나나맛우유를 매운맛을 중화하는 아이템으로 자연스럽게 포지셔닝해 제품 특성을 콘텐츠 맥락 안에 녹였습니다. 출연진은 국내 인지도보다 해외 팬덤 기반의 K-pop 아이돌 멤버를 우선 선정해, 한정된 예산에서 실제 타깃 도달 효율을 극대화했습니다.",
+      "description_en": "A 14-part branded series for global consumers built on the formula 'Banana Flavored Milk after spicy food'.",
+      "kpi_en": "13M | Cumulative views\n260K | Interactions\n11K | New subscribers\n82% | Viewers from Binggrae's export markets",
+      "detail_text_en": "## Background & Challenge\nThe goal was to expand awareness of Banana Flavored Milk among global consumers. Since spicy food challenges are a proven, enduring trend in global content, the appeal formula was set as \"Banana Flavored Milk after spicy food.\"\n## Planning & Execution\nBanana Flavored Milk was positioned naturally as the item that cools the heat, embedding the product's character in the content. Casting prioritized K-pop idol members with strong overseas fandoms over domestic name recognition, maximizing reach to the real target within a limited budget.",
+      "link_labels_en": {"First Video": "Episode 1", "Youtube Playlist": "YouTube playlist"}
+    },
+    {
+      "match": "Hell's Gimbap",
+      "description": "한국 김밥 트렌드와 길거리 챌린지를 결합한 숏폼 시리즈. 본편 5편과 숏츠 25편을 매체 집행 없이 확산시켰습니다.",
+      "kpi": "2,400만 | 누적 조회수 (매체 집행 없음)\n84만 | 인터랙션\n4.1만 | 신규 구독자\n1,700만 | 단일 영상 최고 조회수 (덴마크·말레이시아)",
+      "detail_text": "## 배경과 과제\n글로벌 소비자에게 바나나맛우유와 메로나 인지도를 확장하기 위해 숏폼에 최적화된 길거리 인터뷰·챌린지 형식을 채택했습니다. 미국 유튜브·틱톡·인스타그램에서 이 포맷으로 인지도가 높은 크리에이터 @iamfromkorea를 섭외했습니다.\n## 기획과 실행\n당시 글로벌에서 주목받던 한국 김밥 트렌드에 착안해, 단계별로 매운 김밥을 먹고 버티면 상금과 함께 바나나맛우유·메로나를 중화 아이템으로 제공하는 챌린지를 설계했습니다. 제품을 콘텐츠 맥락 안에 녹여 광고 거부감 없이 소구했습니다.\n## 결과\n별도 매체 집행 없이 현지 알고리즘만으로 확산돼, 단일 영상 기준 덴마크·말레이시아에서 1,700만 회, 독일·멕시코에서 300만 회 이상을 기록했습니다.",
+      "description_en": "A short-form series combining the Korean gimbap trend with street challenges. 5 episodes and 25 Shorts spread with no paid media.",
+      "kpi_en": "24M | Cumulative views (no paid media)\n840K | Interactions\n41K | New subscribers\n17M | Top single-video views (Denmark and Malaysia)",
+      "detail_text_en": "## Background & Challenge\nTo expand awareness of Banana Flavored Milk and Melona among global consumers, I adopted a street-interview and challenge format optimized for short-form and brought on creator @iamfromkorea, known for exactly this format on US YouTube, TikTok, and Instagram.\n## Planning & Execution\nBuilding on the Korean gimbap trend that was drawing global attention, the challenge had participants eat progressively spicier gimbap, with cash prizes plus Banana Flavored Milk and Melona as the items that cool the heat. The products sat inside the content's logic, so the appeal felt organic rather than like advertising.\n## Results\nWith no paid media, the content spread through local algorithms alone, reaching over 17 million views in Denmark and Malaysia and over 3 million in Germany and Mexico on single videos.",
+      "link_labels_en": {"17M View Shorts": "17M-view Short (Denmark)", "3.2M View Shorts": "3.2M-view Short (Germany)", "3.0M View Shorts": "3M-view Short (Mexico)", "Youtube Playlist": "YouTube playlist"}
+    },
+    {
+      "match": "World War Chef",
+      "description": "각국 셰프가 같은 주제를 자국 스타일로 대결하는 요리 시리즈 10편. 메로나 디저트 라운드를 포맷 안에 설계했습니다.",
+      "kpi": "940만 | 누적 조회수\n8만 | 인터랙션\n1.2만 | 신규 구독자\n80% | 수출국 시청자 비중",
+      "detail_text": "## 배경과 과제\n국가 간 음식 문화에 대한 긍정적인 경쟁심이 강한 시청 동기로 작용한다는 점에 착안해, 이를 콘텐츠 유입 구조와 자연스러운 제품 소구로 연결하는 포맷을 고안했습니다.\n## 기획과 실행\n각국 셰프가 동일한 요리 주제를 자국 스타일로 해석하고 MC와 게스트의 평가를 받는 요리 대결 <World War Chef>를 기획했습니다. 여기에 메로나를 활용한 자국 디저트 대결 라운드를 추가해 제품을 포맷 안에 자연스럽게 녹였습니다.",
+      "description_en": "A 10-part cooking series where chefs from different countries tackle the same theme in their own style, with a Melona dessert round built into the format.",
+      "kpi_en": "9.4M | Cumulative views\n80K | Interactions\n12K | New subscribers\n80% | Viewers from Binggrae's export markets",
+      "detail_text_en": "## Background & Challenge\nFriendly rivalry over national food cultures is a strong reason to watch, so I devised a format that turns that rivalry into both audience inflow and natural product appeal.\n## Planning & Execution\nIn <World War Chef>, chefs from different countries interpret the same culinary theme in their national style and are judged by the host and guests. A dessert round built around Melona was added so the product lives inside the format itself.",
+      "link_labels_en": {"Ep.4": "Episode 4 (Indonesia, Philippines)", "Ep.5": "Episode 5 (India, Spain)", "Youtube Playlist": "YouTube playlist"}
+    },
+    {
+      "match": "산꾼도시여자들",
+      "description": "술꾼도시여자들 시즌 사이 공백을 잇는 스핀오프 예능. 메인 티저와 회차 예고편을 기획·제작했습니다.",
+      "kpi": "3.339% | 수도권 최고 시청률\n3.3만 | 메인 티저 조회수 (좋아요 600)\n4.4만 | 본방송 예고편 조회수 (좋아요 417)\n정은지, 이선빈, 한선화 출연",
+      "detail_text": "## 배경과 과제\n술꾼도시여자들 시즌1과 시즌2 사이의 콘텐츠 공백을 메우고 시즌2 기대감을 높이는 것이 목적이었습니다. 드라마 밖 실제 인물들의 매력을 보여주는 것을 미션으로 삼았습니다.\n## 기획과 실행\n메인 티저는 원작 드라마의 콘셉트를 유지하면서 예능에서 드러날 실제 캐릭터에 대한 기대감을 만드는 방향으로, 본방송 예고편은 회차 구성과 콘셉트를 요약해 다음 회차 기대감을 끌어올리는 방식으로 기획·제작했습니다.",
+      "description_en": "A spin-off variety show bridging the seasons of Work Later, Drink Now. Planned and produced the main teaser and episode trailers.",
+      "kpi_en": "3.339% | Peak metropolitan viewership rating\n33K | Main teaser views (600 likes)\n44K | Episode trailer views (417 likes)\nStarring Jeong Eun-ji, Lee Sun-bin, and Han Sun-hwa",
+      "detail_text_en": "## Background & Challenge\nThe show filled the content gap between Seasons 1 and 2 of Work Later, Drink Now and built anticipation for Season 2. Its mission was to show the cast's real-life charm outside the drama.\n## Planning & Execution\nThe main teaser kept the original drama's concept while building excitement for the real personalities that would surface in the variety format. Episode trailers summarized each episode's structure and concept to drive anticipation for the next one.",
+      "link_labels_en": {"1st Trailer": "Episode 1 trailer", "2nd Trailer": "Episode 2 trailer"}
+    },
+    {
+      "match": "샤이니의 빛돌기획",
+      "description": "샤이니 완전체 컴백 쇼케이스를 콩트·관찰 예능으로 구성한 SM엔터테인먼트 브랜디드 콘텐츠. 1차·3차 메인 티저와 신곡 무대 영상을 제작했습니다.",
+      "kpi": "500만 | 'Don't Call Me' 무대 영상 조회수 (좋아요 29만)\n11.1만 | 3차 메인 티저 조회수 (2개 버전 합산)\n10만 | 1차 메인 티저 조회수 (좋아요 9,300)\n0.8% | 수요일 밤 12시 시청률 (전국 유료가구 기준)\n샤이니, 권혁수, 홍현희, 피식대학 출연",
+      "detail_text": "## 배경과 과제\n2년 6개월 만의 완전체 컴백 쇼케이스로, 팬이 아닌 일반 시청자도 배경지식 없이 가볍게 즐길 수 있는 컴백쇼를 목표로 했습니다. 신곡 'Don't Call Me'와 'Heart Attack' 무대를 처음 공개하는 자리였습니다.\n## 기획과 실행\n1차 티저는 멤버들의 진정성이 드러나는 사전 인터뷰 중심으로, 3차 티저는 부캐 콘셉트의 콩트를 중심으로 예능감을 강조해 제작했습니다. 신곡 무대 편집은 안무와 무대 디자인 등 비주얼 요소를 극대화하는 방향으로 진행했습니다.",
+      "description_en": "SM Entertainment branded content framing SHINee's full-group comeback showcase as sketch comedy and observational variety. Produced the 1st and 3rd main teasers and new-song performance videos.",
+      "kpi_en": "5M | 'Don't Call Me' performance video views (290K likes)\n111K | 3rd main teaser views (two versions combined)\n100K | 1st main teaser views (9,300 likes)\n0.8% | Wednesday midnight rating (national paid households)\nStarring SHINee, Kwon Hyuk-soo, Hong Hyun-hee, and Psick Univ",
+      "detail_text_en": "## Background & Challenge\nThis was SHINee's first full-group comeback showcase in two and a half years, planned so that general viewers, not just fans, could enjoy it without background knowledge. It was the first public stage for 'Don't Call Me' and 'Heart Attack'.\n## Planning & Execution\nThe 1st teaser centered on pre-show interviews that captured the members' sincerity, while the 3rd teaser leaned into sketch comedy with alter-ego concepts. The performance edits maximized visual elements such as choreography and stage design.",
+      "link_labels_en": {"Main Episode": "Full episode", "1st Trailer": "1st teaser", "3rd Trailer": "3rd teaser", "Live Performance Editing": "'Don't Call Me' performance edit"}
+    }
+  ]
+}
