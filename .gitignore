@@ -12,3 +12,6 @@ pdf/assets/
 tmp/
 .claude/launch.json
 static/uploads/
+pdf/fonts/
+pdf/cache/
+pdf/*.pdf

@@ -4,3 +4,4 @@ pypdf==6.17.0
 reportlab==5.0.1
 pillow==12.3.0
 pypdfium2==5.13.0
+qrcode==8.2

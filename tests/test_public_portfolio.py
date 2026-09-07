@@ -332,3 +332,25 @@ def test_official_image_replacement_swaps_mapped_files_only(portfolio_app, monke
 
         assert mapped.filename == "ext_official.jpg"
         assert other.filename == "behind_the_scenes.jpg"
+
+
+def test_profile_fixes_normalize_list_values_and_run_once_per_version(portfolio_app):
+    import json
+    from app import apply_profile_fixes_once, sync_canonical_content_once
+
+    with portfolio_app.app_context():
+        sync_canonical_content_once()
+        profile = db.session.get(Profile, 1)
+        profile.experience_en_json = json.dumps([
+            {"company": "CJ ENM", "period": "2019.07 - 2022.03", "role": "Producer",
+             "bullets": ["Credits include: Mountain Village Women"]},
+        ], ensure_ascii=False)
+        project = Project.query.first()
+        project.kpi = "관리자가 고친 성과"
+        db.session.commit()
+
+        assert apply_profile_fixes_once() is True
+        assert profile.experience_en[0]["bullets"] == ["Credits include: City Girls on the Climb"]
+        assert profile.experience_en[0]["period"] == "2019.07 – 2022.03"
+        assert project.kpi == "관리자가 고친 성과"        # 문안은 건드리지 않는다
+        assert apply_profile_fixes_once() is False       # 같은 버전에서는 다시 돌지 않는다

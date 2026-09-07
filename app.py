@@ -526,6 +526,9 @@ def _normalize_json_entries(raw):
         if not isinstance(entry, dict):
             continue
         for key, val in entry.items():
+            if isinstance(val, list):
+                entry[key] = [_normalize_copy(v) if isinstance(v, str) else v for v in val]
+                continue
             if not isinstance(val, str):
                 continue
             val = _normalize_copy(val)
@@ -538,7 +541,14 @@ def _normalize_json_entries(raw):
 
 
 def normalize_public_content():
-    """Idempotently align deployed portfolio copy with the 2026 application."""
+    """최초 1회 동기화: 프로필/기간 표기 정리 + 프로젝트 기준 문안 적용."""
+    normalize_profile_and_periods()
+    _apply_project_copy_overrides()
+    db.session.commit()
+
+
+def normalize_profile_and_periods():
+    """오탈자·기간 표기·영문 용어만 정리한다 (관리자가 쓴 문안의 내용은 바꾸지 않는다)."""
     content_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data',
                                 'hyundai_application_2026.json')
     try:
@@ -596,9 +606,6 @@ def normalize_public_content():
             project.title_en = 'SHINee Inc. — tvN Branded Entertainment'
         if 'Banana Salon' in project.title or 'Banana Salon' in project.title_en:
             project.period = '2026.07 – 진행 중'
-
-    _apply_project_copy_overrides()
-    db.session.commit()
 
 
 def _relabel_links(raw, label_map):
@@ -678,6 +685,39 @@ def apply_youtube_thumbnail_swaps():
 # 기준 문안 동기화는 이 버전당 한 번만 실행된다. 그 뒤로는 관리자 화면에서 저장한 내용이 항상 최신이다.
 # 값을 올리면 다음 시작 때 한 번 더 덮어쓰므로, 관리자 수정 내용을 잃어도 되는 경우에만 올린다.
 CONTENT_SEED_VERSION = 1
+
+
+# 오탈자/기간 표기 정리는 이 버전당 한 번 더 실행된다. 문안 내용은 건드리지 않으므로 관리자 수정과 충돌하지 않는다.
+PROFILE_FIX_VERSION = 2
+
+
+def _marker_version(key):
+    marker = db.session.get(ContentSync, key)
+    return int(marker.value) if marker and (marker.value or '').isdigit() else 0
+
+
+def _set_marker(key, version):
+    marker = db.session.get(ContentSync, key)
+    if marker is None:
+        marker = ContentSync(key=key)
+        db.session.add(marker)
+    marker.value = str(version)
+    marker.applied_at = datetime.utcnow()
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        return False
+    return True
+
+
+def apply_profile_fixes_once():
+    """normalize_profile_and_periods()를 PROFILE_FIX_VERSION당 한 번 실행."""
+    if _marker_version('profile_fix_version') >= PROFILE_FIX_VERSION:
+        return False
+    normalize_profile_and_periods()
+    db.session.commit()
+    return _set_marker('profile_fix_version', PROFILE_FIX_VERSION)
 
 
 def sync_canonical_content_once():
@@ -937,6 +977,11 @@ def init_db():
     except Exception as exc:  # 문안 동기화 실패가 서버 부팅을 막아서는 안 된다
         db.session.rollback()
         print(f"[content-sync] skipped: {exc!r}")
+    try:
+        apply_profile_fixes_once()
+    except Exception as exc:
+        db.session.rollback()
+        print(f"[profile-fix] skipped: {exc!r}")
     try:
         apply_youtube_thumbnail_swaps()
     except Exception as exc:
