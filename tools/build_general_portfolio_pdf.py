@@ -25,7 +25,7 @@ import urllib.request
 from datetime import date
 
 from reportlab.lib.colors import HexColor
-from reportlab.lib.enums import TA_LEFT
+from reportlab.lib.enums import TA_LEFT, TA_RIGHT
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.utils import ImageReader
@@ -81,6 +81,7 @@ LABELS = {
         'summary': '개요', 'role': '역할', 'site_note': '이 PDF는 포트폴리오 사이트의 내용을 기준으로 만들었습니다. 영상과 최신 내용은 사이트에서 바로 확인하실 수 있습니다.',
         'visit': '포트폴리오 사이트에서 더 보기', 'contact': '연락처', 'email': '이메일',
         'linkedin': 'LinkedIn', 'generated': '기준일', 'continued': '(계속)',
+        'contents': '수록 프로젝트',
         'closing_title': '감사합니다.', 'closing_sub': '영상, 링크, 갤러리를 포함한 전체 포트폴리오는 아래 사이트에서 보실 수 있습니다.',
         'page': '',
     },
@@ -92,6 +93,7 @@ LABELS = {
         'summary': 'Overview', 'role': 'Role', 'site_note': 'This PDF is generated from the portfolio website. Videos and the latest updates are available on the site.',
         'visit': 'See more on the portfolio site', 'contact': 'Contact', 'email': 'Email',
         'linkedin': 'LinkedIn', 'generated': 'As of', 'continued': '(cont.)',
+        'contents': 'Projects in this deck',
         'closing_title': 'Thank you.', 'closing_sub': 'The full portfolio, including videos, links, and the gallery, is on the site below.',
         'page': '',
     },
@@ -304,27 +306,68 @@ def is_playlist(url):
 
 # ── Styles ────────────────────────────────────────────────────────────
 
+def heading(text, style):
+    """Section heading with the small accent dash used on the cover."""
+    return Paragraph(f'<font color="#c25e3a">&#8212;</font>&nbsp;&nbsp;{esc(text)}', style)
+
+
+def chips(items, style, level_of=None):
+    """Render a list of short labels as tinted chips (mirrors the site's tag pills)."""
+    parts = []
+    for it in items:
+        parts.append(f'<font backColor="#f6e8df">&nbsp;{esc(it)}&nbsp;</font>')
+        if level_of and level_of.get(it):
+            parts.append(f'<font color="#9c8f7e">&nbsp;{esc(level_of[it])}</font>')
+    return Paragraph('&nbsp;&nbsp;'.join(parts), style)
+
+
+def shrink_to_fit(flowables, width, avail, limit=1.28):
+    """If the story overflows by only a little, scale the type down once instead of
+    pushing a stray line onto a near-empty continuation page."""
+    need = sum(f.wrap(width, 10000)[1] + f.getSpaceBefore() + f.getSpaceAfter() for f in flowables)
+    if not (avail < need <= avail * limit):
+        return need
+    scale = max(0.86, avail / need * 0.96)   # 표 셀은 줄지 않으므로 여유를 둔다
+    for f in flowables:
+        if isinstance(f, Paragraph):
+            st = ParagraphStyle('s', parent=f.style, fontSize=f.style.fontSize * scale,
+                                leading=f.style.leading * scale)
+            f.style = st
+            f.__init__(f.text, st, bulletText=getattr(f, 'bulletText', None))
+    return avail
+
+
+def tile_rows(n, per_row=3):
+    """Split n tiles into rows that differ by at most one, so no row is left with a single tile."""
+    if n <= 0:
+        return []
+    rows = max(1, -(-n // per_row))
+    base, extra = divmod(n, rows)
+    return [base + (1 if i < extra else 0) for i in range(rows)]
+
+
 def styles():
     S = {}
-    S['body'] = ParagraphStyle('body', fontName='Sans', fontSize=9, leading=14.2, textColor=TEXT_2, alignment=TA_LEFT)
-    S['body_small'] = ParagraphStyle('body_small', parent=S['body'], fontSize=8.4, leading=13.5)
+    S['body'] = ParagraphStyle('body', fontName='Sans', fontSize=9, leading=15.3, textColor=TEXT_2, alignment=TA_LEFT)
+    S['body_small'] = ParagraphStyle('body_small', parent=S['body'], fontSize=8.4, leading=14.2)
     S['bullet'] = ParagraphStyle('bullet', parent=S['body'], leftIndent=10, bulletIndent=0, bulletFontName='Sans')
     S['h'] = ParagraphStyle('h', fontName='SansB', fontSize=8.2, leading=11, textColor=TEXT, spaceBefore=4, spaceAfter=6)
     S['sub'] = ParagraphStyle('sub', fontName='SansB', fontSize=9.4, leading=14, textColor=TEXT, spaceBefore=7, spaceAfter=2)
     S['desc'] = ParagraphStyle('desc', fontName='Sans', fontSize=10, leading=16.5, textColor=TEXT_2)
     S['desc_li'] = ParagraphStyle('desc_li', parent=S['desc'], leftIndent=10, bulletIndent=0)
     S['kpi_bullet'] = ParagraphStyle('kpi_bullet', fontName='SansB', fontSize=8.8, leading=13.5, textColor=OLIVE_TEXT, leftIndent=9, bulletIndent=0)
-    S['kpi_value'] = ParagraphStyle('kpi_value', fontName='SerifXB', fontSize=14, leading=16, textColor=OLIVE_TEXT)
+    S['kpi_value'] = ParagraphStyle('kpi_value', fontName='SansXB', fontSize=13.5, leading=16, textColor=OLIVE_TEXT)
     S['kpi_label'] = ParagraphStyle('kpi_label', fontName='Sans', fontSize=7.4, leading=10, textColor=TEXT_2)
     S['link'] = ParagraphStyle('link', fontName='Sans', fontSize=8.4, leading=13, textColor=OLIVE)
     S['tl_company'] = ParagraphStyle('tl_company', fontName='SansB', fontSize=10, leading=14, textColor=TEXT)
-    S['tl_period'] = ParagraphStyle('tl_period', fontName='Sans', fontSize=8, leading=11, textColor=MUTED)
+    S['tl_period'] = ParagraphStyle('tl_period', fontName='Sans', fontSize=8, leading=11, textColor=MUTED, alignment=TA_RIGHT)
     S['tl_role'] = ParagraphStyle('tl_role', fontName='SansB', fontSize=8.6, leading=12.5, textColor=ACCENT, spaceAfter=2)
     S['tl_bullet'] = ParagraphStyle('tl_bullet', parent=S['body_small'], leftIndent=9, bulletIndent=0)
     S['item_main'] = ParagraphStyle('item_main', fontName='SansB', fontSize=9, leading=13, textColor=TEXT)
     S['item_sub'] = ParagraphStyle('item_sub', fontName='Sans', fontSize=8, leading=11.5, textColor=TEXT_2)
     S['item_period'] = ParagraphStyle('item_period', fontName='Sans', fontSize=7.6, leading=11, textColor=MUTED)
     S['tag'] = ParagraphStyle('tag', fontName='SansB', fontSize=8, leading=11, textColor=ACCENT)
+    S['chip'] = ParagraphStyle('chip', fontName='SansB', fontSize=8, leading=17, textColor=ACCENT)
     return S
 
 
@@ -447,8 +490,8 @@ class Doc:
         c.drawString(MARGIN, PAGE_H - 88, d['role'].upper() if d['lang'] == 'en' else d['role'])
         c.drawRightString(PAGE_W - MARGIN, PAGE_H - 88, f"{L['portfolio']} — {date.today().year}")
 
-        photo = cached_image(d['site'], d['photo'], 175, self.quality)
-        text_w = PAGE_W - 2 * MARGIN - (220 if photo else 0)
+        photo = cached_image(d['site'], d['photo'], 200, self.quality)
+        text_w = PAGE_W - 2 * MARGIN - (245 if photo else 0)
         y = PAGE_H - 175
         c.setFont('Serif', 20)
         c.setFillColor(TEXT_2)
@@ -464,16 +507,34 @@ class Doc:
         suffix_w = 0 if d['lang'] == 'en' else pdfmetrics.stringWidth('입니다', 'Serif', 24)
         c.drawString(MARGIN + name_w + 8 + suffix_w, y, '.')
 
-        # tagline with accent bar
-        c.setFillColor(ACCENT)
-        c.rect(MARGIN, y - 78, 2, 44, stroke=0, fill=1)
+        # tagline with an accent bar that matches its height
         para = Paragraph(esc(d['tagline']).replace('\n', '<br/>'),
                          ParagraphStyle('tag', fontName='Sans', fontSize=12, leading=19, textColor=TEXT_2))
         w, h = para.wrap(text_w - 18, 120)
-        para.drawOn(c, MARGIN + 14, y - 34 - h + 8)
+        para_y = y - 34 - h + 8
+        c.setFillColor(ACCENT)
+        c.rect(MARGIN, para_y, 2, h, stroke=0, fill=1)
+        para.drawOn(c, MARGIN + 14, para_y)
+
+        # index strip (mirrors the site hero: 01 / 02 / 03 core competencies)
+        index_items = d['skills'][:3]
+        if index_items:
+            strip_y = 250
+            c.setStrokeColor(BORDER)
+            c.setLineWidth(0.6)
+            c.line(MARGIN, strip_y + 34, MARGIN + 540, strip_y + 34)
+            step = 540 / len(index_items)
+            for i, item in enumerate(index_items):
+                ix = MARGIN + i * step
+                c.setFont('SansB', 8)
+                c.setFillColor(ACCENT)
+                c.drawString(ix, strip_y, f'{i + 1:02d}')
+                c.setFont('Sans', 10)
+                c.setFillColor(TEXT_2)
+                c.drawString(ix + 22, strip_y, item)
 
         if photo:
-            fw, fh = 175, 225
+            fw, fh = 200, 270
             fx, fy = PAGE_W - MARGIN - fw, PAGE_H - 110 - fh
             c.setFillColor(SURFACE)
             c.setStrokeColor(BORDER)
@@ -535,12 +596,12 @@ class Doc:
         bottom = FOOTER_H + 16
 
         left = []
-        left.append(Paragraph(esc(L['about']), S['h']))
+        left.append(heading(L['about'], S['h']))
         for p in d['about']:
             left.append(Paragraph(esc(p), S['desc']))
             left.append(Spacer(1, 6))
         left.append(Spacer(1, 8))
-        left.append(Paragraph(esc(L['experience']), S['h']))
+        left.append(heading(L['experience'], S['h']))
         for exp in d['experience']:
             block = [
                 Table([[Paragraph(esc(exp['company']), S['tl_company']), Paragraph(esc(exp['period']), S['tl_period'])]],
@@ -560,7 +621,7 @@ class Doc:
         def item_list(title, items, with_period=True):
             if not items:
                 return
-            right.append(Paragraph(esc(title), S['h']))
+            right.append(heading(title, S['h']))
             for it in items:
                 rows = []
                 if with_period and it.get('period'):
@@ -577,17 +638,18 @@ class Doc:
         item_list(L['awards'], d['awards'])
         if d['skills']:
             left.append(Spacer(1, 4))
-            left.append(Paragraph(esc(L['skills']), S['h']))
-            left.append(Paragraph('  ·  '.join(esc(x) for x in d['skills']), S['tag']))
-            left.append(Spacer(1, 10))
+            left.append(heading(L['skills'], S['h']))
+            left.append(chips(d['skills'], S['chip']))
+            left.append(Spacer(1, 12))
         if d['tools']:
-            left.append(Paragraph(esc(L['tools']), S['h']))
-            left.append(Paragraph('  ·  '.join(f"{esc(n)} <font color='#9c8f7e'>{esc(l)}</font>" for n, l in d['tools']), S['tag']))
+            left.append(heading(L['tools'], S['h']))
+            left.append(chips([n for n, _ in d['tools']], S['chip'], dict(d['tools'])))
 
         # left column flows onto continuation pages if needed; right column is drawn on the first page only
         Frame(MARGIN + col_w + col_gap, bottom, col_w, top - bottom, leftPadding=0, rightPadding=0,
               topPadding=0, bottomPadding=0).addFromList(right, c)
         self.footer(L['profile'])
+        shrink_to_fit(left, col_w, top - bottom)
         self.flow(left,
                   lambda: Frame(MARGIN, bottom, col_w, top - bottom, leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0),
                   header_factory=lambda continued: (self.page_header(L['profile'], continued), self.footer(L['profile'])))
@@ -638,7 +700,7 @@ class Doc:
             y -= 20
 
         # left column: image + summary + resources
-        left_w = 292
+        left_w = 330
         gap = 26
         right_x = MARGIN + left_w + gap
         right_w = PAGE_W - MARGIN - right_x
@@ -661,7 +723,7 @@ class Doc:
             ly -= th_ + 10
 
         left = []
-        left.append(Paragraph(esc(L['summary']), S['h']))
+        left.append(heading(L['summary'], S['h']))
         desc_lines = [l.strip() for l in (p['desc'] or '').replace('\r', '').split('\n') if l.strip()]
         if len(desc_lines) > 1:
             for l in desc_lines:
@@ -673,12 +735,12 @@ class Doc:
         others = [lk for lk in links if lk not in videos]
         if videos:
             left.append(Spacer(1, 8))
-            left.append(Paragraph(esc(L['videos']), S['h']))
+            left.append(heading(L['videos'], S['h']))
             for lk in videos:
                 left.append(Paragraph(f"▶ <a href=\"{esc(lk['url'])}\"><u>{esc(lk.get('label') or lk['url'])}</u></a>", S['link']))
         if others:
             left.append(Spacer(1, 8))
-            left.append(Paragraph(esc(L['resources']), S['h']))
+            left.append(heading(L['resources'], S['h']))
             for lk in others:
                 left.append(Paragraph(f"→ <a href=\"{esc(lk['url'])}\"><u>{esc(lk.get('label') or lk['url'])}</u></a>", S['link']))
         Frame(MARGIN, bottom, left_w, ly - bottom, leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0).addFromList(left, c)
@@ -687,23 +749,20 @@ class Doc:
         right = []
         tiles, bullets = split_kpi(p['kpi'])
         if tiles or bullets:
-            right.append(Paragraph(esc(L['key_results']), S['h']))
+            right.append(heading(L['key_results'], S['h']))
             if tiles:
-                cols = 3
-                cell_w = (right_w - 6 * (cols - 1)) / cols
-                rows = [tiles[i:i + cols] for i in range(0, len(tiles), cols)]
-                for row in rows:
-                    cells = []
-                    for v, l in row:
-                        cells.append([Paragraph(esc(v), S['kpi_value']), Paragraph(esc(l), S['kpi_label'])])
-                    while len(cells) < cols:
-                        cells.append('')
-                    t = Table([cells], colWidths=[cell_w] * cols, hAlign='LEFT',
+                pos = 0
+                for n in tile_rows(len(tiles)):
+                    row = tiles[pos:pos + n]
+                    pos += n
+                    cell_w = (right_w - 6 * (n - 1)) / n
+                    cells = [[Paragraph(esc(v), S['kpi_value']), Paragraph(esc(l), S['kpi_label'])] for v, l in row]
+                    t = Table([cells], colWidths=[cell_w] * n, hAlign='LEFT',
                               style=TableStyle([('LEFTPADDING', (0, 0), (-1, -1), 8), ('RIGHTPADDING', (0, 0), (-1, -1), 8),
                                                 ('TOPPADDING', (0, 0), (-1, -1), 5), ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-                                                ('VALIGN', (0, 0), (-1, -1), 'TOP')]
-                                               + [('BACKGROUND', (i, 0), (i, 0), OLIVE_LIGHT) for i, cell in enumerate(cells) if cell]
-                                               + [('BOX', (i, 0), (i, 0), 0.6, OLIVE_BORDER) for i, cell in enumerate(cells) if cell]))
+                                                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                                                ('BACKGROUND', (0, 0), (-1, 0), OLIVE_LIGHT)]
+                                               + [('BOX', (i, 0), (i, 0), 0.6, OLIVE_BORDER) for i in range(n)]))
                     right.append(t)
                     right.append(Spacer(1, 6))
             for b in bullets:
@@ -713,7 +772,7 @@ class Doc:
         detail_start = None
         if detail.strip():
             detail_start = len(right)
-            right.append(Paragraph(esc(L['details']), S['h']))
+            right.append(heading(L['details'], S['h']))
             pending = []
 
             def flush():
@@ -738,14 +797,7 @@ class Doc:
                     right.append(Spacer(1, 4))
             flush()
         avail = top - bottom
-        need = sum(f.wrap(right_w, 10000)[1] + f.getSpaceBefore() + f.getSpaceAfter() for f in right)
-        if avail < need <= avail * 1.22:
-            for f in right:
-                if isinstance(f, Paragraph):
-                    st = ParagraphStyle('s', parent=f.style, fontSize=f.style.fontSize * 0.9, leading=f.style.leading * 0.88)
-                    f.style = st
-                    f.__init__(f.text, st, bulletText=getattr(f, 'bulletText', None))
-            need = avail
+        need = shrink_to_fit(right, right_w, avail)
 
         def first_frame():
             return Frame(right_x, bottom, right_w, top - bottom, leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0)
@@ -789,18 +841,18 @@ class Doc:
         self.begin_page(bg=BG_ALT)
         c.setFont('SerifXB', 30)
         c.setFillColor(TEXT)
-        c.drawString(MARGIN, PAGE_H - 150, L['closing_title'])
+        c.drawString(MARGIN, PAGE_H - 128, L['closing_title'])
         sub = Paragraph(esc(L['closing_sub']), ParagraphStyle('s', fontName='Sans', fontSize=11, leading=18, textColor=TEXT_2))
         w, h = sub.wrap(420, 100)
-        sub.drawOn(c, MARGIN, PAGE_H - 165 - h)
+        sub.drawOn(c, MARGIN, PAGE_H - 143 - h)
         c.setFont('SansB', 16)
         c.setFillColor(ACCENT)
         site_text = d['site'].replace('https://', '')
-        c.drawString(MARGIN, PAGE_H - 225 - h, site_text)
-        c.linkURL(d['site'], (MARGIN, PAGE_H - 230 - h, MARGIN + pdfmetrics.stringWidth(site_text, 'SansB', 16), PAGE_H - 208 - h))
+        c.drawString(MARGIN, PAGE_H - 203 - h, site_text)
+        c.linkURL(d['site'], (MARGIN, PAGE_H - 208 - h, MARGIN + pdfmetrics.stringWidth(site_text, 'SansB', 16), PAGE_H - 186 - h))
         c.setFont('Sans', 9.5)
         c.setFillColor(TEXT_2)
-        yy = PAGE_H - 260 - h
+        yy = PAGE_H - 238 - h
         if d['email']:
             c.drawString(MARGIN, yy, f"{L['email']}   {d['email']}")
             c.linkURL('mailto:' + d['email'], (MARGIN, yy - 3, MARGIN + 300, yy + 11))
@@ -809,10 +861,40 @@ class Doc:
             ln = d['linkedin'].replace('https://', '')
             c.drawString(MARGIN, yy, f"{L['linkedin']}   {ln}")
             c.linkURL(d['linkedin'], (MARGIN, yy - 3, MARGIN + 300, yy + 11))
-        self.qr(d['site'], PAGE_W - MARGIN - 150, PAGE_H - 300, 150)
+        self.qr(d['site'], PAGE_W - MARGIN - 128, PAGE_H - 262, 128)
         c.setFont('Sans', 7.6)
         c.setFillColor(MUTED)
-        c.drawRightString(PAGE_W - MARGIN, PAGE_H - 318, f"{L['generated']} {date.today().isoformat()}")
+        c.drawRightString(PAGE_W - MARGIN, PAGE_H - 280, f"{L['generated']} {date.today().isoformat()}")
+
+        # 수록 프로젝트 목록 (두 단)
+        projects = d['projects']
+        if projects:
+            list_y = 178
+            c.setStrokeColor(BORDER)
+            c.setLineWidth(0.6)
+            c.line(MARGIN, list_y + 30, PAGE_W - MARGIN, list_y + 30)
+            self.section_label(MARGIN, list_y + 12, L['contents'])
+            col_w = (PAGE_W - 2 * MARGIN - 30) / 2
+            per_col = -(-len(projects) // 2)
+            for i, proj in enumerate(projects):
+                cx = MARGIN + (i // per_col) * (col_w + 30)
+                cy = list_y - 12 - (i % per_col) * 18
+                c.setFont('SansB', 7.4)
+                c.setFillColor(ACCENT)
+                c.drawString(cx, cy, f'{i + 1:02d}')
+                c.setFont('Sans', 8.4)
+                c.setFillColor(TEXT_2)
+                title = proj['title']
+                max_w = col_w - 90
+                while pdfmetrics.stringWidth(title, 'Sans', 8.4) > max_w and len(title) > 4:
+                    title = title[:-2]
+                    if pdfmetrics.stringWidth(title + '…', 'Sans', 8.4) <= max_w:
+                        title += '…'
+                        break
+                c.drawString(cx + 20, cy, title)
+                c.setFont('Sans', 7.4)
+                c.setFillColor(MUTED)
+                c.drawRightString(cx + col_w, cy, proj['period'])
         self.footer()
 
     def build(self):
