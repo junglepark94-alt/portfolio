@@ -421,6 +421,76 @@ class Profile(db.Model):
             return []
 
 
+def _normalize_copy(value):
+    """Apply narrowly scoped spelling and metric corrections to public copy."""
+    normalized = value or ''
+    for old, new in [
+        ('사이니', '샤이니'),
+        ('버츄얼', '버추얼'),
+        ('런칭', '론칭'),
+        ('컨셉카', '콘셉트카'),
+        ('6782%', '67–82%'),
+        ('67~82%', '67–82%'),
+    ]:
+        normalized = normalized.replace(old, new)
+    return normalized
+
+
+def normalize_public_content():
+    """Idempotently align deployed portfolio copy with the 2026 application."""
+    content_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data',
+                                'hyundai_application_2026.json')
+    try:
+        with open(content_path, encoding='utf-8') as content_file:
+            canonical = json.load(content_file)
+    except (OSError, ValueError):
+        canonical = {}
+
+    profile = db.session.get(Profile, 1)
+    site_copy = canonical.get('site_copy', {})
+    if profile:
+        profile.name_en = canonical.get('identity', {}).get('name_en', 'Jonggeol Park')
+        profile.role = site_copy.get('hero_role_ko', profile.role)
+        profile.role_en = site_copy.get('hero_role_en', profile.role_en)
+        profile.tagline = site_copy.get('hero_tagline_ko', profile.tagline)
+        profile.tagline_en = site_copy.get('hero_tagline_en', profile.tagline_en)
+        for attr in ('about_text', 'about_text_en', 'experience_json', 'experience_en_json'):
+            setattr(profile, attr, _normalize_copy(getattr(profile, attr)))
+
+    category_map = site_copy.get('categories_en', {
+        '콘텐츠 기획': 'Content Strategy & Production',
+        '디지털 콘텐츠': 'Digital Content',
+        '오프라인 캠페인': 'Brand Experience',
+        '프로듀싱': 'Entertainment Production',
+    })
+    legacy_category_map = {
+        'Contents Planning': 'Content Strategy & Production',
+        'Digital Contents': 'Digital Content',
+        'Offline Campaign': 'Brand Experience',
+        'Producing': 'Entertainment Production',
+    }
+    for project in Project.query.all():
+        for attr in (
+            'title', 'description', 'detail_text', 'kpi', 'my_role', 'category',
+            'title_en', 'description_en', 'detail_text_en', 'kpi_en', 'my_role_en',
+        ):
+            setattr(project, attr, _normalize_copy(getattr(project, attr)))
+
+        project.period = re.sub(r'\s*~\s*', ' – ', project.period or '')
+
+        project.category_en = legacy_category_map.get(
+            project.category_en,
+            category_map.get(project.category, project.category_en),
+        )
+        if '샤이니의 빛돌기획' in project.title:
+            project.title = 'tvN 예능 ‘샤이니의 빛돌기획’ 제작'
+            project.title_en = 'SHINee Inc. - tvN Branded Entertainment'
+        if 'Banana Salon' in project.title or 'Banana Salon' in project.title_en:
+            project.period = '2026.07 – 진행 중'
+
+    db.session.commit()
+
+
 # ── DB Init ─────────────────────────────────────────────
 
 def init_db():
@@ -568,6 +638,8 @@ def init_db():
         ]
         db.session.add_all(samples)
         db.session.commit()
+
+    normalize_public_content()
 
 
 # ── Context Processor ────────────────────────────────────

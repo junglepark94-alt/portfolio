@@ -1,4 +1,4 @@
-from app import display_period
+from app import Profile, Project, db, display_period, normalize_public_content
 
 
 def test_display_period_localizes_ongoing_label():
@@ -41,3 +41,25 @@ def test_javascript_restores_focus_and_handles_keyboard_activation():
     assert "e.key === 'Enter'" in js
     assert "e.key === ' '" in js
 
+
+def test_public_content_normalization_is_targeted_and_idempotent(portfolio_app):
+    with portfolio_app.app_context():
+        profile = db.session.get(Profile, 1)
+        profile.name_en = "Jong Geol Park"
+        profile.tagline_en = "From PD to marketer — crafting strategies only someone who knows both worlds can."
+        project = Project.query.first()
+        project.title = "tvN 예능 프로그램 제작 – 사이니의 빛돌기획"
+        project.category_en = "Contents Planning"
+        project.kpi = "오가닉 유입의 6782%가 구독 피드에서 발생"
+        project.period = "2026.07 ~ 진행 중"
+        db.session.commit()
+
+        normalize_public_content()
+        normalize_public_content()
+
+        assert profile.name_en == "Jonggeol Park"
+        assert "I build fandom through content" in profile.tagline_en
+        assert project.title == "tvN 예능 ‘샤이니의 빛돌기획’ 제작"
+        assert project.category_en == "Content Strategy & Production"
+        assert "67–82%" in project.kpi
+        assert project.period == "2026.07 – 진행 중"
