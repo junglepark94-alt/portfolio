@@ -112,5 +112,5 @@ def test_public_content_normalization_fixes_deployed_profile_copy(portfolio_app)
         assert profile.awards_en[0]["title"] == "2025 Korea Pop-Up Store Awards Grand Prize"
         assert project.my_role_en == "Planning & Operations Lead, Agency Management"
         assert project.title == "빙그레×더현대서울 팝업스토어 기획·운영"
-        assert project.title_en == "tvN Variety Program Production – Mountain City Women"
+        assert project.title_en == "tvN Variety Program Production – City Girls on the Climb"
         assert project.period == "2025.05 – 2025.11"

@@ -435,8 +435,9 @@ def _normalize_copy(value):
         ('Digital Contents', 'Digital Content'),
         ('Assitant', 'Assistant'),
         ('Planning & Operations Planning & Operations', 'Planning & Operations'),
-        ('Mountain Village Women', 'Mountain City Women'),
-        ('City girls on the climb', 'Mountain City Women'),
+        ('Mountain Village Women', 'City Girls on the Climb'),
+        ('Mountain City Women', 'City Girls on the Climb'),
+        ('City girls on the climb', 'City Girls on the Climb'),
         ('SHINee Inc. - tvN', 'SHINee Inc. — tvN'),
         ('빙그레X더현대서울', '빙그레×더현대서울'),
     ]:
