@@ -655,6 +655,19 @@ def _apply_project_copy_overrides():
             _apply_copy_entry(project, entry)
 
 
+def apply_youtube_thumbnail_swaps():
+    """잘린 스크린샷 → 원본 유튜브 썸네일 교체. 매 시작 시 실행해도 안전하다 (지정 파일명만 건드리고, 교체 후에는 대상이 없다)."""
+    entries = [e for e in _load_copy_entries() if e.get('youtube_thumbnails')]
+    if not entries:
+        return
+    for project in Project.query.all():
+        title = project.title or ''
+        entry = next((o for o in entries if o.get('match') and o['match'] in title), None)
+        if entry:
+            _swap_in_youtube_thumbnails(project, entry['youtube_thumbnails'])
+    db.session.commit()
+
+
 # 기준 문안 동기화는 이 버전당 한 번만 실행된다. 그 뒤로는 관리자 화면에서 저장한 내용이 항상 최신이다.
 # 값을 올리면 다음 시작 때 한 번 더 덮어쓰므로, 관리자 수정 내용을 잃어도 되는 경우에만 올린다.
 CONTENT_SEED_VERSION = 1
@@ -881,6 +894,11 @@ def init_db():
     except Exception as exc:  # 문안 동기화 실패가 서버 부팅을 막아서는 안 된다
         db.session.rollback()
         print(f"[content-sync] skipped: {exc!r}")
+    try:
+        apply_youtube_thumbnail_swaps()
+    except Exception as exc:
+        db.session.rollback()
+        print(f"[thumbnail-swap] skipped: {exc!r}")
 
 
 # ── Context Processor ────────────────────────────────────

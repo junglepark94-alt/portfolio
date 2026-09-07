@@ -1,5 +1,5 @@
 {
-  "_readme": "Initial project copy for the detail modal, matched against the Korean project title (substring). It is imported ONCE (see CONTENT_SEED_VERSION in app.py) and afterwards the admin page is the source of truth; an admin can re-import a single project with the '기준 문안 불러오기' button on its edit page. Key results: 'value | label' lines render as stat tiles. Detail text: '## ' lines render as sub-headings, '- ' lines as bullets. youtube_thumbnails maps an uploaded image filename to a YouTube video id; the original 1280x720 thumbnail replaces that cropped image.",
+  "_readme": "Initial project copy for the detail modal, matched against the Korean project title (substring). It is imported ONCE (see CONTENT_SEED_VERSION in app.py) and afterwards the admin page is the source of truth; an admin can re-import a single project with the '기준 문안 불러오기' button on its edit page. Key results: 'value | label' lines render as stat tiles. Detail text: '## ' lines render as sub-headings, '- ' lines as bullets. youtube_thumbnails maps an uploaded image filename to a YouTube video id; the original 1280x720 thumbnail replaces that cropped image. Unlike the copy fields this swap runs on every start (it is idempotent and only ever touches the listed filenames), so new mappings take effect on the next deploy.",
   "projects": [
     {
       "match": "Banana Salon",
@@ -96,6 +96,9 @@
         "3.2M View Shorts": "3.2M-view Short (Germany)",
         "3.0M View Shorts": "3M-view Short (Mexico)",
         "Youtube Playlist": "YouTube playlist"
+      },
+      "youtube_thumbnails": {
+        "proj9_1779435858.jpg": "X07eIv-zBVs"
       }
     },
     {
@@ -110,6 +113,9 @@
         "Ep.4": "Episode 4 (Indonesia, Philippines)",
         "Ep.5": "Episode 5 (India, Spain)",
         "Youtube Playlist": "YouTube playlist"
+      },
+      "youtube_thumbnails": {
+        "proj10_1779436178.jpg": "U_kFCUJy_wM"
       }
     },
     {

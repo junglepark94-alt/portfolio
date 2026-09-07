@@ -254,3 +254,22 @@ def test_admin_can_reimport_canonical_copy_for_one_project(portfolio_app):
         db.session.commit()
         assert project.kpi.startswith("568만 | ")
         assert _find_copy_entry("전혀 다른 프로젝트") is None
+
+
+def test_thumbnail_swaps_still_run_after_seed_marker_is_set(portfolio_app, monkeypatch):
+    import app as app_module
+    from app import ProjectImage, apply_youtube_thumbnail_swaps, sync_canonical_content_once
+
+    monkeypatch.setattr(app_module, "_fetch_youtube_thumbnail", lambda vid: f"yt_{vid}.jpg")
+
+    with portfolio_app.app_context():
+        assert sync_canonical_content_once() is True      # 기준 문안은 이미 적용된 상태
+        project = Project.query.first()
+        project.title = "글로벌 유튜브 브랜디드 콘텐츠 <World War Chef>"
+        img = ProjectImage(project_id=project.id, filename="proj10_1779436178.jpg", is_main=True)
+        db.session.add(img)
+        db.session.commit()
+
+        assert sync_canonical_content_once() is False     # 문안은 더 이상 건드리지 않지만
+        apply_youtube_thumbnail_swaps()                    # 새 썸네일 매핑은 적용된다
+        assert img.filename == "yt_U_kFCUJy_wM.jpg"
