@@ -712,7 +712,7 @@ class Doc:
                     right.append(Spacer(1, 4))
             flush()
         avail = top - bottom
-        need = sum(f.wrap(right_w, 10000)[1] for f in right)
+        need = sum(f.wrap(right_w, 10000)[1] + f.getSpaceBefore() + f.getSpaceAfter() for f in right)
         if avail < need <= avail * 1.22:
             for f in right:
                 if isinstance(f, Paragraph):
