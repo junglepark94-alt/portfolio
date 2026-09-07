@@ -38,8 +38,10 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PDF_DIR = os.path.join(ROOT, 'pdf')
 FONT_DIR = os.path.join(PDF_DIR, 'fonts')
 CACHE_DIR = os.path.join(PDF_DIR, 'cache')
+ORIG_DIR = os.path.join(PDF_DIR, 'cache', 'original')
 DEFAULT_SITE = 'https://jgpark.up.railway.app'
-MAX_IMAGE_PX = 1400  # longest edge of embedded images; keeps the PDF a few MB
+RENDER_DPI = 200      # embedded images are sized for the box they are drawn in
+JPEG_QUALITY = 82
 FONT_SOURCES = {
     'NanumGothic-Regular.ttf': 'nanumgothic/NanumGothic-Regular.ttf',
     'NanumGothic-Bold.ttf': 'nanumgothic/NanumGothic-Bold.ttf',
@@ -124,25 +126,39 @@ def ensure_fonts():
     pdfmetrics.registerFontFamily('Serif', normal='Serif', bold='SerifB', italic='Serif', boldItalic='SerifB')
 
 
-def cached_image(site, filename):
-    """Download an uploaded image once; return a local path or None."""
+def original_image(site, filename):
+    """Download an uploaded image once and keep the original bytes on disk."""
     if not filename:
         return None
-    os.makedirs(CACHE_DIR, exist_ok=True)
-    target = os.path.join(CACHE_DIR, os.path.basename(filename))
-    target = os.path.splitext(target)[0] + '.jpg'   # always stored as a downscaled JPEG
+    os.makedirs(ORIG_DIR, exist_ok=True)
+    target = os.path.join(ORIG_DIR, os.path.basename(filename))
     if not os.path.exists(target) or os.path.getsize(target) < 1000:
         try:
             data = fetch(f'{site}/static/uploads/{filename}', binary=True)
         except Exception as exc:
             print(f'  image skipped {filename}: {exc}')
             return None
+        with open(target, 'wb') as fh:
+            fh.write(data)
+    return target
+
+
+def cached_image(site, filename, width_pt, quality):
+    """Return a JPEG sized for a `width_pt` wide box at RENDER_DPI, cached per size."""
+    src = original_image(site, filename)
+    if not src:
+        return None
+    px = max(240, int(round(width_pt / 72.0 * RENDER_DPI)))
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    base = os.path.splitext(os.path.basename(src))[0]
+    target = os.path.join(CACHE_DIR, f'{base}_{px}_{quality}.jpg')
+    if not os.path.exists(target) or os.path.getsize(target) < 500:
         try:
             from PIL import Image
-            im = Image.open(io.BytesIO(data))
-            im = im.convert('RGB')
-            im.thumbnail((MAX_IMAGE_PX, MAX_IMAGE_PX))
-            im.save(target, 'JPEG', quality=82, optimize=True)
+            im = Image.open(src).convert('RGB')
+            if im.width > px:
+                im = im.resize((px, max(1, round(im.height * px / im.width))), Image.LANCZOS)
+            im.save(target, 'JPEG', quality=quality, optimize=True, progressive=True)
         except Exception as exc:
             print(f'  image skipped {filename}: {exc}')
             return None
@@ -315,8 +331,9 @@ def styles():
 # ── Drawing primitives ───────────────────────────────────────────────
 
 class Doc:
-    def __init__(self, path, data, labels, total_pages=None):
+    def __init__(self, path, data, labels, total_pages=None, quality=JPEG_QUALITY):
         self.c = canvas.Canvas(path, pagesize=landscape(A4))
+        self.quality = quality
         self.data = data
         self.L = labels
         self.S = styles()
@@ -430,7 +447,7 @@ class Doc:
         c.drawString(MARGIN, PAGE_H - 88, d['role'].upper() if d['lang'] == 'en' else d['role'])
         c.drawRightString(PAGE_W - MARGIN, PAGE_H - 88, f"{L['portfolio']} — {date.today().year}")
 
-        photo = cached_image(d['site'], d['photo'])
+        photo = cached_image(d['site'], d['photo'], 175, self.quality)
         text_w = PAGE_W - 2 * MARGIN - (220 if photo else 0)
         y = PAGE_H - 175
         c.setFont('Serif', 20)
@@ -629,10 +646,12 @@ class Doc:
         bottom = FOOTER_H + 16
 
         img_h = left_w * 9 / 16
-        main_img = cached_image(d['site'], p['images'][0] if p['images'] else '')
+        main_img = cached_image(d['site'], p['images'][0] if p['images'] else '', left_w, self.quality)
         self.image_box(main_img, MARGIN, top - img_h, left_w, img_h)
         ly = top - img_h - 10
-        thumbs = [cached_image(d['site'], f) for f in p['images'][1:4]]
+        n_thumbs = len(p['images'][1:4])
+        thumb_w = (left_w - 6 * (n_thumbs - 1)) / n_thumbs if n_thumbs else left_w
+        thumbs = [cached_image(d['site'], f, thumb_w, self.quality) for f in p['images'][1:4]]
         thumbs = [t for t in thumbs if t]
         if thumbs:
             tw_ = (left_w - 6 * (len(thumbs) - 1)) / len(thumbs)
@@ -811,18 +830,40 @@ class Doc:
 first_page = 0
 
 
-def build(site, lang, out):
+# (dpi, jpeg quality) steps tried in order when a size budget is given
+SIZE_STEPS = [(200, 82), (150, 78), (120, 72), (100, 68), (84, 62)]
+
+
+def render(site, lang, out, data=None):
+    ensure_fonts()
+    if data is None:
+        data = scrape(site, lang)
+    labels = LABELS[lang]
+    # two passes so the footer can show "page / total"
+    tmp = out + '.tmp'
+    total = Doc(tmp, data, labels, quality=JPEG_QUALITY).build()
+    Doc(out, data, labels, total_pages=total, quality=JPEG_QUALITY).build()
+    os.remove(tmp)
+    return total
+
+
+def build(site, lang, out, max_mb=None):
+    global RENDER_DPI, JPEG_QUALITY
     ensure_fonts()
     print('scraping', site, lang)
     data = scrape(site, lang)
     print(f"  {data['name']} · {len(data['projects'])} projects · {len(data['experience'])} jobs")
-    labels = LABELS[lang]
-    # two passes so the footer can show "page / total"
-    tmp = out + '.tmp'
-    total = Doc(tmp, data, labels).build()
-    Doc(out, data, labels, total_pages=total).build()
-    os.remove(tmp)
-    print('wrote', out, f'({total} pages, {os.path.getsize(out) // 1024} KB)')
+    steps = SIZE_STEPS if max_mb else [(RENDER_DPI, JPEG_QUALITY)]
+    for dpi, quality in steps:
+        RENDER_DPI, JPEG_QUALITY = dpi, quality
+        total = render(site, lang, out, data)
+        size_mb = os.path.getsize(out) / 1024 / 1024
+        note = f'{total} pages, {size_mb:.2f} MB, {dpi} dpi'
+        if not max_mb or size_mb <= max_mb:
+            print('wrote', out, f'({note})')
+            return out
+        print(f'  {note} — over {max_mb} MB, retrying smaller')
+    print('wrote', out, f'({total} pages, {size_mb:.2f} MB — could not reach {max_mb} MB)')
     return out
 
 
@@ -831,10 +872,13 @@ if __name__ == '__main__':
     ap.add_argument('--url', default=DEFAULT_SITE, help='portfolio site origin')
     ap.add_argument('--lang', choices=['ko', 'en'], default='ko')
     ap.add_argument('--out', default=None, help='output PDF path')
+    ap.add_argument('--max-mb', type=float, default=None,
+                    help='shrink images until the PDF fits this size, e.g. --max-mb 2')
     args = ap.parse_args()
-    out = args.out or os.path.join(PDF_DIR, f"portfolio_{args.lang}.pdf")
+    suffix = '' if not args.max_mb else f"_{str(args.max_mb).rstrip('0').rstrip('.')}mb"
+    out = args.out or os.path.join(PDF_DIR, f"portfolio_{args.lang}{suffix}.pdf")
     os.makedirs(os.path.dirname(out), exist_ok=True)
     try:
-        build(args.url.rstrip('/'), args.lang, out)
+        build(args.url.rstrip('/'), args.lang, out, max_mb=args.max_mb)
     except urllib.error.URLError as exc:
         sys.exit(f'network error: {exc}')
