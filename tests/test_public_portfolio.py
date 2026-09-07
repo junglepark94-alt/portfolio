@@ -217,3 +217,40 @@ def test_youtube_thumbnail_fetch_rejects_placeholder_and_non_images(tmp_path, mo
     # 잘못된 형식의 영상 id는 네트워크 요청 없이 거부한다
     assert app_module._fetch_youtube_thumbnail("../../etc/passwd") is None
     assert app_module._fetch_youtube_thumbnail("") is None
+
+
+def test_canonical_sync_runs_once_and_keeps_admin_edits_afterwards(portfolio_app):
+    from app import ContentSync, sync_canonical_content_once
+
+    with portfolio_app.app_context():
+        project = Project.query.first()
+        project.kpi = "임시 성과"
+        db.session.commit()
+
+        assert sync_canonical_content_once() is True
+        assert project.kpi.startswith("568만 | ")          # 최초 1회는 기준 문안 적용
+        assert db.session.get(ContentSync, "seed_version").value.isdigit()
+
+        project.kpi = "관리자가 고친 성과"
+        project.detail_text = "관리자가 고친 상세"
+        db.session.commit()
+
+        assert sync_canonical_content_once() is False       # 두 번째부터는 건드리지 않는다
+        assert project.kpi == "관리자가 고친 성과"
+        assert project.detail_text == "관리자가 고친 상세"
+
+
+def test_admin_can_reimport_canonical_copy_for_one_project(portfolio_app):
+    from app import _apply_copy_entry, _find_copy_entry
+
+    with portfolio_app.app_context():
+        project = Project.query.first()
+        project.kpi = "관리자가 고친 성과"
+        db.session.commit()
+
+        entry = _find_copy_entry(project.title)
+        assert entry and entry["match"] == "Banana Salon"
+        _apply_copy_entry(project, entry)
+        db.session.commit()
+        assert project.kpi.startswith("568만 | ")
+        assert _find_copy_entry("전혀 다른 프로젝트") is None

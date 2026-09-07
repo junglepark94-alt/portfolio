@@ -445,6 +445,15 @@ class Profile(db.Model):
             return []
 
 
+
+class ContentSync(db.Model):
+    """기준 문안(JSON) 동기화가 어느 버전까지 적용됐는지 기록. 이후에는 관리자 수정이 최신이다."""
+    __tablename__ = 'content_sync'
+    key = db.Column(db.String(60), primary_key=True)
+    value = db.Column(db.String(120), default='')
+    applied_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
 def _normalize_copy(value):
     """Apply narrowly scoped spelling and metric corrections to public copy."""
     normalized = value or ''
@@ -595,26 +604,63 @@ def _relabel_links(raw, label_map):
     return json.dumps(links, ensure_ascii=False)
 
 
-def _apply_project_copy_overrides():
-    """Sync project modal copy (summary, key results, detail, link labels) from data/site_projects.json."""
+_COPY_FIELDS = ('description', 'kpi', 'detail_text', 'description_en', 'kpi_en', 'detail_text_en')
+
+
+def _load_copy_entries():
+    """data/site_projects.json의 프로젝트 기준 문안 목록. 파일이 없거나 깨졌으면 빈 목록."""
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'site_projects.json')
     try:
         with open(path, encoding='utf-8') as fh:
-            overrides = json.load(fh).get('projects', [])
+            return json.load(fh).get('projects', [])
     except (OSError, ValueError):
-        return
-    fields = ('description', 'kpi', 'detail_text', 'description_en', 'kpi_en', 'detail_text_en')
+        return []
+
+
+def _find_copy_entry(title):
+    title = title or ''
+    return next((o for o in _load_copy_entries() if o.get('match') and o['match'] in title), None)
+
+
+def _apply_copy_entry(project, entry):
+    """기준 문안 한 건을 프로젝트에 적용 (요약·성과·상세·링크 라벨·썸네일 교체)."""
+    for field in _COPY_FIELDS:
+        if entry.get(field) is not None:
+            setattr(project, field, entry[field])
+    project.links_json = _relabel_links(project.links_json, entry.get('link_labels'))
+    project.links_en_json = _relabel_links(project.links_en_json, entry.get('link_labels_en'))
+    _swap_in_youtube_thumbnails(project, entry.get('youtube_thumbnails'))
+
+
+def _apply_project_copy_overrides():
+    """모든 프로젝트에 기준 문안을 적용. 최초 동기화와 관리자의 '불러오기' 버튼에서만 호출된다."""
+    entries = _load_copy_entries()
     for project in Project.query.all():
         title = project.title or ''
-        entry = next((o for o in overrides if o.get('match') and o['match'] in title), None)
-        if not entry:
-            continue
-        for field in fields:
-            if entry.get(field) is not None:
-                setattr(project, field, entry[field])
-        project.links_json = _relabel_links(project.links_json, entry.get('link_labels'))
-        project.links_en_json = _relabel_links(project.links_en_json, entry.get('link_labels_en'))
-        _swap_in_youtube_thumbnails(project, entry.get('youtube_thumbnails'))
+        entry = next((o for o in entries if o.get('match') and o['match'] in title), None)
+        if entry:
+            _apply_copy_entry(project, entry)
+
+
+# 기준 문안 동기화는 이 버전당 한 번만 실행된다. 그 뒤로는 관리자 화면에서 저장한 내용이 항상 최신이다.
+# 값을 올리면 다음 시작 때 한 번 더 덮어쓰므로, 관리자 수정 내용을 잃어도 되는 경우에만 올린다.
+CONTENT_SEED_VERSION = 1
+
+
+def sync_canonical_content_once():
+    """normalize_public_content()를 CONTENT_SEED_VERSION당 한 번만 실행. 실행했으면 True."""
+    marker = db.session.get(ContentSync, 'seed_version')
+    applied = int(marker.value) if marker and (marker.value or '').isdigit() else 0
+    if applied >= CONTENT_SEED_VERSION:
+        return False
+    normalize_public_content()
+    if marker is None:
+        marker = ContentSync(key='seed_version')
+        db.session.add(marker)
+    marker.value = str(CONTENT_SEED_VERSION)
+    marker.applied_at = datetime.utcnow()
+    db.session.commit()
+    return True
 
 
 _YT_ID_RE = re.compile(r'^[A-Za-z0-9_-]{11}$')
@@ -812,7 +858,7 @@ def init_db():
         db.session.add_all(samples)
         db.session.commit()
 
-    normalize_public_content()
+    sync_canonical_content_once()
 
 
 # ── Context Processor ────────────────────────────────────
@@ -1158,6 +1204,21 @@ def project_edit(pid):
         flash('프로젝트가 수정되었습니다.')
         return redirect(url_for('admin_dashboard'))
     return render_template('project_form.html', project=p)
+
+
+@app.route('/admin/project/<int:pid>/import-copy', methods=['POST'])
+@login_required
+def project_import_copy(pid):
+    """관리자가 원할 때만 data/site_projects.json의 기준 문안으로 되돌린다."""
+    p = Project.query.get_or_404(pid)
+    entry = _find_copy_entry(p.title)
+    if not entry:
+        flash('이 프로젝트 제목과 맞는 기준 문안이 data/site_projects.json에 없습니다.')
+    else:
+        _apply_copy_entry(p, entry)
+        db.session.commit()
+        flash('기준 문안을 불러와 저장했습니다. 필요한 부분을 고친 뒤 다시 저장하세요.')
+    return redirect(url_for('project_edit', pid=pid))
 
 
 @app.route('/admin/project/<int:pid>/delete', methods=['POST'])

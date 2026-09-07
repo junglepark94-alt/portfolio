@@ -1,5 +1,5 @@
 {
-  "_readme": "Canonical public copy for project detail modals. Matched against the Korean project title (substring). Applied idempotently at startup by normalize_public_content(). Key results: 'value | label' lines render as stat tiles. Detail text: '## ' lines render as sub-headings, '- ' lines as bullets. youtube_thumbnails maps an existing uploaded image filename to a YouTube video id; the original 1280x720 thumbnail replaces that cropped image at startup.",
+  "_readme": "Initial project copy for the detail modal, matched against the Korean project title (substring). It is imported ONCE (see CONTENT_SEED_VERSION in app.py) and afterwards the admin page is the source of truth; an admin can re-import a single project with the '기준 문안 불러오기' button on its edit page. Key results: 'value | label' lines render as stat tiles. Detail text: '## ' lines render as sub-headings, '- ' lines as bullets. youtube_thumbnails maps an uploaded image filename to a YouTube video id; the original 1280x720 thumbnail replaces that cropped image.",
   "projects": [
     {
       "match": "Banana Salon",
