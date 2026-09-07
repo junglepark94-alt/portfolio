@@ -103,6 +103,10 @@ if _using_sqlite:
 
 app.config['SQLALCHEMY_DATABASE_URI'] = _db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+if not _using_sqlite:
+    # Railway Postgres는 유휴 연결을 끊는다. 끊긴 연결로 쿼리하면 TCP 타임아웃까지 멈추므로
+    # 사용 전에 ping 하고 주기적으로 재연결한다.
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'pool_pre_ping': True, 'pool_recycle': 300}
 print(f"[DB] engine={'SQLite (ephemeral!)' if _using_sqlite else 'PostgreSQL'}")
 app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
 app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5MB
@@ -110,6 +114,15 @@ app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5MB
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 
 csrf = CSRFProtect(app)
+
+
+@app.after_request
+def _cache_uploaded_images(response):
+    # 업로드 파일명은 타임스탬프/영상 id로 고유하므로 오래 캐시해도 안전하다.
+    # 관리자 화면을 오갈 때마다 수십 장을 다시 받지 않도록 한다.
+    if request.path.startswith('/static/uploads/') and response.status_code == 200:
+        response.headers['Cache-Control'] = 'public, max-age=604800, immutable'
+    return response
 
 
 def _looks_like_image(head):
@@ -659,7 +672,12 @@ def sync_canonical_content_once():
         db.session.add(marker)
     marker.value = str(CONTENT_SEED_VERSION)
     marker.applied_at = datetime.utcnow()
-    db.session.commit()
+    try:
+        db.session.commit()
+    except Exception:
+        # 워커 두 개가 동시에 부팅하며 같은 마커를 넣으려 한 경우: 먼저 성공한 쪽을 그대로 둔다
+        db.session.rollback()
+        return False
     return True
 
 
@@ -858,7 +876,11 @@ def init_db():
         db.session.add_all(samples)
         db.session.commit()
 
-    sync_canonical_content_once()
+    try:
+        sync_canonical_content_once()
+    except Exception as exc:  # 문안 동기화 실패가 서버 부팅을 막아서는 안 된다
+        db.session.rollback()
+        print(f"[content-sync] skipped: {exc!r}")
 
 
 # ── Context Processor ────────────────────────────────────

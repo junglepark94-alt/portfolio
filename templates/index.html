@@ -229,7 +229,7 @@
       >
         {% if main_img %}
         <div class="pc-thumb">
-          <img src="{{ url_for('static', filename='uploads/' + main_img.filename) }}" alt="{{ p_title }}" />
+          <img src="{{ url_for('static', filename='uploads/' + main_img.filename) }}" alt="{{ p_title }}" loading="lazy" decoding="async" />
         </div>
         {% endif %}
         <div class="pc-body" data-detail-label="{{ ui.view_details }} →">

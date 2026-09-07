@@ -1,3 +1,12 @@
+// ── 이미지 로드 실패 시 1회 재시도 (일시적 502 대비) ──
+document.addEventListener('error', function (e) {
+  const img = e.target;
+  if (!(img instanceof HTMLImageElement) || img.dataset.retried || !img.src) return;
+  if (img.src.indexOf('/static/uploads/') === -1) return;
+  img.dataset.retried = '1';
+  setTimeout(function () { img.src = img.src.split('?')[0] + '?retry=' + Date.now(); }, 1200);
+}, true);
+
 // ── Hamburger Menu ───────────────────────────
 (function () {
   const hamburger = document.getElementById('navHamburger');
