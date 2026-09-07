@@ -530,15 +530,15 @@ ul { list-style: none; }
   box-shadow: var(--shadow-lift);
 }
 .pc-thumb {
-  height: 200px;
+  aspect-ratio: 16 / 9;          /* 유튜브 썸네일 규격 (1280×720) */
   overflow: hidden;
   flex-shrink: 0;
-  background: var(--bg-alt);
+  background: #1a1814;
 }
 .pc-thumb img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;           /* 상하좌우 잘리지 않게 */
   transition: transform 0.4s ease;
 }
 .project-card:hover .pc-thumb img { transform: scale(1.04); }
@@ -606,7 +606,7 @@ ul { list-style: none; }
 }
 .coverflow-stage {
   position: relative;
-  height: 400px;
+  height: 320px;                 /* 카드가 16:9로 낮아진 만큼 축소 */
   perspective: 1100px;
   perspective-origin: 50% 50%;
   overflow: visible;
@@ -616,9 +616,9 @@ ul { list-style: none; }
   left: 50%;
   top: 50%;
   width: 340px;
-  height: 255px;
+  height: 191px;                 /* 유튜브 썸네일 규격 (16:9) */
   margin-left: -170px;
-  margin-top: -127px;
+  margin-top: -95px;
   border-radius: 14px;
   overflow: hidden;
   cursor: pointer;
@@ -631,7 +631,8 @@ ul { list-style: none; }
 .gallery-card img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;           /* 상하좌우 잘리지 않게 */
+  background: #1a1814;
   display: block;
   pointer-events: none;
   -webkit-user-drag: none;
@@ -1314,12 +1315,11 @@ form[data-lang="en"] .lang-ko { display: none !important; }
   .timeline-meta { flex-direction: column; gap: 0.15rem; align-items: flex-start; }
 
   /* Projects */
-  .pc-thumb { height: 160px; }
   .pc-body { padding: 0.9rem 1.1rem 1.1rem; }
 
   /* Gallery */
-  .coverflow-stage { height: 280px; }
-  .gallery-card { width: 240px; height: 180px; margin-left: -120px; margin-top: -90px; }
+  .coverflow-stage { height: 220px; }
+  .gallery-card { width: 240px; height: 135px; margin-left: -120px; margin-top: -67px; }
   .cf-arrow { width: 38px; height: 38px; font-size: 1.4rem; left: 0.75rem; }
   .cf-next { left: auto; right: 0.75rem; }
 
@@ -1931,10 +1931,11 @@ form[data-lang="en"] .lang-ko { display: none !important; }
 .modal-gallery-main {
   position: relative;
   width: 100%;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 16 / 9;          /* 유튜브 썸네일 규격 (1280×720) */
   overflow: hidden;
+  background: #1a1814;
 }
-.modal-gallery-main img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.modal-gallery-main img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .gallery-nav {
   position: absolute;
   top: 50%;
@@ -1965,8 +1966,8 @@ form[data-lang="en"] .lang-ko { display: none !important; }
 }
 .modal-gallery-thumbs:empty { display: none; }
 .modal-gallery-thumbs img {
-  width: 52px;
-  height: 38px;
+  width: 56px;
+  height: 32px;
   object-fit: cover;
   border-radius: 3px;
   cursor: pointer;
@@ -2094,8 +2095,7 @@ form[data-lang="en"] .lang-ko { display: none !important; }
   .modal-topbar { padding: 0.5rem 0.6rem 0.5rem 0.9rem; }
   .modal-topbar-title { display: none; }
   .modal-anchors { margin-left: 0; flex: 1; }
-  .modal-gallery-main { aspect-ratio: 16 / 9; }
-  .modal-gallery-thumbs img { width: 44px; height: 32px; }
+  .modal-gallery-thumbs img { width: 48px; height: 27px; }
   .modal-body { padding: 1.25rem 1.25rem 1.5rem; }
   .modal-title { font-size: 1.3rem; }
   .modal-desc, .modal-detail { font-size: 1rem; }
