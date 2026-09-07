@@ -152,5 +152,22 @@
         "proj14_1779627311.jpg": "https://poc-cf-image.cjenm.com/crop/1120x630/public/share/menumng/pgmmain/f637490966764632200.jpg"
       }
     }
-  ]
+  ],
+  "career_highlights": {
+    "_note": "PDF 2페이지 상단 밴드. 'value | label' 형식. 각 수치의 근거는 개별 프로젝트 핵심 성과에 있습니다.",
+    "ko": [
+      "5,200만 | 글로벌 브랜디드 콘텐츠 누적 조회수 (4개 시리즈)",
+      "9.6만 | 신규 구독자 순증 (4개 채널·시리즈)",
+      "3.3만 | 팝업스토어 방문객",
+      "3.2억 원 | 팝업 연계 커머스 매출",
+      "4건 | 국내외 마케팅 어워드 수상·파이널리스트"
+    ],
+    "en": [
+      "52M | Cumulative views across 4 global branded series",
+      "96K | Net new subscribers across 4 channels and series",
+      "33K | Pop-up store visitors",
+      "₩320M | Commerce sales linked to the pop-up",
+      "4 | Marketing awards and finalist nominations"
+    ]
+  }
 }

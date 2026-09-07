@@ -81,7 +81,8 @@ LABELS = {
         'summary': '개요', 'role': '역할', 'site_note': '이 PDF는 포트폴리오 사이트의 내용을 기준으로 만들었습니다. 영상과 최신 내용은 사이트에서 바로 확인하실 수 있습니다.',
         'visit': '포트폴리오 사이트에서 더 보기', 'contact': '연락처', 'email': '이메일',
         'linkedin': 'LinkedIn', 'generated': '기준일', 'continued': '(계속)',
-        'contents': '수록 프로젝트',
+        'contents': '프로젝트 인덱스', 'career': '커리어 요약', 'index_page': '쪽',
+        'cat_all': '전체',
         'closing_title': '감사합니다.', 'closing_sub': '영상, 링크, 갤러리를 포함한 전체 포트폴리오는 아래 사이트에서 보실 수 있습니다.',
         'page': '',
     },
@@ -93,7 +94,8 @@ LABELS = {
         'summary': 'Overview', 'role': 'Role', 'site_note': 'This PDF is generated from the portfolio website. Videos and the latest updates are available on the site.',
         'visit': 'See more on the portfolio site', 'contact': 'Contact', 'email': 'Email',
         'linkedin': 'LinkedIn', 'generated': 'As of', 'continued': '(cont.)',
-        'contents': 'Projects in this deck',
+        'contents': 'Project Index', 'career': 'Career at a glance', 'index_page': 'p.',
+        'cat_all': 'All',
         'closing_title': 'Thank you.', 'closing_sub': 'The full portfolio, including videos, links, and the gallery, is on the site below.',
         'page': '',
     },
@@ -173,6 +175,16 @@ def cached_image(site, filename, width_pt, quality):
 
 # ── Scraping the public page ─────────────────────────────────────────
 
+def load_career_highlights(lang):
+    """Career-level headline numbers from data/site_projects.json (empty list if absent)."""
+    path = os.path.join(ROOT, 'data', 'site_projects.json')
+    try:
+        with open(path, encoding='utf-8') as fh:
+            return json.load(fh).get('career_highlights', {}).get(lang, [])
+    except (OSError, ValueError):
+        return []
+
+
 def _text(fragment):
     fragment = re.sub(r'<br\s*/?>', '\n', fragment)
     fragment = re.sub(r'<[^>]+>', '', fragment)
@@ -211,6 +223,7 @@ def scrape(site, lang):
 def parse(page, site, lang):
     """Turn the public page's HTML into the data the layout needs."""
     data = {'site': site, 'lang': lang}
+    data['highlights'] = load_career_highlights(lang)
 
     hero = _section(page, r'<section[^>]*class="hero', r'</section>')
     data['name'] = _text(_section(hero, r'class="hn-name">', r'</span>')) or 'Portfolio'
@@ -321,13 +334,13 @@ def chips(items, style, level_of=None):
     return Paragraph('&nbsp;&nbsp;'.join(parts), style)
 
 
-def shrink_to_fit(flowables, width, avail, limit=1.28):
+def shrink_to_fit(flowables, width, avail, limit=1.28, floor=0.86):
     """If the story overflows by only a little, scale the type down once instead of
     pushing a stray line onto a near-empty continuation page."""
     need = sum(f.wrap(width, 10000)[1] + f.getSpaceBefore() + f.getSpaceAfter() for f in flowables)
     if not (avail < need <= avail * limit):
         return need
-    scale = max(0.86, avail / need * 0.96)   # 표 셀은 줄지 않으므로 여유를 둔다
+    scale = max(floor, avail / need * 0.96)   # 표 셀은 줄지 않으므로 여유를 둔다
     for f in flowables:
         if isinstance(f, Paragraph):
             st = ParagraphStyle('s', parent=f.style, fontSize=f.style.fontSize * scale,
@@ -374,7 +387,7 @@ def styles():
 # ── Drawing primitives ───────────────────────────────────────────────
 
 class Doc:
-    def __init__(self, path, data, labels, total_pages=None, quality=JPEG_QUALITY):
+    def __init__(self, path, data, labels, total_pages=None, quality=JPEG_QUALITY, project_pages=None):
         self.c = canvas.Canvas(path, pagesize=landscape(A4))
         self.quality = quality
         self.data = data
@@ -382,6 +395,7 @@ class Doc:
         self.S = styles()
         self.total = total_pages
         self.page_no = 0
+        self.project_pages = dict(project_pages or {})
         self.c.setTitle(f"{data['name']} — Portfolio")
         self.c.setAuthor(data['name'])
         self.c.setSubject(f"Portfolio · {data['site']}")
@@ -594,6 +608,8 @@ class Doc:
         col_w = (PAGE_W - 2 * MARGIN - col_gap) / 2
         top = PAGE_H - 110
         bottom = FOOTER_H + 16
+        if d['highlights']:
+            top = self.highlight_band(PAGE_H - 92, d['highlights']) - 18
 
         left = []
         left.append(heading(L['about'], S['h']))
@@ -646,13 +662,104 @@ class Doc:
             left.append(chips([n for n, _ in d['tools']], S['chip'], dict(d['tools'])))
 
         # left column flows onto continuation pages if needed; right column is drawn on the first page only
+        # 오른쪽 단은 이어지는 페이지가 없으므로, 넘치면 줄여서 반드시 한 페이지에 담는다
+        shrink_to_fit(right, col_w, top - bottom, limit=1.6, floor=0.78)
         Frame(MARGIN + col_w + col_gap, bottom, col_w, top - bottom, leftPadding=0, rightPadding=0,
               topPadding=0, bottomPadding=0).addFromList(right, c)
+        if right:
+            print(f'  [profile] warning: {len(right)} item(s) did not fit in the right column')
         self.footer(L['profile'])
-        shrink_to_fit(left, col_w, top - bottom)
+        shrink_to_fit(left, col_w, top - bottom, limit=1.6, floor=0.78)   # 프로필은 한 페이지에 담는다
         self.flow(left,
                   lambda: Frame(MARGIN, bottom, col_w, top - bottom, leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0),
                   header_factory=lambda continued: (self.page_header(L['profile'], continued), self.footer(L['profile'])))
+
+    def highlight_band(self, y, items):
+        """Career-level numbers across the full width; returns the y the band ends at."""
+        c, L = self.c, self.L
+        self.section_label(MARGIN, y, L['career'])
+        y -= 16
+        band_h = 54
+        width = PAGE_W - 2 * MARGIN
+        cell = width / len(items)
+        c.setFillColor(OLIVE_LIGHT)
+        c.setStrokeColor(OLIVE_BORDER)
+        c.setLineWidth(0.6)
+        c.roundRect(MARGIN, y - band_h, width, band_h, 4, stroke=1, fill=1)
+        for i, item in enumerate(items):
+            value, _, label = item.partition('|')
+            x = MARGIN + i * cell
+            if i:
+                c.setStrokeColor(OLIVE_BORDER)
+                c.line(x, y - band_h + 10, x, y - 10)
+            c.setFont('SansXB', 15)
+            c.setFillColor(OLIVE_TEXT)
+            c.drawString(x + 14, y - 26, value.strip())
+            lab = Paragraph(esc(label.strip()),
+                            ParagraphStyle('hl', fontName='Sans', fontSize=7.2, leading=9.6, textColor=TEXT_2))
+            lw, lh = lab.wrap(cell - 26, 30)
+            lab.drawOn(c, x + 14, y - 34 - lh)
+        return y - band_h
+
+    def index_page(self):
+        """Project index right after the profile, so a reader sees the whole deck up front."""
+        d, L, c = self.data, self.L, self.c
+        self.begin_page()
+        self.page_header(L['contents'])
+        y = PAGE_H - 86
+        c.setFont('SerifXB', 20)
+        c.setFillColor(TEXT)
+        c.drawString(MARGIN, y, L['contents'])
+        y -= 30
+
+        # 같은 분류는 한 묶음으로 (사이트 순서상 떨어져 있어도 합친다)
+        groups = []
+        seen = {}
+        for i, p in enumerate(d['projects'], 1):
+            cat = p['category'] or L['cat_all']
+            if cat not in seen:
+                seen[cat] = []
+                groups.append((cat, seen[cat]))
+            seen[cat].append((i, p))
+
+        for cat, items in groups:
+            self.section_label(MARGIN, y, cat)
+            y -= 24
+            for num, p in items:
+                c.setFont('SansB', 8.4)
+                c.setFillColor(ACCENT)
+                c.drawString(MARGIN + 4, y, f'{num:02d}')
+                c.setFont('SansB', 10.5)
+                c.setFillColor(TEXT)
+                c.drawString(MARGIN + 28, y, p['title'])
+                title_w = pdfmetrics.stringWidth(p['title'], 'SansB', 10.5)
+                c.setFont('Sans', 7.6)
+                c.setFillColor(MUTED)
+                c.drawString(MARGIN + 34 + title_w, y, p['period'])
+                tiles, bullets = split_kpi(p['kpi'])
+                if tiles:
+                    value, label = tiles[0]
+                    c.setFont('SansXB', 10.5)
+                    c.setFillColor(OLIVE_TEXT)
+                    vw = pdfmetrics.stringWidth(value, 'SansXB', 10.5)
+                    c.drawRightString(PAGE_W - MARGIN - 46, y, value)
+                    c.setFont('Sans', 7.4)
+                    c.setFillColor(TEXT_2)
+                    lab = label
+                    while pdfmetrics.stringWidth(lab, 'Sans', 7.4) > 210 and len(lab) > 6:
+                        lab = lab[:-2]
+                    c.drawRightString(PAGE_W - MARGIN - 52 - vw, y + 1, lab)
+                page_no = self.project_pages.get(num)
+                if page_no:
+                    c.setFont('Sans', 7.6)
+                    c.setFillColor(MUTED)
+                    c.drawRightString(PAGE_W - MARGIN, y, f"{page_no}{L['index_page']}")
+                c.setStrokeColor(BORDER)
+                c.setLineWidth(0.5)
+                c.line(MARGIN + 4, y - 7, PAGE_W - MARGIN, y - 7)
+                y -= 26
+            y -= 16
+        self.footer(L['contents'])
 
     def page_header(self, label, continued=False):
         c, L = self.c, self.L
@@ -841,18 +948,18 @@ class Doc:
         self.begin_page(bg=BG_ALT)
         c.setFont('SerifXB', 30)
         c.setFillColor(TEXT)
-        c.drawString(MARGIN, PAGE_H - 128, L['closing_title'])
+        c.drawString(MARGIN, PAGE_H - 190, L['closing_title'])
         sub = Paragraph(esc(L['closing_sub']), ParagraphStyle('s', fontName='Sans', fontSize=11, leading=18, textColor=TEXT_2))
         w, h = sub.wrap(420, 100)
-        sub.drawOn(c, MARGIN, PAGE_H - 143 - h)
+        sub.drawOn(c, MARGIN, PAGE_H - 205 - h)
         c.setFont('SansB', 16)
         c.setFillColor(ACCENT)
         site_text = d['site'].replace('https://', '')
-        c.drawString(MARGIN, PAGE_H - 203 - h, site_text)
-        c.linkURL(d['site'], (MARGIN, PAGE_H - 208 - h, MARGIN + pdfmetrics.stringWidth(site_text, 'SansB', 16), PAGE_H - 186 - h))
+        c.drawString(MARGIN, PAGE_H - 265 - h, site_text)
+        c.linkURL(d['site'], (MARGIN, PAGE_H - 270 - h, MARGIN + pdfmetrics.stringWidth(site_text, 'SansB', 16), PAGE_H - 248 - h))
         c.setFont('Sans', 9.5)
         c.setFillColor(TEXT_2)
-        yy = PAGE_H - 238 - h
+        yy = PAGE_H - 300 - h
         if d['email']:
             c.drawString(MARGIN, yy, f"{L['email']}   {d['email']}")
             c.linkURL('mailto:' + d['email'], (MARGIN, yy - 3, MARGIN + 300, yy + 11))
@@ -861,52 +968,26 @@ class Doc:
             ln = d['linkedin'].replace('https://', '')
             c.drawString(MARGIN, yy, f"{L['linkedin']}   {ln}")
             c.linkURL(d['linkedin'], (MARGIN, yy - 3, MARGIN + 300, yy + 11))
-        self.qr(d['site'], PAGE_W - MARGIN - 128, PAGE_H - 262, 128)
+        self.qr(d['site'], PAGE_W - MARGIN - 128, PAGE_H - 324, 128)
         c.setFont('Sans', 7.6)
         c.setFillColor(MUTED)
-        c.drawRightString(PAGE_W - MARGIN, PAGE_H - 280, f"{L['generated']} {date.today().isoformat()}")
+        c.drawRightString(PAGE_W - MARGIN, PAGE_H - 342, f"{L['generated']} {date.today().isoformat()}")
 
-        # 수록 프로젝트 목록 (두 단)
-        projects = d['projects']
-        if projects:
-            list_y = 178
-            c.setStrokeColor(BORDER)
-            c.setLineWidth(0.6)
-            c.line(MARGIN, list_y + 30, PAGE_W - MARGIN, list_y + 30)
-            self.section_label(MARGIN, list_y + 12, L['contents'])
-            col_w = (PAGE_W - 2 * MARGIN - 30) / 2
-            per_col = -(-len(projects) // 2)
-            for i, proj in enumerate(projects):
-                cx = MARGIN + (i // per_col) * (col_w + 30)
-                cy = list_y - 12 - (i % per_col) * 18
-                c.setFont('SansB', 7.4)
-                c.setFillColor(ACCENT)
-                c.drawString(cx, cy, f'{i + 1:02d}')
-                c.setFont('Sans', 8.4)
-                c.setFillColor(TEXT_2)
-                title = proj['title']
-                max_w = col_w - 90
-                while pdfmetrics.stringWidth(title, 'Sans', 8.4) > max_w and len(title) > 4:
-                    title = title[:-2]
-                    if pdfmetrics.stringWidth(title + '…', 'Sans', 8.4) <= max_w:
-                        title += '…'
-                        break
-                c.drawString(cx + 20, cy, title)
-                c.setFont('Sans', 7.4)
-                c.setFillColor(MUTED)
-                c.drawRightString(cx + col_w, cy, proj['period'])
         self.footer()
 
     def build(self):
         global first_page
         self.cover()
         self.profile()
+        self.index_page()
+        started = {}
         for i, p in enumerate(self.data['projects'], 1):
             first_page = self.page_no + 1
+            started[i] = first_page
             self.project(i, p)
         self.closing()
         self.c.save()
-        return self.page_no
+        return self.page_no, started
 
 
 first_page = 0
@@ -923,8 +1004,8 @@ def render(site, lang, out, data=None):
     labels = LABELS[lang]
     # two passes so the footer can show "page / total"
     tmp = out + '.tmp'
-    total = Doc(tmp, data, labels, quality=JPEG_QUALITY).build()
-    Doc(out, data, labels, total_pages=total, quality=JPEG_QUALITY).build()
+    total, pages = Doc(tmp, data, labels, quality=JPEG_QUALITY).build()
+    Doc(out, data, labels, total_pages=total, quality=JPEG_QUALITY, project_pages=pages).build()
     os.remove(tmp)
     return total
 
