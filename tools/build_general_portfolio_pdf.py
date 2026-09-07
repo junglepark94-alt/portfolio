@@ -406,9 +406,14 @@ class Doc:
                 self.begin_page()
                 if header_factory:
                     header_factory(continued=True)
-            frame = frame_factory()
-            frame.addFromList(story, self.c)
-            if story and not first and frame._atTop:  # nothing fit at all: avoid an infinite loop
+            frames = frame_factory()
+            frames = list(frames) if isinstance(frames, (list, tuple)) else [frames]
+            before = len(story)
+            for frame in frames:
+                if not story:
+                    break
+                frame.addFromList(story, self.c)
+            if story and not first and len(story) == before:  # nothing fit at all: avoid an infinite loop
                 story.pop(0)
             first = False
 
@@ -686,7 +691,9 @@ class Doc:
                 right.append(Paragraph(esc(b), S['kpi_bullet'], bulletText='•'))
             right.append(Spacer(1, 10))
         detail = (p['detail'] or '').replace('\r', '')
+        detail_start = None
         if detail.strip():
+            detail_start = len(right)
             right.append(Paragraph(esc(L['details']), S['h']))
             pending = []
 
@@ -719,12 +726,43 @@ class Doc:
                     st = ParagraphStyle('s', parent=f.style, fontSize=f.style.fontSize * 0.9, leading=f.style.leading * 0.88)
                     f.style = st
                     f.__init__(f.text, st, bulletText=getattr(f, 'bulletText', None))
-        self.flow(right,
-                  lambda: Frame(right_x if self.page_no == first_page else MARGIN, bottom,
-                                right_w if self.page_no == first_page else PAGE_W - 2 * MARGIN,
-                                (top if self.page_no == first_page else PAGE_H - 100) - bottom,
-                                leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0),
-                  header_factory=header)
+            need = avail
+
+        def first_frame():
+            return Frame(right_x, bottom, right_w, top - bottom, leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0)
+
+        def two_columns():
+            col_gap = 28
+            col_w = (PAGE_W - 2 * MARGIN - col_gap) / 2
+            h = PAGE_H - 100 - bottom
+            return [Frame(MARGIN, bottom, col_w, h, leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0),
+                    Frame(MARGIN + col_w + col_gap, bottom, col_w, h, leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0)]
+
+        if need > avail and detail_start is not None:
+            # 성과는 첫 페이지에 두고, 상세 설명 전체를 다음 페이지에 두 단으로 나눠 싣는다
+            head, tail = right[:detail_start], right[detail_start:]
+            first_frame().addFromList(head, c)
+            self.begin_page()
+            header(continued=True)
+            col1, col2 = two_columns()
+            heights = [f.wrap(col1._width, 10000)[1] + f.getSpaceBefore() + f.getSpaceAfter() for f in tail]
+            total, running, cut = sum(heights), 0, len(tail)
+            for i, h in enumerate(heights):
+                running += h
+                if running >= total / 2:
+                    cut = i + 1
+                    break
+            # 소제목이 단 끝에 홀로 남지 않게 한다
+            while cut > 1 and isinstance(tail[cut - 1], Paragraph) and tail[cut - 1].style.name in ('sub', 'h'):
+                cut -= 1
+            left_part, right_part = tail[:cut], tail[cut:]
+            col1.addFromList(left_part, c)
+            right_part = left_part + right_part          # 왼쪽 단에 못 들어간 잔여분은 오른쪽 단으로
+            col2.addFromList(right_part, c)
+            if right_part:
+                self.flow(right_part, two_columns, header_factory=header)
+        else:
+            self.flow(right, lambda: first_frame() if self.page_no == first_page else two_columns(), header_factory=header)
         return
 
     def closing(self):
