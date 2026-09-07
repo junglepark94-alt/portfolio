@@ -154,3 +154,66 @@ def test_site_projects_file_is_well_formed():
             assert entry[field].strip(), (entry["match"], field)
         assert "## " in entry["detail_text"] and "## " in entry["detail_text_en"]
         assert "|" in entry["kpi"] and "|" in entry["kpi_en"]
+
+
+def test_youtube_thumbnail_swap_replaces_only_mapped_images(portfolio_app, monkeypatch):
+    import app as app_module
+    from app import ProjectImage
+
+    calls = []
+
+    def fake_fetch(video_id):
+        calls.append(video_id)
+        return f"yt_{video_id}.jpg"
+
+    monkeypatch.setattr(app_module, "_fetch_youtube_thumbnail", fake_fetch)
+
+    with portfolio_app.app_context():
+        project = Project.query.first()
+        project.title = "글로벌 유튜브 브랜디드 콘텐츠 <Banana Salon> 기획"
+        cropped = ProjectImage(project_id=project.id, filename="proj16_1788758649.jpg",
+                               is_main=True, sort_order=0)
+        untouched = ProjectImage(project_id=project.id, filename="site_photo.jpg", sort_order=1)
+        db.session.add_all([cropped, untouched])
+        db.session.commit()
+
+        normalize_public_content()
+        normalize_public_content()
+
+        assert cropped.filename == "yt_F3AqCokSrTw.jpg"
+        assert untouched.filename == "site_photo.jpg"
+        # 두 번째 실행에서는 교체할 대상이 남아 있지 않아 다시 내려받지 않는다
+        assert calls == ["F3AqCokSrTw"]
+
+
+def test_youtube_thumbnail_fetch_rejects_placeholder_and_non_images(tmp_path, monkeypatch):
+    import app as app_module
+
+    class FakeResponse:
+        def __init__(self, payload):
+            self.status = 200
+            self._payload = payload
+
+        def read(self, *_):
+            return self._payload
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+    app_module.app.config["UPLOAD_FOLDER"] = str(tmp_path)
+    payloads = {"maxresdefault": b"\xff\xd8\xff" + b"x" * 200, "hqdefault": b"\xff\xd8\xff" + b"y" * 20000}
+    import urllib.request
+
+    monkeypatch.setattr(urllib.request, "urlopen",
+                        lambda url, timeout=0: FakeResponse(
+                            payloads["maxresdefault"] if "maxresdefault" in url else payloads["hqdefault"]))
+
+    # maxresdefault가 작은 자리표시자면 건너뛰고 hqdefault를 저장한다
+    assert app_module._fetch_youtube_thumbnail("F3AqCokSrTw") == "yt_F3AqCokSrTw.jpg"
+    assert (tmp_path / "yt_F3AqCokSrTw.jpg").read_bytes() == payloads["hqdefault"]
+    # 잘못된 형식의 영상 id는 네트워크 요청 없이 거부한다
+    assert app_module._fetch_youtube_thumbnail("../../etc/passwd") is None
+    assert app_module._fetch_youtube_thumbnail("") is None

@@ -614,6 +614,53 @@ def _apply_project_copy_overrides():
                 setattr(project, field, entry[field])
         project.links_json = _relabel_links(project.links_json, entry.get('link_labels'))
         project.links_en_json = _relabel_links(project.links_en_json, entry.get('link_labels_en'))
+        _swap_in_youtube_thumbnails(project, entry.get('youtube_thumbnails'))
+
+
+_YT_ID_RE = re.compile(r'^[A-Za-z0-9_-]{11}$')
+
+
+def _fetch_youtube_thumbnail(video_id):
+    """Download a video's original 1280x720 thumbnail into uploads. Returns filename or None."""
+    if not _YT_ID_RE.match(video_id or ''):
+        return None
+    filename = f'yt_{video_id}.jpg'
+    folder = app.config['UPLOAD_FOLDER']
+    target = os.path.join(folder, filename)
+    if os.path.exists(target) and os.path.getsize(target) > 8000:
+        return filename
+    import urllib.request as _req
+    for quality in ('maxresdefault', 'hqdefault'):
+        try:
+            url = f'https://img.youtube.com/vi/{video_id}/{quality}.jpg'
+            with _req.urlopen(url, timeout=8) as resp:
+                if resp.status != 200:
+                    continue
+                raw = resp.read(3 * 1024 * 1024)
+        except Exception:
+            continue
+        # maxresdefault가 없으면 유튜브가 120x90 회색 자리표시자를 준다
+        if len(raw) < 8000 or not _looks_like_image(raw[:16]):
+            continue
+        os.makedirs(folder, exist_ok=True)
+        with open(target, 'wb') as fh:
+            fh.write(raw)
+        return filename
+    return None
+
+
+def _swap_in_youtube_thumbnails(project, mapping):
+    """Replace cropped screenshots with the original YouTube thumbnails they came from."""
+    if not mapping:
+        return
+    images = {img.filename: img for img in ProjectImage.query.filter_by(project_id=project.id)}
+    for old_name, video_id in mapping.items():
+        target = images.get(old_name)
+        if target is None:
+            continue  # 이미 교체됐거나 다른 환경
+        new_name = _fetch_youtube_thumbnail(video_id)
+        if new_name and new_name != target.filename:
+            target.filename = new_name
 
 
 # ── DB Init ─────────────────────────────────────────────
