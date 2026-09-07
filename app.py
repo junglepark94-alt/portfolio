@@ -12,6 +12,35 @@ import threading
 
 KST = timezone(timedelta(hours=9))
 
+UI_TEXT = {
+    'ko': {
+        'view_details': '자세히 보기',
+        'open_project': '프로젝트 상세 보기',
+        'close_project': '프로젝트 상세 닫기',
+        'previous_image': '이전 이미지',
+        'next_image': '다음 이미지',
+        'key_results': '핵심 성과',
+        'project_details': '상세 설명',
+    },
+    'en': {
+        'view_details': 'View details',
+        'open_project': 'Open project details',
+        'close_project': 'Close project details',
+        'previous_image': 'Previous image',
+        'next_image': 'Next image',
+        'key_results': 'Key results',
+        'project_details': 'Project details',
+    },
+}
+
+
+def display_period(period, lang='ko'):
+    """Return a project period with a locale-appropriate ongoing label."""
+    value = period or ''
+    if lang == 'en':
+        return value.replace('진행 중', 'Present')
+    return value.replace('Present', '진행 중')
+
 def _today_kst():
     return datetime.now(KST).strftime('%Y-%m-%d')
 
@@ -559,8 +588,10 @@ def _render_index(lang):
     projects = Project.query.order_by(Project.order, Project.created_at.desc()).all()
     gallery_items = GalleryItem.query.order_by(GalleryItem.sort_order, GalleryItem.created_at).all()
     profile = db.session.get(Profile, 1)
-    return render_template('index.html', projects=projects, gallery_items=gallery_items,
-                           profile=profile, lang=lang)
+    return render_template(
+        'index.html', projects=projects, gallery_items=gallery_items,
+        profile=profile, lang=lang, ui=UI_TEXT[lang], display_period=display_period,
+    )
 
 @app.route('/')
 def index():

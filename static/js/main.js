@@ -49,8 +49,14 @@ revealEls.forEach(el => observer.observe(el));
 const modal = document.getElementById('projectModal');
 if (modal) {
   const modalClose = document.getElementById('modalClose');
+  const pageLang = document.documentElement.lang === 'en' ? 'en' : 'ko';
+  const modalText = pageLang === 'en'
+    ? { loading: 'Loading…', playlist: 'Playlist', views: 'views' }
+    : { loading: '로딩 중…', playlist: '재생목록', views: '회' };
+  let activeProjectCard = null;
 
   function openModal(card) {
+    activeProjectCard = card;
     const d = card.dataset;
 
     document.getElementById('modalTitle').textContent = d.title || '';
@@ -123,12 +129,14 @@ if (modal) {
     modal.classList.add('active');
     modal.setAttribute('aria-hidden', 'false');
     document.body.style.overflow = 'hidden';
+    modalClose.focus();
   }
 
   function closeModal() {
     modal.classList.remove('active');
     modal.setAttribute('aria-hidden', 'true');
     document.body.style.overflow = '';
+    if (activeProjectCard) activeProjectCard.focus();
   }
 
   // ── 갤러리 ─────────────────────────────────
@@ -193,7 +201,7 @@ if (modal) {
              <span class="yt-play">▶</span>
            </div>
            <div class="yt-info">
-             <div class="yt-title">로딩 중…</div>
+             <div class="yt-title">${modalText.loading}</div>
              <div class="yt-stats">
                <span class="yt-views"></span>
                <span class="yt-likes"></span>
@@ -204,10 +212,10 @@ if (modal) {
     fetch(`/api/youtube/playlist?list=${playlistId}`)
       .then(r => r.json())
       .then(d => {
-        if (d.error) { item.querySelector('.yt-title').textContent = '재생목록'; return; }
+        if (d.error) { item.querySelector('.yt-title').textContent = modalText.playlist; return; }
         if (d.thumbnail) item.querySelector('.yt-thumb-wrap img').src = d.thumbnail;
         item.querySelector('.yt-title').textContent = d.title || '';
-        item.querySelector('.yt-views').textContent    = d.viewCount    ? '▶ ' + fmtNum(d.viewCount)    + ' 회' : '';
+        item.querySelector('.yt-views').textContent    = d.viewCount    ? '▶ ' + fmtNum(d.viewCount)    + ' ' + modalText.views : '';
         item.querySelector('.yt-likes').textContent    = d.likeCount    ? '👍 ' + fmtNum(d.likeCount)            : '';
         item.querySelector('.yt-comments').textContent = d.commentCount ? '💬 ' + fmtNum(d.commentCount)       : '';
       })
@@ -230,7 +238,7 @@ if (modal) {
              <span class="yt-play">▶</span>
            </div>
            <div class="yt-info">
-             <div class="yt-title">로딩 중…</div>
+             <div class="yt-title">${modalText.loading}</div>
              <div class="yt-stats">
                <span class="yt-views"></span>
                <span class="yt-likes"></span>
@@ -244,7 +252,7 @@ if (modal) {
         if (d.error) { item.querySelector('.yt-title').textContent = ''; return; }
         if (d.thumbnail) item.querySelector('.yt-thumb-wrap img').src = d.thumbnail;
         item.querySelector('.yt-title').textContent = d.title || '';
-        item.querySelector('.yt-views').textContent   = d.viewCount    ? '▶ ' + fmtNum(d.viewCount)    + ' 회' : '';
+        item.querySelector('.yt-views').textContent   = d.viewCount    ? '▶ ' + fmtNum(d.viewCount)    + ' ' + modalText.views : '';
         item.querySelector('.yt-likes').textContent   = d.likeCount    ? '👍 ' + fmtNum(d.likeCount)            : '';
         item.querySelector('.yt-comments').textContent = d.commentCount ? '💬 ' + fmtNum(d.commentCount)       : '';
       })
@@ -261,6 +269,12 @@ if (modal) {
     card.addEventListener('click', e => {
       if (e.target.closest('a')) return;
       openModal(card);
+    });
+    card.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openModal(card);
+      }
     });
   });
 }
@@ -282,7 +296,8 @@ if (modal) {
     const dots = cards.map((_, i) => {
       const btn = document.createElement('button');
       btn.className = 'cf-dot';
-      btn.setAttribute('aria-label', `슬라이드 ${i + 1}`);
+      const slideLabel = document.documentElement.lang === 'en' ? 'Slide' : '슬라이드';
+      btn.setAttribute('aria-label', `${slideLabel} ${i + 1}`);
       btn.addEventListener('click', () => goTo(i));
       dotsWrap.appendChild(btn);
       return btn;

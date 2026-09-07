@@ -523,6 +523,12 @@ ul { list-style: none; }
   box-shadow: var(--shadow-lift);
   border-color: #d8cbb4;
 }
+.project-card:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 65%, white);
+  outline-offset: 4px;
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lift);
+}
 .pc-thumb {
   height: 200px;
   overflow: hidden;
@@ -564,7 +570,7 @@ ul { list-style: none; }
   white-space: nowrap;
 }
 .pc-body::after {
-  content: '자세히 보기 →';
+  content: attr(data-detail-label);
   font-size: 0.76rem;
   font-weight: 600;
   color: var(--muted);
@@ -572,7 +578,6 @@ ul { list-style: none; }
   padding-top: 0.75rem;
   transition: color 0.2s, transform 0.2s;
 }
-.project-card:hover .pc-body::after { color: var(--accent); }
 .project-card:hover .pc-body::after { color: var(--accent); }
 .no-projects { color: var(--muted); }
 .tag {

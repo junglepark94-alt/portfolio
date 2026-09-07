@@ -204,9 +204,10 @@
       {% set p_kpi     = (p.kpi_en if p.kpi_en else p.kpi) if en else p.kpi %}
       {% set p_role    = (p.my_role_en if p.my_role_en else p.my_role) if en else p.my_role %}
       {% set p_cat     = (p.category_en if p.category_en else p.category) if en else p.category %}
-      <article class="project-card reveal"
+      <article class="project-card reveal" role="button" tabindex="0" aria-haspopup="dialog"
+        aria-label="{{ ui.open_project }}: {{ p_title }}"
         data-title="{{ p_title | e }}"
-        data-period="{{ p.period | e }}"
+        data-period="{{ display_period(p.period, lang) | e }}"
         data-desc="{{ p_desc | e }}"
         data-detail="{{ p_detail | e }}"
         data-tags="{{ p.tech_stack | e }}"
@@ -231,10 +232,10 @@
           <img src="{{ url_for('static', filename='uploads/' + main_img.filename) }}" alt="{{ p_title }}" />
         </div>
         {% endif %}
-        <div class="pc-body">
+        <div class="pc-body" data-detail-label="{{ ui.view_details }} →">
           <div class="pc-meta-row">
             {% if p_role %}<span class="pc-role-badge">{{ p_role }}</span>{% endif %}
-            {% if p.period %}<span class="pc-period">{{ p.period }}</span>{% endif %}
+            {% if p.period %}<span class="pc-period">{{ display_period(p.period, lang) }}</span>{% endif %}
           </div>
           <h3 class="pc-title">{{ p_title }}</h3>
         </div>
@@ -253,7 +254,7 @@
     <h2 class="reveal">{{ 'Gallery' if en else '갤러리' }}</h2>
   </div>
   <div class="coverflow-wrap reveal">
-    <button class="cf-arrow cf-prev" id="cfPrev" aria-label="이전">&#8249;</button>
+    <button class="cf-arrow cf-prev" id="cfPrev" aria-label="{{ ui.previous_image }}">&#8249;</button>
     <div class="coverflow-stage" id="coverflowStage">
       {% for item in gallery_items %}
       {% set g_title = (item.title_en if item.title_en else item.title) if en else item.title %}
@@ -267,7 +268,7 @@
       </div>
       {% endfor %}
     </div>
-    <button class="cf-arrow cf-next" id="cfNext" aria-label="다음">&#8250;</button>
+    <button class="cf-arrow cf-next" id="cfNext" aria-label="{{ ui.next_image }}">&#8250;</button>
     <div class="coverflow-dots" id="coverflowDots"></div>
     <div class="cf-title-display" id="cfTitleDisplay"></div>
   </div>
@@ -339,13 +340,13 @@
 
 <!-- ── Project Detail Modal ─────────────────────── -->
 <div class="modal-overlay" id="projectModal" aria-hidden="true">
-  <div class="modal-box" role="dialog" aria-modal="true">
-    <button class="modal-close" id="modalClose" aria-label="닫기">×</button>
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <button class="modal-close" id="modalClose" aria-label="{{ ui.close_project }}">×</button>
     <div class="modal-gallery-wrap" id="modalGalleryWrap" style="display:none;">
       <div class="modal-gallery-main">
         <img id="modalGalleryImg" src="" alt="" />
-        <button class="gallery-nav gallery-prev" id="galleryPrev">&#8249;</button>
-        <button class="gallery-nav gallery-next" id="galleryNext">&#8250;</button>
+        <button class="gallery-nav gallery-prev" id="galleryPrev" aria-label="{{ ui.previous_image }}">&#8249;</button>
+        <button class="gallery-nav gallery-next" id="galleryNext" aria-label="{{ ui.next_image }}">&#8250;</button>
       </div>
       <div class="modal-gallery-thumbs" id="modalGalleryThumbs"></div>
     </div>
@@ -357,11 +358,11 @@
       </div>
       <p class="modal-desc" id="modalDesc"></p>
       <div class="modal-kpi-block" id="modalKpiBlock" style="display:none;">
-        <span class="modal-kpi-label">핵심 성과</span>
+        <span class="modal-kpi-label">{{ ui.key_results }}</span>
         <div class="modal-kpi-value" id="modalKpi"></div>
       </div>
       <div class="modal-detail-block" id="modalDetailBlock" style="display:none;">
-        <div class="modal-detail-label">상세 설명</div>
+        <div class="modal-detail-label">{{ ui.project_details }}</div>
         <div class="modal-detail" id="modalDetail"></div>
       </div>
       <div class="pc-tags" id="modalTags" style="margin-top:1.25rem;"></div>

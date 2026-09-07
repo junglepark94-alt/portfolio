@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="{{ lang if lang is defined else 'ko' }}">
+{% set base_en = (lang is defined and lang == 'en') %}
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -36,7 +37,7 @@
         <a href="{{ url_for('index') }}" class="lang-btn {% if not request.path.startswith('/en') %}active{% endif %}">KOR</a>
         <a href="{{ url_for('index_en') }}" class="lang-btn {% if request.path.startswith('/en') %}active{% endif %}">ENG</a>
       </div>
-      <button class="nav-hamburger" id="navHamburger" aria-label="메뉴" aria-expanded="false">
+      <button class="nav-hamburger" id="navHamburger" aria-label="{{ 'Menu' if base_en else '메뉴' }}" aria-expanded="false">
         <span></span><span></span><span></span>
       </button>
     </nav>
@@ -64,12 +65,7 @@
   </main>
 
   <footer class="site-footer">
-    <p>© 2026 {{ profile.name if profile else '' }}. All Rights Reserved.</p>
-    {% if session.get('logged_in') %}
-    <a href="{{ url_for('admin_dashboard') }}" class="footer-admin-btn">관리자</a>
-    {% else %}
-    <a href="{{ url_for('login') }}" class="footer-admin-btn">관리자</a>
-    {% endif %}
+    <p>© 2026 {{ (profile.name_en if base_en and profile and profile.name_en else profile.name) if profile else '' }}. All Rights Reserved.</p>
   </footer>
 
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>
