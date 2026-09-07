@@ -23,7 +23,7 @@ def test_generated_portfolio_pdf_meets_hyundai_upload_requirements():
         "버추얼",
         "67-82%",
         "현대자동차",
-        "web-production-83ee5.up.railway.app",
+        "jgpark.up.railway.app",
     ]:
         assert required in text
 

@@ -339,35 +339,60 @@
 </section>
 
 <!-- ── Project Detail Modal ─────────────────────── -->
+<script id="modalI18n" type="application/json">{{ ui | tojson }}</script>
 <div class="modal-overlay" id="projectModal" aria-hidden="true">
   <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-    <button class="modal-close" id="modalClose" aria-label="{{ ui.close_project }}">×</button>
-    <div class="modal-gallery-wrap" id="modalGalleryWrap" style="display:none;">
-      <div class="modal-gallery-main">
-        <img id="modalGalleryImg" src="" alt="" />
-        <button class="gallery-nav gallery-prev" id="galleryPrev" aria-label="{{ ui.previous_image }}">&#8249;</button>
-        <button class="gallery-nav gallery-next" id="galleryNext" aria-label="{{ ui.next_image }}">&#8250;</button>
-      </div>
-      <div class="modal-gallery-thumbs" id="modalGalleryThumbs"></div>
+    <div class="modal-topbar">
+      <div class="modal-topbar-title" id="modalTopTitle" aria-hidden="true"></div>
+      <nav class="modal-anchors" id="modalAnchors" aria-label="{{ ui.section_nav }}"></nav>
+      <button class="modal-close" id="modalClose" aria-label="{{ ui.close_project }}">×</button>
     </div>
-    <div class="modal-body">
-      <div class="modal-eyebrow" id="modalPeriod"></div>
-      <h3 class="modal-title" id="modalTitle"></h3>
-      <div class="modal-meta-row" id="modalMetaRow" style="display:none;">
-        <span class="modal-role-badge" id="modalMyRole"></span>
+    <div class="modal-layout">
+      <aside class="modal-media">
+        <div class="modal-gallery-wrap" id="modalGalleryWrap" hidden>
+          <div class="modal-gallery-main">
+            <img id="modalGalleryImg" src="" alt="" />
+            <button class="gallery-nav gallery-prev" id="galleryPrev" aria-label="{{ ui.previous_image }}">&#8249;</button>
+            <button class="gallery-nav gallery-next" id="galleryNext" aria-label="{{ ui.next_image }}">&#8250;</button>
+          </div>
+          <div class="modal-gallery-thumbs" id="modalGalleryThumbs"></div>
+        </div>
+        <section class="modal-section modal-videos" id="secVideos" data-anchor data-anchor-label="{{ ui.videos }}" hidden>
+          <h4 class="modal-h">{{ ui.videos }}</h4>
+          <div class="video-list" id="modalYoutubeList"></div>
+        </section>
+      </aside>
+      <div class="modal-body">
+        <section class="modal-section" id="secOverview" data-anchor data-anchor-label="{{ ui.overview }}">
+          <div class="modal-eyebrow">
+            <span id="modalCategory"></span><span id="modalEyebrowSep" hidden>·</span><span id="modalPeriod"></span>
+          </div>
+          <h3 class="modal-title" id="modalTitle"></h3>
+          <div class="modal-meta-row" id="modalMetaRow" hidden>
+            <span class="modal-role-badge" id="modalMyRole"></span>
+          </div>
+          <div class="modal-desc" id="modalDesc"></div>
+        </section>
+        <section class="modal-section" id="secResults" data-anchor data-anchor-label="{{ ui.key_results }}" hidden>
+          <h4 class="modal-h">{{ ui.key_results }}</h4>
+          <div class="kpi-grid" id="modalKpiGrid"></div>
+          <ul class="kpi-list" id="modalKpiList"></ul>
+        </section>
+        <section class="modal-section" id="secDetail" data-anchor data-anchor-label="{{ ui.project_details }}" hidden>
+          <h4 class="modal-h">{{ ui.project_details }}</h4>
+          <div class="modal-detail" id="modalDetail"></div>
+        </section>
+        <section class="modal-section" id="secResources" data-anchor data-anchor-label="{{ ui.resources }}" hidden>
+          <h4 class="modal-h">{{ ui.resources }}</h4>
+          <div class="modal-links" id="modalLinks"></div>
+          <div class="modal-tags" id="modalTags"></div>
+        </section>
       </div>
-      <p class="modal-desc" id="modalDesc"></p>
-      <div class="modal-kpi-block" id="modalKpiBlock" style="display:none;">
-        <span class="modal-kpi-label">{{ ui.key_results }}</span>
-        <div class="modal-kpi-value" id="modalKpi"></div>
-      </div>
-      <div class="modal-detail-block" id="modalDetailBlock" style="display:none;">
-        <div class="modal-detail-label">{{ ui.project_details }}</div>
-        <div class="modal-detail" id="modalDetail"></div>
-      </div>
-      <div class="pc-tags" id="modalTags" style="margin-top:1.25rem;"></div>
-      <div class="modal-links" id="modalLinks"></div>
-      <div id="modalYoutubeList"></div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="modal-nav-btn" id="modalPrev">← {{ ui.prev_project }}</button>
+      <span class="modal-counter" id="modalCounter"></span>
+      <button type="button" class="modal-nav-btn" id="modalNext">{{ ui.next_project }} →</button>
     </div>
   </div>
 </div>
