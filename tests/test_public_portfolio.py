@@ -47,6 +47,7 @@ def test_public_content_normalization_is_targeted_and_idempotent(portfolio_app):
         profile = db.session.get(Profile, 1)
         profile.name_en = "Jong Geol Park"
         profile.tagline_en = "From PD to marketer — crafting strategies only someone who knows both worlds can."
+        profile.skills_en = "Contents Planning,Digital Contents,Data Analysis"
         project = Project.query.first()
         project.title = "tvN 예능 프로그램 제작 – 사이니의 빛돌기획"
         project.category_en = "Contents Planning"
@@ -59,6 +60,7 @@ def test_public_content_normalization_is_targeted_and_idempotent(portfolio_app):
 
         assert profile.name_en == "Jonggeol Park"
         assert "I build fandom through content" in profile.tagline_en
+        assert profile.skills_en == "Content Strategy & Production,Digital Content,Data Analysis"
         assert project.title == "tvN 예능 ‘샤이니의 빛돌기획’ 제작"
         assert project.category_en == "Content Strategy & Production"
         assert "67–82%" in project.kpi

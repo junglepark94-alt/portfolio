@@ -431,6 +431,8 @@ def _normalize_copy(value):
         ('컨셉카', '콘셉트카'),
         ('6782%', '67–82%'),
         ('67~82%', '67–82%'),
+        ('Contents Planning', 'Content Strategy & Production'),
+        ('Digital Contents', 'Digital Content'),
     ]:
         normalized = normalized.replace(old, new)
     return normalized
@@ -454,7 +456,10 @@ def normalize_public_content():
         profile.role_en = site_copy.get('hero_role_en', profile.role_en)
         profile.tagline = site_copy.get('hero_tagline_ko', profile.tagline)
         profile.tagline_en = site_copy.get('hero_tagline_en', profile.tagline_en)
-        for attr in ('about_text', 'about_text_en', 'experience_json', 'experience_en_json'):
+        for attr in (
+            'about_text', 'about_text_en', 'experience_json', 'experience_en_json',
+            'skills', 'skills_en', 'skills_json', 'tools_json', 'tools_en_json',
+        ):
             setattr(profile, attr, _normalize_copy(getattr(profile, attr)))
 
     category_map = site_copy.get('categories_en', {
