@@ -273,3 +273,62 @@ def test_thumbnail_swaps_still_run_after_seed_marker_is_set(portfolio_app, monke
         assert sync_canonical_content_once() is False     # 문안은 더 이상 건드리지 않지만
         apply_youtube_thumbnail_swaps()                    # 새 썸네일 매핑은 적용된다
         assert img.filename == "yt_U_kFCUJy_wM.jpg"
+
+
+def test_external_image_fetch_enforces_https_and_host_allowlist(tmp_path, monkeypatch):
+    import app as app_module
+    import urllib.request
+
+    app_module.app.config["UPLOAD_FOLDER"] = str(tmp_path)
+    requested = []
+
+    class FakeResponse:
+        status = 200
+
+        def read(self, *_):
+            return b"\xff\xd8\xff" + b"z" * 20000
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+    def fake_urlopen(url, timeout=0):
+        requested.append(url)
+        return FakeResponse()
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+
+    allowed = "https://poc-cf-image.cjenm.com/crop/1120x630/public/share/x.jpg"
+    name = app_module._fetch_external_image(allowed)
+    assert name and name.startswith("ext_") and (tmp_path / name).exists()
+    assert app_module._fetch_external_image(allowed) == name      # 두 번째는 캐시된 파일 재사용
+    assert requested == [allowed]
+
+    # 허용 목록 밖 호스트와 평문 http는 네트워크 요청조차 하지 않는다
+    assert app_module._fetch_external_image("https://evil.example.com/a.jpg") is None
+    assert app_module._fetch_external_image("http://poc-cf-image.cjenm.com/a.jpg") is None
+    assert app_module._fetch_external_image("https://169.254.169.254/latest/meta-data") is None
+    assert requested == [allowed]
+
+
+def test_official_image_replacement_swaps_mapped_files_only(portfolio_app, monkeypatch):
+    import app as app_module
+    from app import ProjectImage, apply_youtube_thumbnail_swaps
+
+    monkeypatch.setattr(app_module, "_fetch_external_image", lambda url: "ext_official.jpg")
+
+    with portfolio_app.app_context():
+        project = Project.query.first()
+        project.title = "tvN 예능 ‘샤이니의 빛돌기획’ 제작"
+        mapped = ProjectImage(project_id=project.id, filename="proj14_1779627311.jpg", is_main=True)
+        other = ProjectImage(project_id=project.id, filename="behind_the_scenes.jpg", sort_order=1)
+        db.session.add_all([mapped, other])
+        db.session.commit()
+
+        apply_youtube_thumbnail_swaps()
+        apply_youtube_thumbnail_swaps()
+
+        assert mapped.filename == "ext_official.jpg"
+        assert other.filename == "behind_the_scenes.jpg"

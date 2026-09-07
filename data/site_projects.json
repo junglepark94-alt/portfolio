@@ -1,5 +1,5 @@
 {
-  "_readme": "Initial project copy for the detail modal, matched against the Korean project title (substring). It is imported ONCE (see CONTENT_SEED_VERSION in app.py) and afterwards the admin page is the source of truth; an admin can re-import a single project with the '기준 문안 불러오기' button on its edit page. Key results: 'value | label' lines render as stat tiles. Detail text: '## ' lines render as sub-headings, '- ' lines as bullets. youtube_thumbnails maps an uploaded image filename to a YouTube video id; the original 1280x720 thumbnail replaces that cropped image. Unlike the copy fields this swap runs on every start (it is idempotent and only ever touches the listed filenames), so new mappings take effect on the next deploy.",
+  "_readme": "Initial project copy for the detail modal, matched against the Korean project title (substring). It is imported ONCE (see CONTENT_SEED_VERSION in app.py) and afterwards the admin page is the source of truth; an admin can re-import a single project with the '기준 문안 불러오기' button on its edit page. Key results: 'value | label' lines render as stat tiles. Detail text: '## ' lines render as sub-headings, '- ' lines as bullets. youtube_thumbnails maps an uploaded image filename to a YouTube video id; the original 1280x720 thumbnail replaces that cropped image. Unlike the copy fields this swap runs on every start (it is idempotent and only ever touches the listed filenames), so new mappings take effect on the next deploy. image_replacements maps an uploaded image filename to an official image URL (tvN programme key art, cropped to 16:9 by the CDN); only hosts in _ALLOWED_IMAGE_HOSTS are fetched.",
   "projects": [
     {
       "match": "Banana Salon",
@@ -129,6 +129,9 @@
       "link_labels_en": {
         "1st Trailer": "Episode 1 trailer",
         "2nd Trailer": "Episode 2 trailer"
+      },
+      "image_replacements": {
+        "proj15_1779627557.jpg": "https://poc-cf-image.cjenm.com/crop/1120x630/public/share/menumng/pgmmain/f637795835625497379.jpg"
       }
     },
     {
@@ -144,6 +147,9 @@
         "1st Trailer": "1st teaser",
         "3rd Trailer": "3rd teaser",
         "Live Performance Editing": "'Don't Call Me' performance edit"
+      },
+      "image_replacements": {
+        "proj14_1779627311.jpg": "https://poc-cf-image.cjenm.com/crop/1120x630/public/share/menumng/pgmmain/f637490966764632200.jpg"
       }
     }
   ]

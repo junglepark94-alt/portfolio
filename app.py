@@ -643,6 +643,7 @@ def _apply_copy_entry(project, entry):
     project.links_json = _relabel_links(project.links_json, entry.get('link_labels'))
     project.links_en_json = _relabel_links(project.links_en_json, entry.get('link_labels_en'))
     _swap_in_youtube_thumbnails(project, entry.get('youtube_thumbnails'))
+    _swap_in_official_images(project, entry.get('image_replacements'))
 
 
 def _apply_project_copy_overrides():
@@ -656,15 +657,21 @@ def _apply_project_copy_overrides():
 
 
 def apply_youtube_thumbnail_swaps():
-    """잘린 스크린샷 → 원본 유튜브 썸네일 교체. 매 시작 시 실행해도 안전하다 (지정 파일명만 건드리고, 교체 후에는 대상이 없다)."""
-    entries = [e for e in _load_copy_entries() if e.get('youtube_thumbnails')]
+    """잘린 스크린샷 → 원본 썸네일/공식 이미지 교체.
+
+    매 시작 시 실행해도 안전하다: 지정된 파일명만 찾아 바꾸고, 교체 후에는 대상이 남지 않는다.
+    """
+    entries = [e for e in _load_copy_entries()
+               if e.get('youtube_thumbnails') or e.get('image_replacements')]
     if not entries:
         return
     for project in Project.query.all():
         title = project.title or ''
         entry = next((o for o in entries if o.get('match') and o['match'] in title), None)
-        if entry:
-            _swap_in_youtube_thumbnails(project, entry['youtube_thumbnails'])
+        if not entry:
+            continue
+        _swap_in_youtube_thumbnails(project, entry.get('youtube_thumbnails'))
+        _swap_in_official_images(project, entry.get('image_replacements'))
     db.session.commit()
 
 
@@ -696,34 +703,70 @@ def sync_canonical_content_once():
 
 _YT_ID_RE = re.compile(r'^[A-Za-z0-9_-]{11}$')
 
+# 외부 이미지는 이 호스트에서만 받는다 (유튜브 썸네일, tvN 공식 프로그램 이미지)
+_ALLOWED_IMAGE_HOSTS = {'img.youtube.com', 'i.ytimg.com', 'poc-cf-image.cjenm.com'}
+_MAX_IMAGE_BYTES = 5 * 1024 * 1024
+
+
+def _download_image(url, filename):
+    """허용 호스트의 이미지를 uploads에 저장. 성공 시 filename, 실패 시 None."""
+    import urllib.parse as _parse
+    import urllib.request as _req
+    parts = _parse.urlparse(url)
+    if parts.scheme != 'https' or parts.hostname not in _ALLOWED_IMAGE_HOSTS:
+        return None
+    folder = app.config['UPLOAD_FOLDER']
+    target = os.path.join(folder, filename)
+    if os.path.exists(target) and os.path.getsize(target) > 8000:
+        return filename
+    try:
+        with _req.urlopen(url, timeout=10) as resp:
+            if getattr(resp, 'status', 200) != 200:
+                return None
+            raw = resp.read(_MAX_IMAGE_BYTES)
+    except Exception:
+        return None
+    if len(raw) < 8000 or not _looks_like_image(raw[:16]):
+        return None
+    os.makedirs(folder, exist_ok=True)
+    with open(target, 'wb') as fh:
+        fh.write(raw)
+    return filename
+
+
+def _fetch_external_image(url):
+    """공식 이미지 URL을 내려받아 안정적인 파일명으로 저장한다."""
+    import hashlib
+    if not url:
+        return None
+    return _download_image(url, 'ext_' + hashlib.sha1(url.encode()).hexdigest()[:12] + '.jpg')
+
 
 def _fetch_youtube_thumbnail(video_id):
     """Download a video's original 1280x720 thumbnail into uploads. Returns filename or None."""
     if not _YT_ID_RE.match(video_id or ''):
         return None
     filename = f'yt_{video_id}.jpg'
-    folder = app.config['UPLOAD_FOLDER']
-    target = os.path.join(folder, filename)
-    if os.path.exists(target) and os.path.getsize(target) > 8000:
-        return filename
-    import urllib.request as _req
     for quality in ('maxresdefault', 'hqdefault'):
-        try:
-            url = f'https://img.youtube.com/vi/{video_id}/{quality}.jpg'
-            with _req.urlopen(url, timeout=8) as resp:
-                if resp.status != 200:
-                    continue
-                raw = resp.read(3 * 1024 * 1024)
-        except Exception:
-            continue
-        # maxresdefault가 없으면 유튜브가 120x90 회색 자리표시자를 준다
-        if len(raw) < 8000 or not _looks_like_image(raw[:16]):
-            continue
-        os.makedirs(folder, exist_ok=True)
-        with open(target, 'wb') as fh:
-            fh.write(raw)
-        return filename
+        # maxresdefault가 없으면 유튜브가 120x90 회색 자리표시자를 주므로 크기 검사로 걸러진다
+        got = _download_image(f'https://img.youtube.com/vi/{video_id}/{quality}.jpg', filename)
+        if got:
+            return got
     return None
+
+
+def _swap_in_official_images(project, mapping):
+    """잘린 캡처를 공식 이미지(프로그램 키아트 등)로 교체."""
+    if not mapping:
+        return
+    images = {img.filename: img for img in ProjectImage.query.filter_by(project_id=project.id)}
+    for old_name, url in mapping.items():
+        target = images.get(old_name)
+        if target is None:
+            continue
+        new_name = _fetch_external_image(url)
+        if new_name and new_name != target.filename:
+            target.filename = new_name
 
 
 def _swap_in_youtube_thumbnails(project, mapping):
