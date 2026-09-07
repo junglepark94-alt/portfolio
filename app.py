@@ -433,9 +433,54 @@ def _normalize_copy(value):
         ('67~82%', '67–82%'),
         ('Contents Planning', 'Content Strategy & Production'),
         ('Digital Contents', 'Digital Content'),
+        ('Assitant', 'Assistant'),
+        ('Planning & Operations Planning & Operations', 'Planning & Operations'),
+        ('Mountain Village Women', 'Mountain City Women'),
+        ('City girls on the climb', 'Mountain City Women'),
+        ('SHINee Inc. - tvN', 'SHINee Inc. — tvN'),
+        ('빙그레X더현대서울', '빙그레×더현대서울'),
     ]:
         normalized = normalized.replace(old, new)
+    normalized = re.sub(r'Korea Pop-Up Store Awards(?! Grand Prize)',
+                        'Korea Pop-Up Store Awards Grand Prize', normalized)
     return normalized
+
+
+_PERIOD_DATE = r'\d{4}\.\s*\d{1,2}(?:\.\s*\d{1,2})?'
+_PERIOD_END = r'현재|진행 중|Present|Ongoing'
+
+
+def _normalize_period(value):
+    """Unify date ranges to 'YYYY.MM – YYYY.MM' with an en dash and no stray spaces."""
+    normalized = value or ''
+    normalized = re.sub(r'(\d{4})\.\s+(\d{1,2})', r'\1.\2', normalized)
+    normalized = re.sub(r'(\d{4}\.\d{1,2})\.\s+(\d{1,2})', r'\1.\2', normalized)
+    normalized = re.sub(
+        r'(%s)\s*[-~–—]\s*(%s|%s)' % (_PERIOD_DATE, _PERIOD_DATE, _PERIOD_END),
+        r'\1 – \2', normalized,
+    )
+    return normalized
+
+
+def _normalize_json_entries(raw):
+    """Normalize copy and periods inside a JSON list of dict entries; leave unparsable input as-is."""
+    try:
+        entries = json.loads(raw or '[]')
+    except (TypeError, ValueError):
+        return raw
+    if not isinstance(entries, list):
+        return raw
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        for key, val in entry.items():
+            if not isinstance(val, str):
+                continue
+            val = _normalize_copy(val)
+            if key == 'period':
+                val = _normalize_period(val)
+            entry[key] = val
+    return json.dumps(entries, ensure_ascii=False)
 
 
 def normalize_public_content():
@@ -457,10 +502,15 @@ def normalize_public_content():
         profile.tagline = site_copy.get('hero_tagline_ko', profile.tagline)
         profile.tagline_en = site_copy.get('hero_tagline_en', profile.tagline_en)
         for attr in (
-            'about_text', 'about_text_en', 'experience_json', 'experience_en_json',
-            'skills', 'skills_en', 'skills_json', 'tools_json', 'tools_en_json',
+            'about_text', 'about_text_en', 'skills', 'skills_en', 'skills_json',
+            'tools_json', 'tools_en_json',
         ):
             setattr(profile, attr, _normalize_copy(getattr(profile, attr)))
+        for attr in (
+            'experience_json', 'experience_en_json', 'education_json',
+            'education_en_json', 'awards_json', 'awards_en_json',
+        ):
+            setattr(profile, attr, _normalize_json_entries(getattr(profile, attr)))
 
     category_map = site_copy.get('categories_en', {
         '콘텐츠 기획': 'Content Strategy & Production',
@@ -481,7 +531,7 @@ def normalize_public_content():
         ):
             setattr(project, attr, _normalize_copy(getattr(project, attr)))
 
-        project.period = re.sub(r'\s*~\s*', ' – ', project.period or '')
+        project.period = _normalize_period(project.period)
 
         project.category_en = legacy_category_map.get(
             project.category_en,
@@ -489,7 +539,7 @@ def normalize_public_content():
         )
         if '샤이니의 빛돌기획' in project.title:
             project.title = 'tvN 예능 ‘샤이니의 빛돌기획’ 제작'
-            project.title_en = 'SHINee Inc. - tvN Branded Entertainment'
+            project.title_en = 'SHINee Inc. — tvN Branded Entertainment'
         if 'Banana Salon' in project.title or 'Banana Salon' in project.title_en:
             project.period = '2026.07 – 진행 중'
 

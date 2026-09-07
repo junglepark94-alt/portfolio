@@ -65,3 +65,52 @@ def test_public_content_normalization_is_targeted_and_idempotent(portfolio_app):
         assert project.category_en == "Content Strategy & Production"
         assert "67–82%" in project.kpi
         assert project.period == "2026.07 – 진행 중"
+
+
+def test_period_normalization_unifies_dashes_and_stray_spaces():
+    from app import _normalize_period
+
+    assert _normalize_period("2022.08 - 2023.12") == "2022.08 – 2023.12"
+    assert _normalize_period("2013.03~2019.08") == "2013.03 – 2019.08"
+    assert _normalize_period("2010.03-2013.02") == "2010.03 – 2013.02"
+    assert _normalize_period("2025.05 – 2025. 11") == "2025.05 – 2025.11"
+    assert _normalize_period("2022.07 - 현재") == "2022.07 – 현재"
+    assert _normalize_period("2022.07 - Present") == "2022.07 – Present"
+    assert _normalize_period("2025.07.17 – 2025.07.27") == "2025.07.17 – 2025.07.27"
+    assert _normalize_period("2026.07 – 진행 중") == "2026.07 – 진행 중"
+
+
+def test_public_content_normalization_fixes_deployed_profile_copy(portfolio_app):
+    import json
+
+    with portfolio_app.app_context():
+        profile = db.session.get(Profile, 1)
+        profile.experience_en_json = json.dumps([
+            {"company": "CJ ENM", "period": "2019.07 - 2022.03",
+             "role": "Producer / AC (Assitant Creator)",
+             "details": ["Credits include: Mountain Village Women"]},
+        ], ensure_ascii=False)
+        profile.education_json = json.dumps(
+            [{"school": "고려대학교", "period": "2013.03~2019.08"}], ensure_ascii=False)
+        profile.awards_en_json = json.dumps(
+            [{"year": "2025", "title": "2025 Korea Pop-Up Store Awards", "org": "Popply"}],
+            ensure_ascii=False)
+        project = Project.query.first()
+        project.my_role_en = "Planning & Operations Planning & Operations Lead, Agency Management"
+        project.title = "빙그레X더현대서울 팝업스토어 기획·운영"
+        project.title_en = "tvN Variety Program Production – City girls on the climb"
+        project.period = "2025.05 – 2025. 11"
+        db.session.commit()
+
+        normalize_public_content()
+        normalize_public_content()
+
+        exp = profile.experience_en[0]
+        assert exp["period"] == "2019.07 – 2022.03"
+        assert exp["role"] == "Producer / AC (Assistant Creator)"
+        assert profile.education[0]["period"] == "2013.03 – 2019.08"
+        assert profile.awards_en[0]["title"] == "2025 Korea Pop-Up Store Awards Grand Prize"
+        assert project.my_role_en == "Planning & Operations Lead, Agency Management"
+        assert project.title == "빙그레×더현대서울 팝업스토어 기획·운영"
+        assert project.title_en == "tvN Variety Program Production – Mountain City Women"
+        assert project.period == "2025.05 – 2025.11"
