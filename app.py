@@ -201,7 +201,7 @@ class Project(db.Model):
     image_filename = db.Column(db.String(300), default='')  # 레거시
     detail_text = db.Column(db.Text, default='')
     links_json = db.Column(db.Text, default='[]')
-    kpi = db.Column(db.String(300), default='')
+    kpi = db.Column(db.Text, default='')
     my_role = db.Column(db.String(200), default='')
     category = db.Column(db.String(100), default='')
     # English
@@ -464,8 +464,11 @@ def _normalize_copy(value):
         ('빙그레X더현대서울', '빙그레×더현대서울'),
     ]:
         normalized = normalized.replace(old, new)
-    normalized = re.sub(r'Korea Pop-Up Store Awards(?! Grand Prize)',
-                        'Korea Pop-Up Store Awards Grand Prize', normalized)
+    # 이전 규칙이 만든 'Grand Prize' 중복 표기 복구
+    normalized = normalized.replace('Korea Pop-Up Store Awards Grand Prize – Grand Prize',
+                                    'Korea Pop-Up Store Awards – Grand Prize')
+    normalized = normalized.replace('Grand Prize at the 2025 Korea Pop-Up Store Awards Grand Prize',
+                                    'Grand Prize at the 2025 Korea Pop-Up Store Awards')
     return normalized
 
 
@@ -502,6 +505,8 @@ def _normalize_json_entries(raw):
             val = _normalize_copy(val)
             if key == 'period':
                 val = _normalize_period(val)
+            if key == 'title' and val.strip() in ('2025 Korea Pop-Up Store Awards', 'Korea Pop-Up Store Awards'):
+                val = val.strip() + ' Grand Prize'
             entry[key] = val
     return json.dumps(entries, ensure_ascii=False)
 
@@ -588,6 +593,7 @@ def init_db():
             "ALTER TABLE profile ADD COLUMN og_image_url VARCHAR(500) DEFAULT ''",
             "ALTER TABLE profile ADD COLUMN open_to_work BOOLEAN DEFAULT FALSE",
             "ALTER TABLE project ADD COLUMN kpi VARCHAR(300) DEFAULT ''",
+            "ALTER TABLE project ALTER COLUMN kpi TYPE TEXT",  # PostgreSQL only; SQLite ignores
             "ALTER TABLE project ADD COLUMN my_role VARCHAR(200) DEFAULT ''",
             "ALTER TABLE project ADD COLUMN category VARCHAR(100) DEFAULT ''",
             "ALTER TABLE profile ADD COLUMN profile_image_filename VARCHAR(300) DEFAULT ''",

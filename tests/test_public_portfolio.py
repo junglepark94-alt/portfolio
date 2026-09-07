@@ -100,6 +100,8 @@ def test_public_content_normalization_fixes_deployed_profile_copy(portfolio_app)
         project.title = "빙그레X더현대서울 팝업스토어 기획·운영"
         project.title_en = "tvN Variety Program Production – City girls on the climb"
         project.period = "2025.05 – 2025. 11"
+        project.description_en = "Winner of the 2025 Korea Pop-Up Store Awards Grand Prize – Grand Prize"
+        project.detail_text_en = "It won the Grand Prize at the 2025 Korea Pop-Up Store Awards Grand Prize, receiving recognition."
         db.session.commit()
 
         normalize_public_content()
@@ -114,3 +116,5 @@ def test_public_content_normalization_fixes_deployed_profile_copy(portfolio_app)
         assert project.title == "빙그레×더현대서울 팝업스토어 기획·운영"
         assert project.title_en == "tvN Variety Program Production – City Girls on the Climb"
         assert project.period == "2025.05 – 2025.11"
+        assert project.description_en == "Winner of the 2025 Korea Pop-Up Store Awards – Grand Prize"
+        assert project.detail_text_en == "It won the Grand Prize at the 2025 Korea Pop-Up Store Awards, receiving recognition."
