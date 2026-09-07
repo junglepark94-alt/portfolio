@@ -8,3 +8,5 @@ instance/
 venv/
 .DS_Store
 backups/
+pdf/assets/
+tmp/
