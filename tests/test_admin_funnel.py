@@ -22,6 +22,19 @@ def test_duplicate_event_rows_are_rejected(portfolio_app):
     assert VisitEvent.query.count() == 1
 
 
+def test_same_event_on_a_later_day_is_a_separate_row(portfolio_app):
+    """유니크 제약에 date가 포함되어야 기간 필터가 의도대로 동작한다.
+
+    date가 빠지면 재방문자의 행이 첫 방문 날짜로 고정돼 최근 기간 집계에서 사라진다.
+    """
+    db.session.add(_ev('s1', 'visit'))
+    db.session.add(VisitEvent(session_key='s1', stage='visit', project_id=0,
+                              detail='', date='2026-01-01'))
+    db.session.commit()
+
+    assert VisitEvent.query.filter_by(session_key='s1', stage='visit').count() == 2
+
+
 def test_different_projects_are_separate_rows(portfolio_app):
     db.session.add(_ev('s1', 'project_detail', project_id=1))
     db.session.add(_ev('s1', 'project_detail', project_id=2))
