@@ -187,6 +187,25 @@ def cached_youtube_thumb(video_id, width_pt, quality):
     return target
 
 
+def cached_local_tile(name, width_pt, quality):
+    """Resized copy of a curated still committed under data/astra_tiles."""
+    src = os.path.join(base.ROOT, "data", "astra_tiles", name)
+    if not os.path.exists(src):
+        print(f"  tile missing: {name}")
+        return None
+    px = max(240, int(round(width_pt / 72.0 * base.RENDER_DPI)))
+    os.makedirs(base.CACHE_DIR, exist_ok=True)
+    stem = os.path.splitext(os.path.basename(src))[0]
+    target = os.path.join(base.CACHE_DIR, f"tile_{stem}_{px}_{quality}.jpg")
+    if not os.path.exists(target):
+        with Image.open(src) as im:
+            im = im.convert("RGB")
+            if im.width > px:
+                im = im.resize((px, max(1, round(im.height * px / im.width))), Image.LANCZOS)
+            im.save(target, "JPEG", quality=quality, optimize=True, progressive=True)
+    return target
+
+
 def _aspect(path):
     try:
         with Image.open(path) as im:
@@ -358,35 +377,53 @@ def render_project(doc, content, idx, total, pj):
     # is two cropped thumbnails when the site has them, otherwise topic chips.
     lx, lw = M, 350
     hero_top = 420
-    # Tiles under the hero: the site's extra images first, then the project's
-    # own YouTube videos listed in the JSON (for projects the site holds only
-    # one still for). Up to three.
-    extra = [t for t in (_image(doc, site, i, 340) for i in (1, 2, 3)) if t]
-    for vid in pj.get("videos") or []:
-        if len(extra) >= 3:
-            break
-        t = cached_youtube_thumb(vid, 340, doc.quality)
-        if t:
-            extra.append(t)
-    extra = extra[:3]
-    vertical = sum(1 for t in extra if _aspect(t) < 0.75) >= 2
-    # Vertical sources (Shorts frames) get tall tiles and a slightly shorter
-    # hero; landscape sources get 16:9 cells, which a YouTube still fills
-    # without any crop. Either way the stats row below stays clear.
-    hero_h, tile_h = (158, 92) if vertical else (188, 63)
+    # Media tiles under the hero, in priority order: curated stills committed
+    # under data/astra_tiles, then the site's own extra images, then the
+    # project's YouTube videos (for projects the site holds a single still of).
+    # A tile entry is a filename, or {"file": ..., "focus": 0..1} to say which
+    # band of a tall still to keep.
+    tiles, focuses = [], []
+    for entry in pj.get("tiles") or []:
+        name = entry if isinstance(entry, str) else entry.get("file")
+        path = cached_local_tile(name, 340, doc.quality)
+        if path:
+            tiles.append(path)
+            focuses.append(None if isinstance(entry, str) else entry.get("focus"))
+    if not tiles:
+        tiles = [t for t in (_image(doc, site, i, 340) for i in (1, 2, 3)) if t]
+        for vid in pj.get("videos") or []:
+            if len(tiles) >= 3:
+                break
+            t = cached_youtube_thumb(vid, 340, doc.quality)
+            if t:
+                tiles.append(t)
+        focuses = [None] * len(tiles)
+    tiles, focuses = tiles[:3], focuses[:3]
+
+    vertical = sum(1 for t in tiles if _aspect(t) < 0.8) >= 2
+    # Vertical stills need tall cells, so the hero gives up height to them;
+    # landscape stills fill a 16:9 cell with no crop at all.
+    hero_h, tile_h = (145, 127) if vertical else (188, 63)
     hero = _image(doc, site, 0, 700)
     if hero:
         draw_image_cover(c, hero, lx, hero_top - hero_h, lw, hero_h, radius=3, focus_y=0.35)
     row_top = hero_top - hero_h - 8
-    if len(extra) >= 2:
-        n = len(extra)
+    if len(tiles) >= 2:
+        n = len(tiles)
         tw = (lw - 8 * (n - 1)) / n
-        th = tile_h if vertical else min(tile_h, round(tw * 9 / 16))
-        for i, t in enumerate(extra):
+        if vertical:
+            th = tile_h
+        else:
+            # Match the widest source so nothing is cropped off the sides — a
+            # 2:1 frame in a 16:9 cell would lose the ends of its caption.
+            th = min(tile_h, round(tw / max(_aspect(t) for t in tiles)))
+        for i, t in enumerate(tiles):
             a = _aspect(t)
-            # a Shorts frame keeps its face band (0.4); a portrait screenshot
+            # a tall still keeps its subject band (0.35); a portrait screenshot
             # keeps its picture, not its caption (0.18); landscape stays centred
-            focus = 0.4 if a < 0.75 else (0.18 if a < 1.0 else 0.5)
+            focus = focuses[i]
+            if focus is None:
+                focus = 0.35 if a < 0.8 else (0.18 if a < 1.0 else 0.5)
             draw_image_cover(c, t, lx + i * (tw + 8), row_top - th, tw, th, radius=3, focus_y=focus)
     elif pj.get("chips"):
         cw, ch = (lw - 16) / 3, 24
