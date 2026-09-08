@@ -343,6 +343,29 @@ def record_event(stage, project_id=0, detail=''):
         return False
 
 
+def prune_visit_events(retention_days=VISIT_EVENT_RETENTION_DAYS):
+    """보관 기간이 지난 이벤트를 삭제한다. 하루 1회만 실제로 수행."""
+    today = _today_kst()
+    marker = db.session.get(ContentSync, 'visit_event_pruned_on')
+    if marker is not None and marker.value == today:
+        return 0
+
+    cutoff = (datetime.now(KST).date() - timedelta(days=retention_days)).strftime('%Y-%m-%d')
+    try:
+        removed = VisitEvent.query.filter(VisitEvent.date < cutoff).delete(
+            synchronize_session=False)
+        if marker is None:
+            marker = ContentSync(key='visit_event_pruned_on')
+            db.session.add(marker)
+        marker.value = today
+        marker.applied_at = datetime.utcnow()
+        db.session.commit()
+        return removed
+    except Exception:
+        db.session.rollback()
+        return 0
+
+
 def track_visit():
     """공개 페이지 방문 기록. 같은 세션은 하루 1회만 카운트."""
     try:

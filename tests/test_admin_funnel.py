@@ -126,3 +126,16 @@ def test_empty_input_is_all_zero():
     assert stats['sessions'] == 0
     assert stats['conversions'] == []
     assert stats['ranking'] == []
+
+
+def test_prune_removes_events_past_retention_once_a_day(portfolio_app):
+    from app import prune_visit_events
+
+    db.session.add(VisitEvent(session_key='old', stage='visit', project_id=0,
+                              detail='', date='2020-01-01'))
+    db.session.add(_ev('new', 'visit'))
+    db.session.commit()
+
+    assert prune_visit_events() == 1
+    assert [r.session_key for r in VisitEvent.query.all()] == ['new']
+    assert prune_visit_events() == 0
