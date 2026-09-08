@@ -1597,6 +1597,38 @@ def gallery_reorder():
     return app.response_class(response=_json.dumps({'ok': True}), mimetype='application/json')
 
 
+# ── Public Funnel Tracking ────────────────────────────────────
+
+@app.route('/api/track', methods=['POST'])
+@csrf.exempt
+def api_track():
+    """공개 페이지 퍼널 이벤트 수집. 성공·무시·중복 모두 204."""
+    if _rate_limited(f'track:{_client_ip()}', max_hits=60, window=60):
+        return ('', 204)
+
+    data = request.get_json(silent=True) or {}
+    stage = str(data.get('stage') or '')
+    if stage not in TRACKABLE_STAGES:
+        return ('', 204)
+
+    detail = str(data.get('detail') or '')
+    if stage == 'convert':
+        if detail not in CONVERT_KINDS:
+            return ('', 204)
+    else:
+        detail = ''
+
+    try:
+        project_id = int(data.get('project_id') or 0)
+    except (TypeError, ValueError):
+        project_id = 0
+    if stage != 'project_detail':
+        project_id = 0
+
+    record_event(stage, project_id, detail)
+    return ('', 204)
+
+
 # ── YouTube API Proxy ────────────────────────────────────
 
 @app.route('/api/youtube')

@@ -34,3 +34,30 @@ def test_index_records_one_visit_event_per_session(client):
     client.get('/')
 
     assert VisitEvent.query.filter_by(stage='visit').count() == 1
+
+
+def test_track_endpoint_records_once_and_ignores_unknown_stage(client):
+    assert client.post('/api/track', json={'stage': 'projects_view'}).status_code == 204
+    client.post('/api/track', json={'stage': 'projects_view'})
+    assert client.post('/api/track', json={'stage': 'admin_wipe'}).status_code == 204
+
+    assert [r.stage for r in VisitEvent.query.all()] == ['projects_view']
+
+
+def test_track_endpoint_rejects_forged_visit_stage(client):
+    client.post('/api/track', json={'stage': 'visit'})
+
+    assert VisitEvent.query.filter_by(stage='visit').count() == 0
+
+
+def test_track_endpoint_rejects_unknown_convert_kind(client):
+    client.post('/api/track', json={'stage': 'convert', 'detail': 'bitcoin'})
+
+    assert VisitEvent.query.count() == 0
+
+
+def test_track_endpoint_scrubs_irrelevant_fields(client):
+    client.post('/api/track', json={'stage': 'convert', 'detail': 'resume', 'project_id': 7})
+
+    row = VisitEvent.query.one()
+    assert (row.stage, row.detail, row.project_id) == ('convert', 'resume', 0)
