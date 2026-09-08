@@ -1,6 +1,7 @@
 import pytest
 from sqlalchemy.exc import IntegrityError
 
+from analytics import build_funnel_stats
 from app import VisitEvent, _today_kst, db
 
 
@@ -61,3 +62,67 @@ def test_track_endpoint_scrubs_irrelevant_fields(client):
 
     row = VisitEvent.query.one()
     assert (row.stage, row.detail, row.project_id) == ('convert', 'resume', 0)
+
+
+def test_funnel_is_monotonic_when_a_stage_is_missing():
+    events = [
+        ('s1', 'visit', 0, ''),
+        ('s1', 'project_detail', 3, ''),   # projects_view 유실
+        ('s2', 'visit', 0, ''),
+    ]
+
+    stats = build_funnel_stats(events, {3: '프로젝트 A'})
+
+    counts = [s['count'] for s in stats['steps']]
+    assert counts == [2, 1, 1, 0]
+    assert counts == sorted(counts, reverse=True)
+    assert stats['steps'][0]['rate'] is None
+    assert stats['steps'][1]['rate'] == 50.0
+    assert stats['sessions'] == 2
+
+
+def test_widths_are_relative_to_the_first_stage():
+    events = [
+        ('s1', 'visit', 0, ''), ('s1', 'projects_view', 0, ''),
+        ('s2', 'visit', 0, ''), ('s3', 'visit', 0, ''), ('s4', 'visit', 0, ''),
+    ]
+
+    stats = build_funnel_stats(events, {})
+
+    assert [s['width'] for s in stats['steps']] == [100.0, 25.0, 0.0, 0.0]
+
+
+def test_conversion_breakdown_counts_unique_sessions():
+    events = [
+        ('s1', 'visit', 0, ''), ('s1', 'convert', 0, 'resume'),
+        ('s2', 'visit', 0, ''), ('s2', 'convert', 0, 'resume'),
+        ('s2', 'convert', 0, 'email'),
+    ]
+
+    stats = build_funnel_stats(events, {})
+
+    assert stats['conversions'][0] == {'kind': 'resume', 'label': '이력서 다운로드', 'count': 2}
+    assert stats['conversions'][1] == {'kind': 'email', 'label': '이메일', 'count': 1}
+    assert stats['overall'] == 100.0
+
+
+def test_ranking_labels_a_deleted_project_and_respects_top_n():
+    events = [('s1', 'visit', 0, ''), ('s1', 'project_detail', 99, ''),
+              ('s1', 'project_detail', 1, ''), ('s2', 'project_detail', 1, '')]
+
+    stats = build_funnel_stats(events, {1: '프로젝트 A'}, top_n=1)
+    assert stats['ranking'] == [{'project_id': 1, 'title': '프로젝트 A', 'count': 2}]
+
+    full = build_funnel_stats(events, {1: '프로젝트 A'})
+    assert full['ranking'][1] == {'project_id': 99, 'title': '삭제됨 (#99)', 'count': 1}
+
+
+def test_empty_input_is_all_zero():
+    stats = build_funnel_stats([], {})
+
+    assert [s['count'] for s in stats['steps']] == [0, 0, 0, 0]
+    assert [s['width'] for s in stats['steps']] == [0.0, 0.0, 0.0, 0.0]
+    assert stats['overall'] == 0.0
+    assert stats['sessions'] == 0
+    assert stats['conversions'] == []
+    assert stats['ranking'] == []
