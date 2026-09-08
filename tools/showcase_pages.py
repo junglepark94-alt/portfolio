@@ -25,7 +25,7 @@ from reportlab.pdfbase import pdfmetrics
 import build_general_portfolio_pdf as base
 
 REQUIRED_KEYS = ("portfolio_summary", "experience_map", "working_method",
-                 "showcase_production_titles")
+                 "showcase_production_titles", "impact_column_projects")
 
 
 def load_showcase_content(data):
@@ -41,6 +41,7 @@ def load_showcase_content(data):
         "experience_map": data["experience_map"],
         "working_method": data["working_method"],
         "production_titles": data["showcase_production_titles"],
+        "impact_column_projects": data["impact_column_projects"],
     }
 
 
@@ -71,6 +72,25 @@ def split_projects(projects, production_titles):
     return main, production, missing
 
 
+
+def first_image_for(doc, title_text, width_pt):
+    """Cached path to the first image of the scraped project with this title.
+
+    Titles are matched the way split_projects matches them (whitespace
+    normalised). Returns None when the title is absent or the project has no
+    images, so callers can lay out without a picture.
+    """
+    wanted = _norm(title_text)
+    for project in doc.data.get("projects") or []:
+        if _norm(project.get("title")) != wanted:
+            continue
+        images = project.get("images") or []
+        if not images:
+            return None
+        return base.cached_image(doc.data["site"], images[0], width_pt, doc.quality)
+    return None
+
+
 def card_grid(x, y, width, height, cols, rows, gap):
     """Even card grid inside the given box, listed left-to-right, top row first.
 
@@ -96,16 +116,24 @@ def ensure_fonts_for_tests():
     base.ensure_fonts()
 
 
+# A number keeps its digits, thousands separators and decimal point together, so
+# a line never breaks inside one — "2,400만" must not wrap to "2," / "400만".
+_ATOM = re.compile(r"\d[\d,.]*\d|\d|.", re.S)
+
+
 def _wrap(text, width, font, size):
+    """Break text to `width`, one CJK character at a time but never inside a number."""
     lines = []
     for paragraph in (text or "").split("\n"):
         line = ""
-        for ch in paragraph:
-            if pdfmetrics.stringWidth(line + ch, font, size) <= width:
-                line += ch
-            else:
+        for atom in _ATOM.findall(paragraph):
+            if pdfmetrics.stringWidth(line + atom, font, size) <= width:
+                line += atom
+            elif line:
                 lines.append(line)
-                line = ch
+                line = atom
+            else:                      # a single atom wider than the box
+                lines.append(atom)
         lines.append(line)
     return lines
 
@@ -395,6 +423,12 @@ def render_impact(doc, content):
         ("글로벌 수출 브랜드 채널", "국가별 문화 코드와 현지 알고리즘에 맞는 시리즈를 설계해 제품 인지도와 오가닉 구독자를 함께 확보했습니다."),
         ("온라인 → 오프라인", "온라인 세계관을 공간·굿즈·커머스로 확장하고, 현장의 콘텐츠가 다시 SNS로 돌아오는 순환을 설계했습니다."),
     ]
+    # One supporting photo per column, pulled from the matching site project.
+    # 218pt wide at 16:9 so the source thumbnails are shown whole, not cropped.
+    col_w = 218
+    img_h = round(col_w * 9 / 16)
+    col_titles = content["impact_column_projects"]
+    body_ends = []
     for i, (head, body) in enumerate(columns):
         x = base.MARGIN + i * 255
         c.setFont("SansB", 13)
@@ -403,7 +437,18 @@ def render_impact(doc, content):
         c.setStrokeColor(base.ACCENT)
         c.setLineWidth(2)
         c.line(x, 275, x + 44, 275)
-        draw_text(c, body, x, 250, 218, size=9.2, leading=16)
+        body_y, _ = draw_text(c, body, x, 250, col_w, size=9.2, leading=16)
+        body_ends.append(body_y)
+
+    # All three photos sit on one line, below the longest column's body, so a
+    # column whose text wraps to an extra line does not push its picture down.
+    img_top = min(body_ends) - 24
+    for i in range(len(columns)):
+        photo = (first_image_for(doc, col_titles[i], 400)
+                 if i < len(col_titles) else None)
+        if photo:
+            draw_image_cover(c, photo, base.MARGIN + i * 255, img_top - img_h,
+                             col_w, img_h, radius=8)
 
     doc.footer("BRAND & CONTENT PORTFOLIO")
 
@@ -433,6 +478,25 @@ def render_experience_map(doc, content):
     doc.footer("BRAND & CONTENT PORTFOLIO")
 
 
+def _mini_case_height(project, width):
+    """Card height that exactly fits this project's content.
+
+    The production cards hold a 16:9 still plus a variable amount of text, so a
+    fixed height either clips a long entry or leaves an empty band under a short
+    one. Mirrors the block order and gaps in _mini_case below.
+    """
+    inner = width - 32
+    title_lines = min(len(_wrap(project["title"], inner, "SansB", 11.5)), 2)
+    desc_lines = min(len(_wrap(project.get("desc") or "", inner, "Sans", 8.1)), 3)
+    bullets = base.split_kpi(project.get("kpi"))[1][:3]
+    h = round(width * 9 / 16) + 23          # still, then the title's first baseline
+    h += (title_lines - 1) * 16 + 22        # title block, gap to role
+    h += 22                                 # role line, gap to desc
+    h += (desc_lines - 1) * 13 + 24         # desc block, gap to bullets
+    h += max(len(bullets), 1) * 17          # bullet rows
+    return h + 14                           # bottom padding
+
+
 def _mini_case(doc, project, x, y, width, height):
     """Ported from build_portfolio_pdf.mini_case (220-236).
 
@@ -450,10 +514,14 @@ def _mini_case(doc, project, x, y, width, height):
     images = project.get("images") or []
     # 400 is render resolution for the card's image box, not the drawn size
     photo = base.cached_image(doc.data["site"], images[0], 400, doc.quality) if images else None
-    draw_image_cover(c, photo, x, y + height - 122, width, 122, radius=10)
+    # The sources are 16:9 stills. The old 122pt box was ~3:1, so draw_image_cover
+    # cropped away about 40% of each frame's height and left the card bottom empty.
+    # A 16:9 box shows the whole still and takes up that dead space.
+    img_h = round(width * 9 / 16)
+    draw_image_cover(c, photo, x, y + height - img_h, width, img_h, radius=10)
 
     c.setFillColor(base.TEXT)
-    title_y, _ = draw_text(c, project["title"], x + 16, y + height - 145, width - 32,
+    title_y, _ = draw_text(c, project["title"], x + 16, y + height - img_h - 23, width - 32,
                             size=11.5, leading=16, font="SansB", max_lines=2)
 
     c.setFillColor(base.MUTED)
@@ -462,7 +530,7 @@ def _mini_case(doc, project, x, y, width, height):
                            size=7.5, leading=13, font="Sans", color=base.MUTED, max_lines=1)
 
     desc_y, _ = draw_text(c, project.get("desc") or "", x + 16, role_y - 22, width - 32,
-                           size=8.1, leading=13, color=base.MUTED, max_lines=4)
+                           size=8.1, leading=13, color=base.MUTED, max_lines=3)
 
     _, bullets = base.split_kpi(project.get("kpi"))
     yy = desc_y - 24
@@ -482,7 +550,14 @@ def render_production_foundation(doc, content, production):
     title(c, "사람과 이야기를 끝까지 완성하는 제작 현장에서 시작했습니다",
           y=base.PAGE_H - 96, size=22)
 
-    cells = card_grid(base.MARGIN, 66, base.PAGE_W - 2 * base.MARGIN, 390,
+    # Both cards take the height the taller one needs, so they stay a matched
+    # pair with no empty band under the shorter entry. Top edge stays fixed
+    # under the title; the cards grow downward.
+    grid_w = base.PAGE_W - 2 * base.MARGIN
+    card_w = (grid_w - 24) / 2
+    card_h = max((_mini_case_height(p, card_w) for p in production), default=400)
+    card_h = min(card_h, 400)
+    cells = card_grid(base.MARGIN, 466 - card_h, grid_w, card_h,
                        cols=2, rows=1, gap=24)
     for project, (x, y, w, h) in zip(production, cells):
         _mini_case(doc, project, x, y, w, h)
