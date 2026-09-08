@@ -303,7 +303,7 @@ VISIT_EVENT_RETENTION_DAYS = 180
 
 
 class VisitEvent(db.Model):
-    """퍼널 단계별 익명 이벤트. 세션당 (stage, project_id, detail) 조합 1회."""
+    """퍼널 단계별 익명 이벤트. 세션당 하루 1회 (stage, project_id, detail) 조합 1회."""
     __tablename__ = 'visit_event'
     id = db.Column(db.Integer, primary_key=True)
     session_key = db.Column(db.String(16), index=True, nullable=False)
@@ -313,7 +313,7 @@ class VisitEvent(db.Model):
     date = db.Column(db.String(10), index=True, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     __table_args__ = (
-        db.UniqueConstraint('session_key', 'stage', 'project_id', 'detail',
+        db.UniqueConstraint('session_key', 'stage', 'project_id', 'detail', 'date',
                             name='uq_visit_event_session_stage'),
     )
 
@@ -369,6 +369,7 @@ def prune_visit_events(retention_days=VISIT_EVENT_RETENTION_DAYS):
 
 def track_visit():
     """공개 페이지 방문 기록. 같은 세션은 하루 1회만 카운트."""
+    prune_visit_events()
     try:
         record_event('visit')
         today = _today_kst()
@@ -1154,17 +1155,21 @@ def admin_dashboard():
         'total': sum(rows.values()),
     }
 
-    # 퍼널 통계: 7일 / 30일 두 벌을 한 번에 렌더하고 화면에서 토글한다
+    # 퍼널 통계: 30일 치를 한 번만 조회하고 7일/30일로 나눠 집계한다 (7일은 30일의 부분집합)
     prune_visit_events()
     titles = {p.id: p.title for p in projects}
-    funnel = {}
-    for span in (7, 30):
-        since = (today - timedelta(days=span - 1)).strftime('%Y-%m-%d')
-        rows = db.session.query(
-            VisitEvent.session_key, VisitEvent.stage,
-            VisitEvent.project_id, VisitEvent.detail,
-        ).filter(VisitEvent.date >= since).all()
-        funnel[str(span)] = build_funnel_stats(rows, titles)
+    since_30 = (today - timedelta(days=29)).strftime('%Y-%m-%d')
+    since_7 = (today - timedelta(days=6)).strftime('%Y-%m-%d')
+    event_rows = db.session.query(
+        VisitEvent.session_key, VisitEvent.stage,
+        VisitEvent.project_id, VisitEvent.detail, VisitEvent.date,
+    ).filter(VisitEvent.date >= since_30).all()
+    events_30 = [row[:4] for row in event_rows]
+    events_7 = [row[:4] for row in event_rows if row[4] >= since_7]
+    funnel = {
+        '7': build_funnel_stats(events_7, titles),
+        '30': build_funnel_stats(events_30, titles),
+    }
     funnel_meta = {'since': db.session.query(db.func.min(VisitEvent.date)).scalar() or '-'}
 
     return render_template('admin.html', projects=projects, profile=profile,
