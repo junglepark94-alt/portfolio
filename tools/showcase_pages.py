@@ -401,6 +401,7 @@ def _mini_case(doc, project, x, y, width, height):
     c.roundRect(x, y, width, height, 10, fill=1, stroke=0)
 
     images = project.get("images") or []
+    # 400 is render resolution for the card's image box, not the drawn size
     photo = base.cached_image(doc.data["site"], images[0], 400, doc.quality) if images else None
     draw_image_cover(c, photo, x, y + height - 122, width, 122, radius=10)
 
@@ -412,7 +413,8 @@ def _mini_case(doc, project, x, y, width, height):
     c.setFont("Sans", 7.5)
     c.setFillColor(base.MUTED)
     role_y = title_y - 22
-    c.drawString(x + 16, role_y, project.get("role") or "")
+    role_y, _ = draw_text(c, project.get("role") or "", x + 16, role_y, width - 32,
+                           size=7.5, leading=13, font="Sans", color=base.MUTED, max_lines=1)
 
     desc_y, _ = draw_text(c, project.get("desc") or "", x + 16, role_y - 22, width - 32,
                            size=8.1, leading=13, color=base.MUTED, max_lines=4)
@@ -543,7 +545,19 @@ def render_closing(doc, content):
         match = re.search(r'\d{4}', award.get("period", ""))
         return int(match.group()) if match else 0
     sorted_awards = sorted(doc.data["awards"], key=extract_year, reverse=True)
+    # Boundary: card y origin (112) + inner padding (top padding = 442 - 408 = 34)
+    boundary = 146
     for award in sorted_awards:
+        # Predict where this award would end to check for overflow
+        title_lines = len(_wrap(award["main"], 155, "SansB", 9))
+        sub_lines = len(_wrap(award["sub"], 155, "Sans", 7.5))
+        main_y_pred = yy - (title_lines - 1) * 14
+        sub_y_pred = (main_y_pred - 14) - (sub_lines - 1) * 12
+
+        # Break before drawing an award whose block would cross the boundary
+        if sub_y_pred < boundary:
+            break
+
         c.setFont("SerifB", 13)
         c.setFillColor(base.ACCENT)
         c.drawString(568, yy, award["period"])
