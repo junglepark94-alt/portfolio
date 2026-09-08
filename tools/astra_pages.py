@@ -9,10 +9,13 @@ Copy comes from data/astra_portfolio.json. Images, links, experience, education
 and awards come from the scraped site. Every image is drawn with a crop-to-fill
 box (never letterboxed), so mixed source aspect ratios do not leave bars.
 """
+import os
 import re
+import urllib.request
 from datetime import date
 
 import qrcode
+from PIL import Image
 from reportlab.lib.colors import HexColor
 from reportlab.pdfbase import pdfmetrics
 
@@ -24,8 +27,8 @@ LIGHT_BG = HexColor("#f7f5ef")
 DARK_BG = HexColor("#252722")
 TEXT = HexColor("#252722")
 TEXT_L = HexColor("#f7f5ef")           # text on dark pages
-MUTED = HexColor("#8f918a")
-MUTED_L = HexColor("#a3a59e")
+MUTED = HexColor("#5f625b")
+MUTED_L = HexColor("#c6c8c1")
 ACCENT = HexColor("#c44f2f")           # on light pages
 ACCENT_L = HexColor("#f08964")         # on dark pages
 RULE = HexColor("#dedbd2")
@@ -111,12 +114,12 @@ def _chrome(doc, label, dark=False):
     """Running header + footer. Page count uses the two-pass total when known."""
     c = doc.c
     fg, mu, ru = (TEXT_L, MUTED_L, RULE_L) if dark else (TEXT, MUTED, RULE)
-    _t(c, "JONGGEOL PARK", M, H - 34, "SansB", 6.5, fg)
-    _t(c, label, 240, H - 34, "Sans", 6.5, mu)
+    _t(c, "JONGGEOL PARK", M, H - 34, "SansB", 7, fg)
+    _t(c, label, 240, H - 34, "Sans", 7, mu)
     _rule(c, M, RIGHT, H - 47, ru)
     _rule(c, M, RIGHT, 31, ru)
-    _t(c, "BRAND MARKETING / CONTENT STRATEGY", M, 18, "Sans", 6, mu)
-    _t(c, f"{date.today():%Y.%m}  /  PORTFOLIO", 600, 18, "Sans", 6, mu)
+    _t(c, "BRAND MARKETING / CONTENT STRATEGY", M, 18, "Sans", 6.6, mu)
+    _t(c, f"{date.today():%Y.%m}  /  PORTFOLIO", 600, 18, "Sans", 6.6, mu)
     total = f"{doc.total:02d}" if doc.total else "--"
     _rt(c, f"{doc.page_no:02d} / {total}", RIGHT, 18, "SansB", 7, fg)
 
@@ -142,6 +145,54 @@ def _image(doc, project, index, width_pt=560):
     if index >= len(images):
         return None
     return base.cached_image(doc.data["site"], images[index], width_pt, doc.quality)
+
+
+def cached_youtube_thumb(video_id, width_pt, quality):
+    """Thumbnail of one of the user's own videos, cached like site images.
+
+    Shorts expose a clean vertical frame (`oar2`); regular videos only a 16:9
+    `maxresdefault`. `hqdefault` is the last resort — it is 4:3 with black bars,
+    so its 16:9 middle is kept. Returns None when nothing could be fetched.
+    """
+    os.makedirs(base.ORIG_DIR, exist_ok=True)
+    os.makedirs(base.CACHE_DIR, exist_ok=True)
+    src = os.path.join(base.ORIG_DIR, f"ytv_{video_id}.jpg")
+    if not os.path.exists(src) or os.path.getsize(src) < 500:
+        for name in ("oar2", "maxresdefault", "hqdefault"):
+            try:
+                data = urllib.request.urlopen(
+                    f"https://i.ytimg.com/vi/{video_id}/{name}.jpg", timeout=20).read()
+            except Exception:
+                continue
+            if len(data) < 500:
+                continue
+            with open(src, "wb") as fh:
+                fh.write(data)
+            if name == "hqdefault":
+                with Image.open(src) as im:
+                    w, h = im.size
+                    im.convert("RGB").crop((0, int(h * 0.125), w, int(h * 0.875))).save(src, "JPEG", quality=92)
+            break
+        else:
+            print(f"  youtube thumbnail skipped {video_id}")
+            return None
+    px = max(240, int(round(width_pt / 72.0 * base.RENDER_DPI)))
+    target = os.path.join(base.CACHE_DIR, f"ytv_{video_id}_{px}_{quality}.jpg")
+    if not os.path.exists(target):
+        with Image.open(src) as im:
+            im = im.convert("RGB")
+            if im.width > px:
+                im = im.resize((px, max(1, round(im.height * px / im.width))), Image.LANCZOS)
+            im.save(target, "JPEG", quality=quality, optimize=True, progressive=True)
+    return target
+
+
+def _aspect(path):
+    try:
+        with Image.open(path) as im:
+            return im.width / im.height
+    except Exception:
+        return 16 / 9
 
 
 def _link_urls(project, labels):
@@ -170,7 +221,7 @@ def render_cover(doc, content):
     for i, line in enumerate(cv["headline_accent"]):
         _t(c, line, M, y, "SansXB", 30, ACCENT_L if i == len(cv["headline_accent"]) - 1 else TEXT_L)
         y -= 38
-    draw_text(c, cv["sub"], M, 300, 400, size=9.5, leading=16, color=MUTED_L)
+    draw_text(c, cv["sub"], M, 300, 400, size=10, leading=17, color=MUTED_L)
     _t(c, doc.data["name"], M, 190, "SansXB", 19, TEXT_L)
     _t(c, "Jonggeol Park", M, 172, "Sans", 8.5, MUTED_L)
 
@@ -185,7 +236,7 @@ def render_cover(doc, content):
     for line in cv["experience"]:
         _t(c, line, px, yy, "Sans", 8.5, TEXT_L)
         yy -= 16
-    _t(c, cv["tags"], px, yy - 6, "Sans", 6.5, MUTED_L)
+    _t(c, cv["tags"], px, yy - 6, "Sans", 7.2, MUTED_L)
 
 
 def render_profile(doc, content):
@@ -205,7 +256,7 @@ def render_profile(doc, content):
         _t(c, exp["period"], M + 124, yy, "Sans", 7.5, MUTED)
         yy, _ = draw_text(c, exp.get("role") or "", M, yy - 23, 360, size=8.3, leading=12, font="SansB")
         body = " · ".join(exp.get("bullets") or [])
-        yy, _ = draw_text(c, body, M, yy - 17, 360, size=7.6, leading=13, color=MUTED, max_lines=3)
+        yy, _ = draw_text(c, body, M, yy - 17, 360, size=8, leading=13.5, color=MUTED, max_lines=3)
         yy -= 48
         if yy < 120:
             break
@@ -262,14 +313,14 @@ def render_overview(doc, content, first_project_page, tail_page):
     _page(doc, "page-overview", ov["label"])
 
     _t(c, ov["headline"], M, 497, "SansXB", 22, TEXT)
-    draw_text(c, ov["sub"], M, 470, 700, size=8.5, leading=13, color=MUTED)
+    draw_text(c, ov["sub"], M, 470, 700, size=9, leading=14, color=MUTED)
 
     col_w, gap = 245, 20
     for i, (value, label) in enumerate(ov["stats"]):
         x = M + i * (col_w + gap)
         _rule(c, x, x + col_w, 440, ACCENT, 1.5)
         _t(c, value, x, 405, "SansXB", 28, TEXT)
-        draw_text(c, label, x, 385, col_w, size=8, leading=13, color=MUTED)
+        draw_text(c, label, x, 385, col_w, size=8.5, leading=13, color=MUTED)
 
     _t(c, ov["work_label"], M, 322, "SansB", 6.5, ACCENT)
     y = 300
@@ -281,14 +332,14 @@ def render_overview(doc, content, first_project_page, tail_page):
             last = first + g["count"] - 1
         _t(c, g["num"], M, y, "SansB", 8, ACCENT)
         _t(c, g["title"], M + 40, y, "SansB", 9, TEXT)
-        _t(c, g["items"], 330, y, "Sans", 7.8, MUTED)
+        _t(c, g["items"], 330, y, "Sans", 8.2, MUTED)
         _rt(c, f"{first:02d} - {last:02d}", RIGHT, y, "SansB", 7.5, TEXT)
         _rule(c, M, RIGHT, y - 14, RULE)
         _link_in(c, f"page-{first}", M, y - 12, RIGHT - M, 28)
         y -= 42
 
     foot = ov["footnote"].replace("{date}", f"{date.today():%Y.%m.%d}")
-    draw_text(c, foot, M, 52, RIGHT - M, size=5.8, leading=9, color=MUTED, max_lines=2)
+    draw_text(c, foot, M, 52, RIGHT - M, size=6.6, leading=10, color=MUTED, max_lines=2)
 
 
 def render_project(doc, content, idx, total, pj):
@@ -301,28 +352,42 @@ def render_project(doc, content, idx, total, pj):
     _t(c, pj["headline"][0], M, 500, "SansXB", 21, TEXT)
     _t(c, pj["headline"][1], M, 473, "SansXB", 21, TEXT)
     _t(c, pj["name"], M, 440, "SansB", 10.5, ACCENT)
-    _t(c, (site or {}).get("period") or "", COL2, 440, "Sans", 8, MUTED)
+    _t(c, (site or {}).get("period") or "", COL2, 440, "Sans", 8.5, MUTED)
 
     # Left column media. Hero is always a 16:9 crop-to-fill box; the row below
     # is two cropped thumbnails when the site has them, otherwise topic chips.
     lx, lw = M, 350
-    hero_h = 188                           # a hair under 16:9 (197) so the stats row clears the thumbs
     hero_top = 420
+    # Tiles under the hero: the site's extra images first, then the project's
+    # own YouTube videos listed in the JSON (for projects the site holds only
+    # one still for). Up to three.
+    extra = [t for t in (_image(doc, site, i, 340) for i in (1, 2, 3)) if t]
+    for vid in pj.get("videos") or []:
+        if len(extra) >= 3:
+            break
+        t = cached_youtube_thumb(vid, 340, doc.quality)
+        if t:
+            extra.append(t)
+    extra = extra[:3]
+    vertical = sum(1 for t in extra if _aspect(t) < 0.75) >= 2
+    # Vertical sources (Shorts frames) get tall tiles and a slightly shorter
+    # hero; landscape sources get 16:9 cells, which a YouTube still fills
+    # without any crop. Either way the stats row below stays clear.
+    hero_h, tile_h = (158, 92) if vertical else (188, 63)
     hero = _image(doc, site, 0, 700)
     if hero:
         draw_image_cover(c, hero, lx, hero_top - hero_h, lw, hero_h, radius=3, focus_y=0.35)
     row_top = hero_top - hero_h - 8
-    extra = [_image(doc, site, i, 340) for i in (1, 2, 3)]
-    extra = [t for t in extra if t]
     if len(extra) >= 2:
-        # Three 16:9 cells when the site has the images (a 16:9 still then
-        # needs no crop at all); otherwise two cells. Portrait sources are
-        # cropped from the top, where a screenshot's picture sits, not its caption.
-        n = 3 if len(extra) >= 3 else 2
+        n = len(extra)
         tw = (lw - 8 * (n - 1)) / n
-        th = min(63, round(tw * 9 / 16))
-        for i, t in enumerate(extra[:n]):
-            draw_image_cover(c, t, lx + i * (tw + 8), row_top - th, tw, th, radius=3, focus_y=0.18)
+        th = tile_h if vertical else min(tile_h, round(tw * 9 / 16))
+        for i, t in enumerate(extra):
+            a = _aspect(t)
+            # a Shorts frame keeps its face band (0.4); a portrait screenshot
+            # keeps its picture, not its caption (0.18); landscape stays centred
+            focus = 0.4 if a < 0.75 else (0.18 if a < 1.0 else 0.5)
+            draw_image_cover(c, t, lx + i * (tw + 8), row_top - th, tw, th, radius=3, focus_y=focus)
     elif pj.get("chips"):
         cw, ch = (lw - 16) / 3, 24
         for i, chip in enumerate(pj["chips"][:3]):
@@ -337,7 +402,7 @@ def render_project(doc, content, idx, total, pj):
         x = lx + i * stat_w
         size = 24 if pdfmetrics.stringWidth(value, "SansXB", 24) <= stat_w - 8 else 19
         _t(c, value, x, 120, "SansXB", size, TEXT)
-        draw_text(c, label, x, 102, stat_w - 8, size=7.2, leading=11, color=MUTED, max_lines=2)
+        draw_text(c, label, x, 102, stat_w - 8, size=7.6, leading=11.5, color=MUTED, max_lines=2)
 
     # Links
     xx = lx
@@ -345,23 +410,23 @@ def render_project(doc, content, idx, total, pj):
         xx = _arrow_link(c, label, xx, 62, url=url)
 
     # Footnote
-    draw_text(c, pj.get("footnote") or "", M, 46, RIGHT - M, size=5.8, leading=9, color=MUTED, max_lines=2)
+    draw_text(c, pj.get("footnote") or "", M, 46, RIGHT - M, size=6.4, leading=9.5, color=MUTED, max_lines=2)
 
     # Right column sections, flowing from the top.
     y = 406
     for label, body in pj["sections"]:
         _t(c, label, COL2, y, "SansB", 7.2, ACCENT)
-        y, _ = draw_text(c, body, COL2, y - 16, COL_W, size=8.3, leading=12.5, max_lines=4)
+        y, _ = draw_text(c, body, COL2, y - 16, COL_W, size=8.7, leading=13.2, max_lines=4)
         y -= 26
 
     # Highlight block anchored near the bottom of the column.
     hy = min(150, y - 4)
     _rule(c, COL2, RIGHT, hy, ACCENT, 0.8)
     _t(c, pj["highlight"][0], COL2, hy - 22, "SansB", 9.5, TEXT)
-    draw_text(c, pj["highlight"][1], COL2, hy - 38, COL_W, size=7.8, leading=11, color=MUTED, max_lines=2)
+    draw_text(c, pj["highlight"][1], COL2, hy - 38, COL_W, size=8.3, leading=11.5, color=MUTED, max_lines=2)
     role = (site or {}).get("role") or ""
-    _t(c, "역할", COL2, 68, "SansB", 7, MUTED)
-    _t(c, role, COL2 + 24, 68, "Sans", 7, MUTED)
+    _t(c, "역할", COL2, 68, "SansB", 7.5, MUTED)
+    _t(c, role, COL2 + 26, 68, "Sans", 7.5, MUTED)
 
 
 def render_production(doc, content):
@@ -369,7 +434,7 @@ def render_production(doc, content):
     _page(doc, f"page-{doc.page_no + 1}", pr["label"])
 
     _t(c, pr["headline"], M, 500, "SansXB", 21, TEXT)
-    draw_text(c, pr["sub"], M, 475, 700, size=8.5, leading=13, color=MUTED)
+    draw_text(c, pr["sub"], M, 475, 700, size=9, leading=14, color=MUTED)
 
     card_w = COL_W
     img_h = round(card_w * 9 / 16)       # 209
@@ -380,17 +445,17 @@ def render_production(doc, content):
         if img:
             draw_image_cover(c, img, x, 440 - img_h, card_w, img_h, radius=3)
         _t(c, card["name"], x, 205, "SansXB", 13, TEXT)
-        _rt(c, card["period"], x + card_w, 205, "Sans", 7.5, MUTED)
+        _rt(c, card["period"], x + card_w, 205, "Sans", 8, MUTED)
         draw_text(c, card["desc"], x, 182, card_w, size=8, leading=13, max_lines=2)
         value, label = card["stat"]
         _t(c, value, x, 118, "SansXB", 24, ACCENT)
         vw = pdfmetrics.stringWidth(value, "SansXB", 24)
-        draw_text(c, label, x + vw + 14, 126, card_w - vw - 14, size=7.5, leading=11, color=MUTED, max_lines=2)
+        draw_text(c, label, x + vw + 14, 126, card_w - vw - 14, size=8, leading=11.5, color=MUTED, max_lines=2)
         xx = x
         for lab, url in _link_urls(site, card.get("links") or [])[:2]:
             xx = _arrow_link(c, lab, xx, 70, url=url)
 
-    draw_text(c, pr.get("footnote") or "", M, 48, RIGHT - M, size=5.8, leading=9, color=MUTED, max_lines=2)
+    draw_text(c, pr.get("footnote") or "", M, 48, RIGHT - M, size=6.4, leading=9.5, color=MUTED, max_lines=2)
 
 
 def render_method(doc, content, first_project_page):
@@ -406,12 +471,12 @@ def render_method(doc, content, first_project_page):
         _t(c, st["num"], x, 366, "SansXB", 34, ACCENT_L)
         _rule(c, x, x + col_w, 334, RULE_L)
         _t(c, st["title"], x, 311, "SansB", 12, TEXT_L)
-        draw_text(c, st["body"], x, 284, col_w, size=8.3, leading=13, color=MUTED_L)
+        draw_text(c, st["body"], x, 284, col_w, size=8.7, leading=13.5, color=MUTED_L)
         _t(c, f"실제 적용  /  {st['case']}", x, 222, "SansB", 6.8, ACCENT_L)
-        y, _ = draw_text(c, st["applied"], x, 204, col_w, size=7.8, leading=12, color=TEXT_L, max_lines=4)
+        y, _ = draw_text(c, st["applied"], x, 204, col_w, size=8.2, leading=12.5, color=TEXT_L, max_lines=4)
         y -= 20
         for line in st["result"].split("\n"):
-            _t(c, "→ " + line, x, y, "SansB", 7.6, ACCENT_L)
+            _t(c, "→ " + line, x, y, "SansB", 8, ACCENT_L)
             y -= 12
         _arrow_link(c, "사례로 이동", x, y - 14, dest=f"page-{first_project_page + st['project']}",
                     color=TEXT_L)
@@ -424,7 +489,7 @@ def render_eod(doc, content):
     _t(c, eo["mark"], M, 430, "SansXB", 58, ACCENT_L)
     _t(c, eo["headline"][0], M, 370, "SansXB", 22, TEXT_L)
     _t(c, eo["headline"][1], M, 342, "SansXB", 22, TEXT_L)
-    draw_text(c, eo["sub"], M, 300, 420, size=9, leading=15, color=MUTED_L)
+    draw_text(c, eo["sub"], M, 300, 420, size=9.5, leading=15.5, color=MUTED_L)
 
     y = 200
     rows = (("EMAIL", d.get("email"), f"mailto:{d.get('email')}"),
@@ -440,7 +505,7 @@ def render_eod(doc, content):
 
     qx, qs = RIGHT - 96, 96
     _qr(c, d["site"], qx, 110, qs)
-    draw_text(c, eo["site_note"], COL2, 160, qx - COL2 - 24, size=7.5, leading=12, color=MUTED_L)
+    draw_text(c, eo["site_note"], COL2, 160, qx - COL2 - 24, size=8, leading=12.5, color=MUTED_L)
 
 
 # ── Document assembly ─────────────────────────────────────────────────
