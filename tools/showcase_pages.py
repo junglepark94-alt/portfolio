@@ -306,3 +306,81 @@ def render_profile(doc, content):
         yy -= 66
 
     doc.footer("BRAND & CONTENT PORTFOLIO")
+
+
+def render_impact(doc, content):
+    """Ported from build_portfolio_pdf.build_pdf, the '03 Impact' block (328-361)."""
+    c = doc.c
+    doc.begin_page()
+    summary = content["portfolio_summary"]
+    eyebrow(c, "IMPACT AT A GLANCE", base.MARGIN, base.PAGE_H - 58)
+    title_y = title(c, "서로 다른 채널에서 관계를 만들고, 브랜드 경험으로 확장했습니다",
+                     y=base.PAGE_H - 100, size=23)
+
+    # The brief's literal tiles = card_grid(base.MARGIN, 470, ..., 145, ...) puts
+    # the grid's top edge at 470 + 145 = 615pt, above PAGE_H (~595pt) and
+    # colliding with the title above it. Anchor the grid below the title's
+    # actual last baseline instead, keeping the same 145pt tile height and
+    # landing close to the original box's top edge (454pt).
+    tiles_top = title_y - 34
+    tiles = card_grid(base.MARGIN, tiles_top - 145, base.PAGE_W - 2 * base.MARGIN, 145,
+                       cols=4, rows=1, gap=16)
+    TILES = [
+        ("organic_subscribers", "국내·글로벌 채널 합산"),
+        ("global_content_views", "글로벌 콘텐츠 누적 조회"),
+        ("popup_commerce_revenue", "팝업 연계 커머스 매출"),
+        ("export_market_viewer_share", "글로벌 시리즈 수출국 시청 비중"),
+    ]
+    for i, ((key, label), (x, y, w, h)) in enumerate(zip(TILES, tiles)):
+        value = summary[key]
+        if i == 0:
+            value = f"오가닉 구독자 {value}"
+        c.setFillColor(base.SURFACE)
+        c.roundRect(x, y, w, h, 10, fill=1, stroke=0)
+        c.setFont("SansB", 16 if i == 0 else 22)
+        c.setFillColor(base.ACCENT)
+        c.drawString(x + 18, y + h - 42, value)
+        draw_text(c, label, x + 18, y + h - 69, w - 36, size=8.5, leading=13,
+                  color=base.MUTED)
+
+    columns = [
+        ("국내 캐릭터 IP 채널", "빙그레우스를 버추얼 유튜버로 전환해 검색·순 시청자·재방문·재생률을 함께 성장시키고 팬덤 기반을 만들었습니다."),
+        ("글로벌 수출 브랜드 채널", "국가별 문화 코드와 현지 알고리즘에 맞는 시리즈를 설계해 제품 인지도와 오가닉 구독자를 함께 확보했습니다."),
+        ("온라인 → 오프라인", "온라인 세계관을 공간·굿즈·커머스로 확장하고, 현장의 콘텐츠가 다시 SNS로 돌아오는 순환을 설계했습니다."),
+    ]
+    for i, (head, body) in enumerate(columns):
+        x = base.MARGIN + i * 255
+        c.setFont("SansB", 13)
+        c.setFillColor(base.TEXT)
+        c.drawString(x, 290, head)
+        c.setStrokeColor(base.ACCENT)
+        c.setLineWidth(2)
+        c.line(x, 275, x + 44, 275)
+        draw_text(c, body, x, 250, 218, size=9.2, leading=16)
+
+    doc.footer("BRAND & CONTENT PORTFOLIO")
+
+
+def render_experience_map(doc, content):
+    """Ported from build_portfolio_pdf.build_pdf, the '04 Experience map' block (363-384)."""
+    c = doc.c
+    doc.begin_page()
+    eyebrow(c, "EXPERIENCE MAP", base.MARGIN, base.PAGE_H - 58)
+    title(c, "채널의 목적과 고객에 따라 다른 성장 공식을 설계했습니다",
+          y=base.PAGE_H - 96, size=22)
+
+    cells = card_grid(base.MARGIN, 73, base.PAGE_W - 2 * base.MARGIN, 379,
+                       cols=2, rows=2, gap=24)
+    for card, (x, y, w, h) in zip(content["experience_map"], cells):
+        c.setFillColor(base.SURFACE)
+        c.roundRect(x, y, w, h, 11, fill=1, stroke=0)
+        c.setFont("SansB", 7.5)
+        c.setFillColor(base.ACCENT)
+        c.drawString(x + 18, y + h - 31, card["eyebrow"])
+        c.setFont("SansB", 13)
+        c.setFillColor(base.TEXT)
+        c.drawString(x + 18, y + h - 62, card["heading"])
+        draw_text(c, card["body"], x + 18, y + h - 91, w - 36, size=8.7, leading=16,
+                  color=base.MUTED)
+
+    doc.footer("BRAND & CONTENT PORTFOLIO")
