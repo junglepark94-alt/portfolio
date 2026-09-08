@@ -9,6 +9,7 @@ import re
 import json
 import base64
 import threading
+from analytics import build_funnel_stats
 import secrets
 
 KST = timezone(timedelta(hours=9))
@@ -1152,9 +1153,24 @@ def admin_dashboard():
         'last30': sum(d['count'] for d in days),
         'total': sum(rows.values()),
     }
+
+    # 퍼널 통계: 7일 / 30일 두 벌을 한 번에 렌더하고 화면에서 토글한다
+    prune_visit_events()
+    titles = {p.id: p.title for p in projects}
+    funnel = {}
+    for span in (7, 30):
+        since = (today - timedelta(days=span - 1)).strftime('%Y-%m-%d')
+        rows = db.session.query(
+            VisitEvent.session_key, VisitEvent.stage,
+            VisitEvent.project_id, VisitEvent.detail,
+        ).filter(VisitEvent.date >= since).all()
+        funnel[str(span)] = build_funnel_stats(rows, titles)
+    funnel_meta = {'since': db.session.query(db.func.min(VisitEvent.date)).scalar() or '-'}
+
     return render_template('admin.html', projects=projects, profile=profile,
                            gallery_items=gallery_items, db_info=db_info,
-                           visit_stats=visit_stats)
+                           visit_stats=visit_stats, funnel=funnel,
+                           funnel_meta=funnel_meta)
 
 
 @app.route('/admin/profile', methods=['GET', 'POST'])

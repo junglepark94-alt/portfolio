@@ -1,0 +1,107 @@
+{# 포트폴리오 퍼널 — admin.html에서 include #}
+<div class="admin-section-card">
+  <div class="asc-header">
+    <div>
+      <div class="asc-label">포트폴리오 퍼널</div>
+      <div class="asc-summary">방문 → 프로젝트 섹션 → 상세 열람 → 전환 · 집계 시작 {{ funnel_meta.since }}</div>
+    </div>
+    <div class="chart-range" role="group" aria-label="퍼널 기간 선택">
+      <button type="button" class="range-btn funnel-range-btn" data-frange="7">7일</button>
+      <button type="button" class="range-btn funnel-range-btn is-active" data-frange="30">30일</button>
+    </div>
+  </div>
+
+  <div class="funnel-body">
+    {% for key in ['7', '30'] %}
+    {% set f = funnel[key] %}
+    <div class="funnel-pane" data-frange="{{ key }}"{% if key == '7' %} hidden{% endif %}>
+      {% if f.sessions == 0 %}
+      <p class="funnel-empty">아직 수집된 이벤트가 없습니다.</p>
+      {% else %}
+      <ol class="funnel-steps">
+        {% for s in f.steps %}
+        <li class="funnel-step">
+          <div class="fs-head">
+            <span class="fs-label">{{ s.label }}</span>
+            <span class="fs-count">{{ s.count }}<span class="fs-unit">세션</span></span>
+          </div>
+          <div class="fs-bar"><span style="width:{{ s.width }}%"></span></div>
+          <div class="fs-rate">{% if s.rate is none %}기준{% else %}직전 대비 {{ s.rate }}%{% endif %}</div>
+        </li>
+        {% endfor %}
+      </ol>
+      <p class="funnel-overall">방문 대비 최종 전환율 <strong>{{ f.overall }}%</strong></p>
+
+      <div class="funnel-grid">
+        <section>
+          <h4 class="funnel-h">전환 내역</h4>
+          {% if f.conversions %}
+          <table class="funnel-table">
+            <tbody>
+              {% for c in f.conversions %}
+              <tr><td>{{ c.label }}</td><td class="num">{{ c.count }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <p class="funnel-empty">아직 전환이 없습니다.</p>
+          {% endif %}
+        </section>
+        <section>
+          <h4 class="funnel-h">프로젝트별 열람</h4>
+          {% if f.ranking %}
+          <table class="funnel-table">
+            <tbody>
+              {% for r in f.ranking %}
+              <tr><td>{{ r.title }}</td><td class="num">{{ r.count }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <p class="funnel-empty">아직 열람 기록이 없습니다.</p>
+          {% endif %}
+        </section>
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<style>
+  .funnel-body { padding:1.5rem; }
+  .funnel-empty { color:var(--muted); font-size:0.86rem; margin:0.4rem 0; }
+  .funnel-steps { list-style:none; margin:0 0 1rem; padding:0; }
+  .funnel-step + .funnel-step { margin-top:0.9rem; }
+  .fs-head { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:0.35rem; }
+  .fs-label { font-size:0.88rem; color:var(--text-2); }
+  .fs-count { font-size:1.15rem; font-weight:700; color:var(--text); letter-spacing:-0.01em; }
+  .fs-unit { font-size:0.72rem; font-weight:500; color:var(--muted); margin-left:0.22rem; }
+  .fs-bar { background:var(--bg); border:1px solid var(--border); border-radius:6px; height:14px; overflow:hidden; }
+  .fs-bar > span { display:block; height:100%; background:var(--accent); border-radius:5px 0 0 5px; transition:width .25s; }
+  .fs-rate { font-size:0.75rem; color:var(--muted); margin-top:0.28rem; }
+  .funnel-overall { font-size:0.86rem; color:var(--text-2); margin:0 0 1.5rem; }
+  .funnel-overall strong { color:var(--accent); }
+  .funnel-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:1.25rem; }
+  .funnel-h { font-size:0.82rem; font-weight:600; color:var(--text-2); margin:0 0 0.5rem; }
+  .funnel-table { width:100%; border-collapse:collapse; font-size:0.84rem; }
+  .funnel-table td { padding:0.42rem 0; border-bottom:1px solid var(--border); color:var(--text-2); }
+  .funnel-table td.num { text-align:right; font-weight:600; color:var(--text); width:4rem; }
+  @media (max-width:640px) { .funnel-grid { grid-template-columns:1fr; } }
+</style>
+
+<script>
+  (function () {
+    const btns = document.querySelectorAll('.funnel-range-btn');
+    if (!btns.length) return;
+    btns.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const range = btn.dataset.frange;
+        btns.forEach(function (other) { other.classList.toggle('is-active', other === btn); });
+        document.querySelectorAll('.funnel-pane').forEach(function (pane) {
+          pane.hidden = pane.dataset.frange !== range;
+        });
+      });
+    });
+  })();
+</script>
