@@ -200,6 +200,8 @@ def test_admin_dashboard_renders_collected_funnel_data(client, portfolio_app):
     assert '프로젝트별 열람' in html
     assert '아직 수집된 이벤트가 없습니다' not in html
     assert '아직 열람 기록이 없습니다' not in html
+    assert project.title in html
+    assert '삭제됨' not in html
 
 
 def test_public_page_exposes_tracking_hooks(client):

@@ -44,7 +44,7 @@ def build_funnel_stats(events, project_titles, top_n=8):
             best[session_key] = rank
         if stage == 'convert' and detail:
             converts.setdefault(detail, set()).add(session_key)
-        if stage == 'project_detail' and project_id:
+        if stage == 'project_detail' and project_id:  # project_id 0은 프로젝트와 무관한 이벤트(수집 시점에 정리됨)
             projects.setdefault(project_id, set()).add(session_key)
 
     steps = []
