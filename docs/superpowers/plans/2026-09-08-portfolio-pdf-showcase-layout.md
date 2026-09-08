@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - 모든 명령은 프로젝트 venv로 실행한다: `.venv/Scripts/python.exe`
-- `tools/build_general_portfolio_pdf.py`의 기존 함수·메서드 본문은 수정 금지. 추가만 허용하며, 예외는 Task 7이 명시하는 `Doc.__init__`, `Doc.build`, `render`, `build`, `__main__` 네 지점뿐이다.
+- `tools/build_general_portfolio_pdf.py`의 기존 함수·메서드 본문은 수정 금지. 추가만 허용하며, 예외는 Task 7이 명시하는 `Doc.__init__`, `Doc.build`, `render`, `build`, `__main__` 다섯 지점뿐이다.
 - `--layout` 기본값은 `general`. 인자 없이 실행하면 현행 13페이지 출력이 그대로 나와야 한다.
 - 폰트는 `Sans` / `SansB` / `Serif` / `SerifB` / `SerifXB` 다섯 이름만 쓴다. `C:/Windows/Fonts` 경로를 새로 참조하지 않는다.
 - 색은 `build_general_portfolio_pdf`의 상수(`BG`, `BG_ALT`, `SURFACE`, `BORDER`, `TEXT`, `TEXT_2`, `MUTED`, `ACCENT`)만 쓴다. 새 헥스 리터럴을 만들지 않는다.
@@ -423,7 +423,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 **Interfaces:**
 - Consumes: `card_grid` (Task 3)
 - Produces:
-  - `draw_text(c, text, x, y, width, size=10, leading=16, font='Sans', color=None, max_lines=None) -> float` — 줄바꿈 후 마지막 베이스라인 y를 반환한다. `color=None`이면 `TEXT`.
+  - `draw_text(c, text, x, y, width, size=10, leading=16, font='Sans', color=None, max_lines=None) -> tuple[float, int]` — `(마지막 베이스라인 y, 그린 줄 수)`를 반환한다. `color=None`이면 `TEXT`. 호출부는 대부분 y만 쓰므로 `y, _ = draw_text(...)` 형태로 받는다.
   - `eyebrow(c, text, x, y) -> None`
   - `render_cover(doc, content) -> None`
   - `render_profile(doc, content) -> None`
@@ -434,25 +434,37 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 `tests/test_showcase_pages.py` 끝에 추가:
 
 ```python
-def test_draw_text_wraps_and_returns_the_last_baseline():
+@pytest.fixture
+def scratch_canvas(tmp_path):
     from reportlab.pdfgen import canvas as rl_canvas
 
     showcase_pages.ensure_fonts_for_tests()
-    c = rl_canvas.Canvas(str(Path(__file__).parent / "_scratch.pdf"))
-    end_y = showcase_pages.draw_text(c, "가" * 200, 0, 500, 100, size=10, leading=16)
-
-    assert end_y < 500 - 16          # wrapped onto more than one line
-    assert end_y == 500 - 16 * (showcase_pages.LAST_LINE_COUNT - 1)
+    return rl_canvas.Canvas(str(tmp_path / "scratch.pdf"))
 
 
-def test_draw_text_respects_max_lines():
-    from reportlab.pdfgen import canvas as rl_canvas
+def test_draw_text_wraps_at_the_given_width(scratch_canvas):
+    # 10pt Nanum CJK glyphs are one em wide, so a 100pt box holds 10 per line.
+    end_y, lines = showcase_pages.draw_text(
+        scratch_canvas, "가" * 25, 0, 500, 100, size=10, leading=16)
 
-    showcase_pages.ensure_fonts_for_tests()
-    c = rl_canvas.Canvas(str(Path(__file__).parent / "_scratch.pdf"))
-    showcase_pages.draw_text(c, "가" * 500, 0, 500, 100, size=10, leading=16, max_lines=3)
+    assert lines == 3
+    assert end_y == 468.0          # 500 - 16 * 2
 
-    assert showcase_pages.LAST_LINE_COUNT == 3
+
+def test_draw_text_starts_a_new_line_at_each_newline(scratch_canvas):
+    end_y, lines = showcase_pages.draw_text(
+        scratch_canvas, "가\n나\n다", 0, 500, 100, size=10, leading=16)
+
+    assert lines == 3
+    assert end_y == 468.0
+
+
+def test_draw_text_respects_max_lines(scratch_canvas):
+    end_y, lines = showcase_pages.draw_text(
+        scratch_canvas, "가" * 500, 0, 500, 100, size=10, leading=16, max_lines=3)
+
+    assert lines == 3
+    assert end_y == 468.0
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -468,8 +480,6 @@ Expected: FAIL — `AttributeError: module 'showcase_pages' has no attribute 'en
 from reportlab.pdfbase import pdfmetrics
 
 import build_general_portfolio_pdf as base
-
-LAST_LINE_COUNT = 0
 
 
 def ensure_fonts_for_tests():
@@ -493,17 +503,18 @@ def _wrap(text, width, font, size):
 
 def draw_text(c, text, x, y, width, size=10, leading=16, font="Sans", color=None,
               max_lines=None):
-    """Draw wrapped text downward from baseline y; return the last baseline used."""
-    global LAST_LINE_COUNT
+    """Draw wrapped text downward from baseline y.
+
+    Returns (last baseline used, number of lines drawn).
+    """
     lines = _wrap(text, width, font, size)
     if max_lines is not None:
         lines = lines[:max_lines]
-    LAST_LINE_COUNT = len(lines)
     c.setFont(font, size)
     c.setFillColor(color if color is not None else base.TEXT)
     for i, line in enumerate(lines):
         c.drawString(x, y - i * leading, line)
-    return y - (len(lines) - 1) * leading
+    return y - (len(lines) - 1) * leading, len(lines)
 
 
 def eyebrow(c, text, x, y):
@@ -515,7 +526,7 @@ def eyebrow(c, text, x, y):
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_showcase_pages.py -v`
-Expected: 9 passed
+Expected: 10 passed
 
 - [ ] **Step 5: Port the cover and profile renderers**
 
@@ -532,6 +543,8 @@ if photo:
 ```
 
 3. 프로필의 경력·학력·수상은 `data["experience"]` 대신 스크레이핑 결과를 쓴다: `doc.data["experience"]`, `doc.data["education"]`, `doc.data["awards"]`. 각 원소의 키는 경력이 `company` / `period` / `role` / `bullets`, 학력·수상이 `main` / `period`다.
+
+원본은 `yy = draw_text(...)`로 y만 받지만 이 모듈의 `draw_text`는 `(y, 줄 수)`를 반환한다. 이식할 때 모든 호출부를 `yy, _ = draw_text(...)`로 바꾼다. 이는 Task 5·6의 이식에도 똑같이 적용된다.
 
 `draw_image_cover`는 `tools/build_portfolio_pdf.py:110-138`을 그대로 옮긴다 (Pillow로 비율 유지 크롭 후 `roundRect` 클리핑).
 
@@ -743,26 +756,67 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 `tests/test_showcase_pages.py` 끝에 추가:
 
+이 테스트는 두 레이아웃이 실제로 서로 다른 면 순서를 만드는지를 확인한다. 스크레이핑과 이미지 다운로드를 피하려고 최소 데이터를 직접 만든다.
+
 ```python
-def test_general_layout_still_builds_the_original_page_sequence():
+MINIMAL_SITE_DATA = {
+    "name": "박종걸", "role": "브랜드 마케팅", "photo": "", "site": "http://example.test",
+    "lang": "ko", "about": ["소개"], "education": [], "language": [], "awards": [],
+    "experience": [], "email": "me@example.test", "linkedin": "",
+    "projects": [
+        {"title": f"프로젝트 {i}", "period": "2025", "desc": "설명", "detail": "",
+         "kpi": "100만 | 조회수", "role": "기획", "category": "콘텐츠",
+         "links": [], "images": [], "tags": ""}
+        for i in range(1, 4)
+    ] + [
+        {"title": "산꾼도시여자들", "period": "2021", "desc": "설명", "detail": "",
+         "kpi": "", "role": "조연출", "category": "제작",
+         "links": [], "images": [], "tags": ""},
+        {"title": "샤이니의 빛돌기획", "period": "2020", "desc": "설명", "detail": "",
+         "kpi": "", "role": "조연출", "category": "제작",
+         "links": [], "images": [], "tags": ""},
+    ],
+}
+
+
+def _render(tmp_path, layout, content=None):
     import build_general_portfolio_pdf as base
+    from pypdf import PdfReader
 
-    doc = base.Doc.__new__(base.Doc)
-    doc.layout = "general"
-    assert doc.layout == "general"
+    base.ensure_fonts()
+    out = tmp_path / f"{layout}.pdf"
+    base.Doc(str(out), dict(MINIMAL_SITE_DATA), base.LABELS["ko"],
+             layout=layout, content=content).build()
+    reader = PdfReader(str(out))
+    return len(reader.pages), "\n".join(p.extract_text() or "" for p in reader.pages)
 
 
-def test_doc_defaults_to_the_general_layout():
-    import build_general_portfolio_pdf as base
+def test_general_layout_keeps_cover_profile_index_projects_closing(tmp_path):
+    pages, text = _render(tmp_path, "general")
 
-    sig = base.Doc.__init__.__defaults__
-    assert "general" in sig
+    # cover + profile + index + 5 projects + closing
+    assert pages == 9
+    assert "산꾼도시여자들" in text
+
+
+def test_showcase_layout_wraps_the_detail_projects_in_the_editorial_pages(tmp_path):
+    data = json.loads(DATA_PATH.read_text(encoding="utf-8"))
+    content = showcase_pages.load_showcase_content(data)
+
+    pages, text = _render(tmp_path, "showcase", content)
+
+    # cover + profile + impact + map + 3 detail projects + production + method + closing
+    assert pages == 10
+    assert "오가닉 구독자 10만+" in text      # impact page
+    assert "04 · PRODUCTION" in text        # experience map page
+    assert "MEASURE & TOOL" in text         # working method page
+    assert "01 / 03" in text                # detail label counts only the 3 main projects
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_showcase_pages.py -v`
-Expected: FAIL — `AssertionError` (`'general'` not in `Doc.__init__.__defaults__`)
+Expected: FAIL — `TypeError: __init__() got an unexpected keyword argument 'layout'`
 
 - [ ] **Step 3: Add the layout parameter to Doc**
 
@@ -906,7 +960,7 @@ def build(site, lang, out, max_mb=None, layout='general'):
 - [ ] **Step 7: Run the unit tests**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_showcase_pages.py tests/test_portfolio_pdf_tool.py -v`
-Expected: 11 passed
+Expected: 14 passed
 
 - [ ] **Step 8: Confirm the general layout is unchanged**
 
