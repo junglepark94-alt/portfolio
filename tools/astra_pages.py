@@ -9,18 +9,21 @@ Copy comes from data/astra_portfolio.json. Images, links, experience, education
 and awards come from the scraped site. Every image is drawn with a crop-to-fill
 box (never letterboxed), so mixed source aspect ratios do not leave bars.
 """
+import io
 import os
 import re
 import urllib.request
 from datetime import date
+from pathlib import Path
 
 import qrcode
 from PIL import Image
 from reportlab.lib.colors import HexColor
+from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase import pdfmetrics
 
 import build_general_portfolio_pdf as base
-from showcase_pages import _norm, _wrap, draw_image_cover, draw_text
+
 
 # ── Palette (sampled from the reference render) ───────────────────────
 LIGHT_BG = HexColor("#f7f5ef")
@@ -49,6 +52,87 @@ def load_astra_content(data):
         if key not in data:
             raise KeyError(key)
     return data
+
+
+# ── Text and image primitives ─────────────────────────────────────────
+# Moved here when the older showcase layout was retired; this module is the
+# only consumer.
+
+def _norm(title):
+    return re.sub(r"\s+", " ", (title or "")).strip()
+
+
+# A number keeps its digits, thousands separators and decimal point together, so
+# a line never breaks inside one — "2,400만" must not wrap to "2," / "400만".
+_ATOM = re.compile(r"\d[\d,.]*\d|\d|.", re.S)
+
+
+def _wrap(text, width, font, size):
+    """Break text to `width`, one CJK character at a time but never inside a number."""
+    lines = []
+    for paragraph in (text or "").split("\n"):
+        line = ""
+        for atom in _ATOM.findall(paragraph):
+            if pdfmetrics.stringWidth(line + atom, font, size) <= width:
+                line += atom
+            elif line:
+                lines.append(line)
+                line = atom
+            else:                      # a single atom wider than the box
+                lines.append(atom)
+        lines.append(line)
+    return lines
+
+
+def draw_text(c, text, x, y, width, size=10, leading=16, font="Sans", color=None,
+              max_lines=None):
+    """Draw wrapped text downward from baseline y.
+
+    Returns (last baseline used, number of lines drawn).
+    """
+    lines = _wrap(text, width, font, size)
+    if max_lines is not None:
+        lines = lines[:max_lines]
+    c.setFont(font, size)
+    c.setFillColor(color if color is not None else base.TEXT)
+    for i, line in enumerate(lines):
+        c.drawString(x, y - i * leading, line)
+    return y - (len(lines) - 1) * leading, len(lines)
+
+
+def draw_image_cover(c, image_path, x, y, width, height, radius=8, focus_y=0.5):
+    """Draw an image filling the box exactly.
+
+    Crops the source to fill the box (never letterboxes). `focus_y` picks where a
+    vertical crop is taken from: 0.5 keeps the middle, smaller values keep more
+    of the top — useful for portrait screenshots whose picture sits above a caption.
+    """
+    if not image_path or not Path(image_path).exists():
+        c.setFillColor(base.BG_ALT)
+        c.roundRect(x, y, width, height, radius, fill=1, stroke=0)
+        return
+    with Image.open(image_path) as image:
+        image = image.convert("RGB")
+        source_ratio = image.width / image.height
+        target_ratio = width / height
+        if source_ratio > target_ratio:
+            crop_width = int(image.height * target_ratio)
+            left = (image.width - crop_width) // 2
+            image = image.crop((left, 0, left + crop_width, image.height))
+        else:
+            crop_height = int(image.width / target_ratio)
+            top = int((image.height - crop_height) * focus_y)
+            image = image.crop((0, top, image.width, top + crop_height))
+        image.thumbnail((int(width * 2.2), int(height * 2.2)), Image.Resampling.LANCZOS)
+        buffer = io.BytesIO()
+        image.save(buffer, format="JPEG", quality=82, optimize=True)
+        buffer.seek(0)
+        c.saveState()
+        path = c.beginPath()
+        path.roundRect(x, y, width, height, radius)
+        c.clipPath(path, stroke=0, fill=0)
+        c.drawImage(ImageReader(buffer), x, y, width, height, mask="auto")
+        c.restoreState()
 
 
 # ── Small drawing helpers ─────────────────────────────────────────────

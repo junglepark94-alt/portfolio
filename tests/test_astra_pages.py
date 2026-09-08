@@ -8,7 +8,29 @@ sys.path.insert(0, str(Path(__file__).parents[1] / "tools"))
 
 import astra_pages  # noqa: E402
 import build_general_portfolio_pdf as base  # noqa: E402
-from test_showcase_pages import MINIMAL_SITE_DATA  # noqa: E402
+
+
+# A site fixture small enough to render without touching the network.
+MINIMAL_SITE_DATA = {
+    "name": "박종걸", "role": "브랜드 마케팅", "photo": "", "site": "http://example.test",
+    "tagline": "태그라인",
+    "skills": [], "tools": [], "highlights": [],
+    "lang": "ko", "about": ["소개"], "education": [], "language": [], "awards": [],
+    "experience": [], "email": "me@example.test", "linkedin": "",
+    "projects": [
+        {"title": f"프로젝트 {i}", "period": "2025", "desc": "설명", "detail": "",
+         "kpi": "100만 | 조회수", "role": "기획", "category": "콘텐츠",
+         "links": [], "images": [], "tags": ""}
+        for i in range(1, 4)
+    ] + [
+        {"title": "tvN 예능 프로그램 제작 – 산꾼도시여자들", "period": "2021", "desc": "설명", "detail": "",
+         "kpi": "", "role": "조연출", "category": "제작",
+         "links": [], "images": [], "tags": ""},
+        {"title": "tvN 예능 ‘샤이니의 빛돌기획’ 제작", "period": "2020", "desc": "설명", "detail": "",
+         "kpi": "", "role": "조연출", "category": "제작",
+         "links": [], "images": [], "tags": ""},
+    ],
+}
 
 
 ASTRA_PATH = Path(__file__).parents[1] / "data" / "astra_portfolio.json"

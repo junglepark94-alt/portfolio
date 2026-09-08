@@ -980,8 +980,6 @@ class Doc:
 
     def build(self):
         global first_page
-        if self.layout == 'showcase':
-            return self._build_showcase()
         if self.layout == 'astra':
             import astra_pages
             return astra_pages.build(self, self.content)
@@ -994,36 +992,6 @@ class Doc:
             started[i] = first_page
             self.project(i, p)
         self.closing()
-        self.c.save()
-        return self.page_no, started
-
-    def _build_showcase(self):
-        global first_page
-        import showcase_pages as sp
-
-        content = self.content
-        main, production, missing = sp.split_projects(
-            self.data['projects'], content['production_titles'])
-        if missing:
-            print('  warning: production titles not found on the site:', ', '.join(missing))
-        if len(main) != 8:
-            print(f'  warning: expected 8 detail projects, got {len(main)}')
-
-        # Doc.project() labels pages "NN / total" from data['projects']
-        self.data = dict(self.data, projects=main)
-
-        sp.render_cover(self, content)
-        sp.render_profile(self, content)
-        sp.render_impact(self, content)
-        sp.render_experience_map(self, content)
-        started = {}
-        for i, p in enumerate(main, 1):
-            first_page = self.page_no + 1
-            started[i] = first_page
-            self.project(i, p)
-        sp.render_production_foundation(self, content, production)
-        sp.render_working_method(self, content)
-        sp.render_closing(self, content)
         self.c.save()
         return self.page_no, started
 
@@ -1054,13 +1022,7 @@ def build(site, lang, out, max_mb=None, layout='general'):
     global RENDER_DPI, JPEG_QUALITY
     ensure_fonts()
     content = None
-    if layout == 'showcase':
-        import json as _json
-        import showcase_pages as sp
-        path = os.path.join(ROOT, 'data', 'hyundai_application_2026.json')
-        with open(path, encoding='utf-8') as fh:
-            content = sp.load_showcase_content(_json.load(fh))
-    elif layout == 'astra':
+    if layout == 'astra':
         import json as _json
         import astra_pages
         path = os.path.join(ROOT, 'data', 'astra_portfolio.json')
@@ -1090,9 +1052,8 @@ if __name__ == '__main__':
     ap.add_argument('--out', default=None, help='output PDF path')
     ap.add_argument('--max-mb', type=float, default=None,
                     help='shrink images until the PDF fits this size, e.g. --max-mb 2')
-    ap.add_argument('--layout', choices=['general', 'showcase', 'astra'], default='general',
-                    help="'showcase' combines the editorial intro/closing pages "
-                         "with the project detail pages")
+    ap.add_argument('--layout', choices=['general', 'astra'], default='general',
+                    help="'astra' is the editorial layout built from data/astra_portfolio.json")
     args = ap.parse_args()
     suffix = '' if not args.max_mb else f"_{str(args.max_mb).rstrip('0').rstrip('.')}mb"
     out = args.out or os.path.join(PDF_DIR, f"portfolio_{args.layout}_{args.lang}{suffix}.pdf")
