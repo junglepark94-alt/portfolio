@@ -239,7 +239,7 @@ def render_profile(doc, content):
         c.drawRightString(base.MARGIN + col_w - 18, yy, exp["period"].replace("–", "-"))
         yy, _ = draw_text(c, exp["role"], base.MARGIN + 18, yy - 20, col_w - 36,
                            size=8.5, leading=13, font="SansB")
-        yy, _ = draw_text(c, "\n".join(exp["bullets"]), base.MARGIN + 18, yy - 3,
+        yy, _ = draw_text(c, " · ".join(exp["bullets"]), base.MARGIN + 18, yy - 17,
                            col_w - 36, size=7.7, leading=12.5, color=base.MUTED, max_lines=4)
         yy -= 18
 
@@ -261,7 +261,7 @@ def render_profile(doc, content):
     yy = base_y + box_h - 62
     last_edu_yy = yy
     for edu in doc.data["education"]:
-        last_edu_yy, _ = draw_text(c, f"{edu['main']}\n{edu['period']}", mid_x + 18, yy,
+        last_edu_yy, _ = draw_text(c, f"{edu['main']} {edu['sub']}\n{edu['period']}", mid_x + 18, yy,
                                     col_w - 36, size=9, leading=15, font="SansB")
         yy = last_edu_yy - 15
     sep1_y = last_edu_yy - 23
