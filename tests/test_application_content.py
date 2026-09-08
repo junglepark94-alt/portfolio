@@ -37,3 +37,14 @@ def test_canonical_projects_use_normalized_facts_and_terminology():
     assert projects["banana_salon"]["status"] == "진행 중"
     assert projects["banana_salon"]["period"]["end"] is None
 
+
+def test_portfolio_summary_distinguishes_the_channels_behind_aggregate_growth():
+    content = load_content()
+    summary = content["portfolio_summary"]
+
+    assert summary["organic_subscribers"] == "10만+"
+    assert summary["organic_subscriber_scope"] == [
+        "국내 캐릭터 IP 채널",
+        "글로벌 수출 브랜드 채널",
+    ]
+

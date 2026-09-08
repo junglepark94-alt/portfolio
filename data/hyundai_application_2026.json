@@ -12,6 +12,16 @@
     "ko": "콘텐츠에서 시작해 팬덤을 만들고, 공간과 상품으로 브랜드 경험을 확장하는 마케터",
     "en": "A brand marketer who turns content into fandom, then extends it into spaces and products"
   },
+  "portfolio_summary": {
+    "organic_subscribers": "10만+",
+    "organic_subscriber_scope": [
+      "국내 캐릭터 IP 채널",
+      "글로벌 수출 브랜드 채널"
+    ],
+    "global_content_views": "5,200만+",
+    "popup_commerce_revenue": "3.2억 원",
+    "export_market_viewer_share": "80%+"
+  },
   "site_copy": {
     "hero_role_ko": "브랜드 마케팅 · 콘텐츠 전략",
     "hero_role_en": "Brand Marketing · Content Strategy",
