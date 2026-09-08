@@ -387,7 +387,8 @@ def styles():
 # ── Drawing primitives ───────────────────────────────────────────────
 
 class Doc:
-    def __init__(self, path, data, labels, total_pages=None, quality=JPEG_QUALITY, project_pages=None):
+    def __init__(self, path, data, labels, total_pages=None, quality=JPEG_QUALITY,
+                 project_pages=None, layout='general', content=None):
         self.c = canvas.Canvas(path, pagesize=landscape(A4))
         self.quality = quality
         self.data = data
@@ -400,6 +401,8 @@ class Doc:
         self.c.setAuthor(data['name'])
         self.c.setSubject(f"Portfolio · {data['site']}")
         self.c.setCreator('portfolio site → PDF builder')
+        self.layout = layout
+        self.content = content
 
     # page chrome
     def begin_page(self, bg=BG):
@@ -977,6 +980,8 @@ class Doc:
 
     def build(self):
         global first_page
+        if self.layout == 'showcase':
+            return self._build_showcase()
         self.cover()
         self.profile()
         self.index_page()
@@ -989,6 +994,36 @@ class Doc:
         self.c.save()
         return self.page_no, started
 
+    def _build_showcase(self):
+        global first_page
+        import showcase_pages as sp
+
+        content = self.content
+        main, production, missing = sp.split_projects(
+            self.data['projects'], content['production_titles'])
+        if missing:
+            print('  warning: production titles not found on the site:', ', '.join(missing))
+        if len(main) != 8:
+            print(f'  warning: expected 8 detail projects, got {len(main)}')
+
+        # Doc.project() labels pages "NN / total" from data['projects']
+        self.data = dict(self.data, projects=main)
+
+        sp.render_cover(self, content)
+        sp.render_profile(self, content)
+        sp.render_impact(self, content)
+        sp.render_experience_map(self, content)
+        started = {}
+        for i, p in enumerate(main, 1):
+            first_page = self.page_no + 1
+            started[i] = first_page
+            self.project(i, p)
+        sp.render_production_foundation(self, content, production)
+        sp.render_working_method(self, content)
+        sp.render_closing(self, content)
+        self.c.save()
+        return self.page_no, started
+
 
 first_page = 0
 
@@ -997,29 +1032,38 @@ first_page = 0
 SIZE_STEPS = [(200, 82), (150, 78), (120, 72), (100, 68), (84, 62)]
 
 
-def render(site, lang, out, data=None):
+def render(site, lang, out, data=None, layout='general', content=None):
     ensure_fonts()
     if data is None:
         data = scrape(site, lang)
     labels = LABELS[lang]
     # two passes so the footer can show "page / total"
     tmp = out + '.tmp'
-    total, pages = Doc(tmp, data, labels, quality=JPEG_QUALITY).build()
-    Doc(out, data, labels, total_pages=total, quality=JPEG_QUALITY, project_pages=pages).build()
+    total, pages = Doc(tmp, data, labels, quality=JPEG_QUALITY,
+                       layout=layout, content=content).build()
+    Doc(out, data, labels, total_pages=total, quality=JPEG_QUALITY,
+        project_pages=pages, layout=layout, content=content).build()
     os.remove(tmp)
     return total
 
 
-def build(site, lang, out, max_mb=None):
+def build(site, lang, out, max_mb=None, layout='general'):
     global RENDER_DPI, JPEG_QUALITY
     ensure_fonts()
+    content = None
+    if layout == 'showcase':
+        import json as _json
+        import showcase_pages as sp
+        path = os.path.join(ROOT, 'data', 'hyundai_application_2026.json')
+        with open(path, encoding='utf-8') as fh:
+            content = sp.load_showcase_content(_json.load(fh))
     print('scraping', site, lang)
     data = scrape(site, lang)
     print(f"  {data['name']} · {len(data['projects'])} projects · {len(data['experience'])} jobs")
     steps = SIZE_STEPS if max_mb else [(RENDER_DPI, JPEG_QUALITY)]
     for dpi, quality in steps:
         RENDER_DPI, JPEG_QUALITY = dpi, quality
-        total = render(site, lang, out, data)
+        total = render(site, lang, out, data, layout=layout, content=content)
         size_mb = os.path.getsize(out) / 1024 / 1024
         note = f'{total} pages, {size_mb:.2f} MB, {dpi} dpi'
         if not max_mb or size_mb <= max_mb:
@@ -1037,11 +1081,14 @@ if __name__ == '__main__':
     ap.add_argument('--out', default=None, help='output PDF path')
     ap.add_argument('--max-mb', type=float, default=None,
                     help='shrink images until the PDF fits this size, e.g. --max-mb 2')
+    ap.add_argument('--layout', choices=['general', 'showcase'], default='general',
+                    help="'showcase' combines the editorial intro/closing pages "
+                         "with the project detail pages")
     args = ap.parse_args()
     suffix = '' if not args.max_mb else f"_{str(args.max_mb).rstrip('0').rstrip('.')}mb"
-    out = args.out or os.path.join(PDF_DIR, f"portfolio_{args.lang}{suffix}.pdf")
+    out = args.out or os.path.join(PDF_DIR, f"portfolio_{args.layout}_{args.lang}{suffix}.pdf")
     os.makedirs(os.path.dirname(out), exist_ok=True)
     try:
-        build(args.url.rstrip('/'), args.lang, out, max_mb=args.max_mb)
+        build(args.url.rstrip('/'), args.lang, out, max_mb=args.max_mb, layout=args.layout)
     except urllib.error.URLError as exc:
         sys.exit(f'network error: {exc}')

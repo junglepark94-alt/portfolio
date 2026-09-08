@@ -128,3 +128,59 @@ def test_draw_text_respects_max_lines(scratch_canvas):
 
     assert lines == 3
     assert end_y == 468.0
+
+
+MINIMAL_SITE_DATA = {
+    "name": "박종걸", "role": "브랜드 마케팅", "photo": "", "site": "http://example.test",
+    "tagline": "태그라인",
+    "skills": [], "tools": [], "highlights": [],
+    "lang": "ko", "about": ["소개"], "education": [], "language": [], "awards": [],
+    "experience": [], "email": "me@example.test", "linkedin": "",
+    "projects": [
+        {"title": f"프로젝트 {i}", "period": "2025", "desc": "설명", "detail": "",
+         "kpi": "100만 | 조회수", "role": "기획", "category": "콘텐츠",
+         "links": [], "images": [], "tags": ""}
+        for i in range(1, 4)
+    ] + [
+        {"title": "산꾼도시여자들", "period": "2021", "desc": "설명", "detail": "",
+         "kpi": "", "role": "조연출", "category": "제작",
+         "links": [], "images": [], "tags": ""},
+        {"title": "샤이니의 빛돌기획", "period": "2020", "desc": "설명", "detail": "",
+         "kpi": "", "role": "조연출", "category": "제작",
+         "links": [], "images": [], "tags": ""},
+    ],
+}
+
+
+def _render(tmp_path, layout, content=None):
+    import build_general_portfolio_pdf as base
+    from pypdf import PdfReader
+
+    base.ensure_fonts()
+    out = tmp_path / f"{layout}.pdf"
+    base.Doc(str(out), dict(MINIMAL_SITE_DATA), base.LABELS["ko"],
+             layout=layout, content=content).build()
+    reader = PdfReader(str(out))
+    return len(reader.pages), "\n".join(p.extract_text() or "" for p in reader.pages)
+
+
+def test_general_layout_keeps_cover_profile_index_projects_closing(tmp_path):
+    pages, text = _render(tmp_path, "general")
+
+    # cover + profile + index + 5 projects + closing
+    assert pages == 9
+    assert "산꾼도시여자들" in text
+
+
+def test_showcase_layout_wraps_the_detail_projects_in_the_editorial_pages(tmp_path):
+    data = json.loads(DATA_PATH.read_text(encoding="utf-8"))
+    content = showcase_pages.load_showcase_content(data)
+
+    pages, text = _render(tmp_path, "showcase", content)
+
+    # cover + profile + impact + map + 3 detail projects + production + method + closing
+    assert pages == 10
+    assert "오가닉 구독자 10만+" in text      # impact page
+    assert "04 · PRODUCTION" in text        # experience map page
+    assert "MEASURE & TOOL" in text         # working method page
+    assert "01 / 03" in text                # detail label counts only the 3 main projects
