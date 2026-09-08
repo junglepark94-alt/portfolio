@@ -345,13 +345,13 @@ def record_event(stage, project_id=0, detail=''):
 
 def prune_visit_events(retention_days=VISIT_EVENT_RETENTION_DAYS):
     """보관 기간이 지난 이벤트를 삭제한다. 하루 1회만 실제로 수행."""
-    today = _today_kst()
-    marker = db.session.get(ContentSync, 'visit_event_pruned_on')
-    if marker is not None and marker.value == today:
-        return 0
-
-    cutoff = (datetime.now(KST).date() - timedelta(days=retention_days)).strftime('%Y-%m-%d')
     try:
+        today = _today_kst()
+        marker = db.session.get(ContentSync, 'visit_event_pruned_on')
+        if marker is not None and marker.value == today:
+            return 0
+
+        cutoff = (datetime.now(KST).date() - timedelta(days=retention_days)).strftime('%Y-%m-%d')
         removed = VisitEvent.query.filter(VisitEvent.date < cutoff).delete(
             synchronize_session=False)
         if marker is None:

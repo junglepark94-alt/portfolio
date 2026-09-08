@@ -139,3 +139,23 @@ def test_prune_removes_events_past_retention_once_a_day(portfolio_app):
     assert prune_visit_events() == 1
     assert [r.session_key for r in VisitEvent.query.all()] == ['new']
     assert prune_visit_events() == 0
+
+
+def test_prune_boundary_keeps_exact_cutoff_and_removes_one_day_older(portfolio_app):
+    from datetime import datetime, timedelta
+
+    from app import KST, prune_visit_events
+
+    retention_days = 3
+    today = datetime.now(KST).date()
+    surviving_date = (today - timedelta(days=retention_days)).strftime('%Y-%m-%d')
+    deleted_date = (today - timedelta(days=retention_days + 1)).strftime('%Y-%m-%d')
+
+    db.session.add(VisitEvent(session_key='surviving', stage='visit', project_id=0,
+                              detail='', date=surviving_date))
+    db.session.add(VisitEvent(session_key='deleted', stage='visit', project_id=0,
+                              detail='', date=deleted_date))
+    db.session.commit()
+
+    assert prune_visit_events(retention_days=retention_days) == 1
+    assert [r.session_key for r in VisitEvent.query.all()] == ['surviving']
