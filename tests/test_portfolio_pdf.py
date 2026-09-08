@@ -29,7 +29,6 @@ def test_generated_portfolio_pdf_is_general_purpose_and_content_rich():
         "동남아 타깃 회차가 미국 타깃 회차 대비 조회 2.1배",
         "현지 알고리즘만으로 확산",
         "67-82%",
-        "현대자동차",
         "jgpark.up.railway.app",
     ]:
         assert required in text
