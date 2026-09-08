@@ -214,6 +214,9 @@ if (modal) {
   function openModal(card) {
     activeProjectCard = card;
     const d = card.dataset;
+    if (window.trackFunnel) {
+      window.trackFunnel('project_detail', { project_id: parseInt(d.pid || '0', 10) });
+    }
 
     $('modalTitle').textContent = d.title || '';
     $('modalTopTitle').textContent = d.title || '';
@@ -692,3 +695,54 @@ window.addEventListener('scroll', () => {
     navTick = false;
   });
 }, { passive: true });
+
+/* ── 퍼널 이벤트 수집 ──────────────────────────────────── */
+(function () {
+  const sent = new Set();
+
+  function track(stage, opts) {
+    const o = opts || {};
+    const key = stage + ':' + (o.project_id || 0) + ':' + (o.detail || '');
+    if (sent.has(key)) return;
+    sent.add(key);
+
+    const body = JSON.stringify({
+      stage: stage,
+      project_id: o.project_id || 0,
+      detail: o.detail || ''
+    });
+    try {
+      const blob = new Blob([body], { type: 'application/json' });
+      if (navigator.sendBeacon && navigator.sendBeacon('/api/track', blob)) return;
+    } catch (e) { /* sendBeacon 미지원 → fetch로 폴백 */ }
+    fetch('/api/track', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: body,
+      keepalive: true
+    }).catch(function () {});
+  }
+
+  window.trackFunnel = track;
+
+  // 프로젝트 섹션은 뷰포트보다 높을 수 있어 threshold를 크게 잡으면
+  // 영영 발화하지 않는다. 화면에 들어오는 순간 1회만 기록한다.
+  const section = document.getElementById('projects');
+  if (section && 'IntersectionObserver' in window) {
+    const io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          track('projects_view');
+          io.disconnect();
+        }
+      });
+    }, { threshold: 0.01 });
+    io.observe(section);
+  }
+
+  document.querySelectorAll('[data-convert]').forEach(function (el) {
+    el.addEventListener('click', function () {
+      track('convert', { detail: el.dataset.convert });
+    });
+  });
+})();

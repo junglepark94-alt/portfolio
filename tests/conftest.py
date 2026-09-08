@@ -23,6 +23,8 @@ def portfolio_app():
             role_en="Brand Marketing · Content Strategy",
             tagline="콘텐츠에서 팬덤을 만들고, 공간과 상품으로 브랜드 경험을 확장합니다.",
             tagline_en="I build fandom through content and extend it into memorable brand experiences.",
+            email="test@example.com",
+            resume_filename="resume.pdf",
             about_text="소개",
             about_text_en="Profile",
             experience_json="[]",

@@ -200,3 +200,22 @@ def test_admin_dashboard_renders_collected_funnel_data(client, portfolio_app):
     assert '프로젝트별 열람' in html
     assert '아직 수집된 이벤트가 없습니다' not in html
     assert '아직 열람 기록이 없습니다' not in html
+
+
+def test_public_page_exposes_tracking_hooks(client):
+    html = client.get('/').get_data(as_text=True)
+
+    assert 'data-pid=' in html
+    assert 'data-convert="email"' in html
+    assert 'data-convert="resume"' in html
+
+
+def test_main_js_sends_all_three_client_stages():
+    js = open('static/js/main.js', encoding='utf-8').read()
+
+    assert "'/api/track'" in js
+    assert 'window.trackFunnel' in js
+    assert "track('projects_view')" in js
+    assert "'project_detail'" in js
+    assert "'convert'" in js
+    assert 'IntersectionObserver' in js
