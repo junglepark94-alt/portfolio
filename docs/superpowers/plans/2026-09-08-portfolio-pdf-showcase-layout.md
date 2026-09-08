@@ -99,7 +99,7 @@ def test_load_showcase_content_reads_all_sections_from_the_real_data_file():
     assert content["working_method"][0]["evidence"]
 
     assert content["portfolio_summary"]["organic_subscribers"] == "10만+"
-    assert content["production_titles"] == ["산꾼도시여자들", "샤이니의 빛돌기획"]
+    assert content["production_titles"] == ["tvN 예능 프로그램 제작 – 산꾼도시여자들", "tvN 예능 ‘샤이니의 빛돌기획’ 제작"]
 
 
 def test_load_showcase_content_names_the_missing_key():
@@ -162,7 +162,7 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'showcase_pages'`
       "evidence": "분석 속도 향상·사내 뉴스레터 작성 시간 70% 단축"
     }
   ],
-  "showcase_production_titles": ["산꾼도시여자들", "샤이니의 빛돌기획"],
+  "showcase_production_titles": ["tvN 예능 프로그램 제작 – 산꾼도시여자들", "tvN 예능 ‘샤이니의 빛돌기획’ 제작"],
 ```
 
 - [ ] **Step 4: Verify the JSON still parses**
@@ -245,13 +245,13 @@ def test_split_projects_separates_production_titles_and_keeps_site_order():
     ]
 
     main, production, missing = showcase_pages.split_projects(
-        projects, ["산꾼도시여자들", "샤이니의 빛돌기획"])
+        projects, ["tvN 예능 프로그램 제작 – 산꾼도시여자들", "tvN 예능 ‘샤이니의 빛돌기획’ 제작"])
 
     assert [p["title"] for p in main] == [
         "글로벌 유튜브 브랜디드 콘텐츠 〈Banana Salon〉 기획",
         "빙그레우스 유튜브 채널",
     ]
-    assert [p["title"] for p in production] == ["산꾼도시여자들", "샤이니의 빛돌기획"]
+    assert [p["title"] for p in production] == ["tvN 예능 프로그램 제작 – 산꾼도시여자들", "tvN 예능 ‘샤이니의 빛돌기획’ 제작"]
     assert missing == []
 
 

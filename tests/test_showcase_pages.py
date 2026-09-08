@@ -27,7 +27,7 @@ def test_load_showcase_content_reads_all_sections_from_the_real_data_file():
     assert content["working_method"][0]["evidence"]
 
     assert content["portfolio_summary"]["organic_subscribers"] == "10만+"
-    assert content["production_titles"] == ["산꾼도시여자들", "샤이니의 빛돌기획"]
+    assert content["production_titles"] == ["tvN 예능 프로그램 제작 – 산꾼도시여자들", "tvN 예능 ‘샤이니의 빛돌기획’ 제작"]
 
 
 def test_load_showcase_content_names_the_missing_key():
@@ -142,10 +142,10 @@ MINIMAL_SITE_DATA = {
          "links": [], "images": [], "tags": ""}
         for i in range(1, 4)
     ] + [
-        {"title": "산꾼도시여자들", "period": "2021", "desc": "설명", "detail": "",
+        {"title": "tvN 예능 프로그램 제작 – 산꾼도시여자들", "period": "2021", "desc": "설명", "detail": "",
          "kpi": "", "role": "조연출", "category": "제작",
          "links": [], "images": [], "tags": ""},
-        {"title": "샤이니의 빛돌기획", "period": "2020", "desc": "설명", "detail": "",
+        {"title": "tvN 예능 ‘샤이니의 빛돌기획’ 제작", "period": "2020", "desc": "설명", "detail": "",
          "kpi": "", "role": "조연출", "category": "제작",
          "links": [], "images": [], "tags": ""},
     ],
