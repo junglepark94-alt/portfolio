@@ -95,3 +95,36 @@ def test_card_grid_single_row_splits_width_only():
     assert cells[0] == (44.0, 200.0, 163.0, 140.0)
     assert cells[3][0] == 44.0 + 3 * (163.0 + 16)
     assert all(cell[3] == 140.0 for cell in cells)
+
+
+@pytest.fixture
+def scratch_canvas(tmp_path):
+    from reportlab.pdfgen import canvas as rl_canvas
+
+    showcase_pages.ensure_fonts_for_tests()
+    return rl_canvas.Canvas(str(tmp_path / "scratch.pdf"))
+
+
+def test_draw_text_wraps_at_the_given_width(scratch_canvas):
+    # 10pt Nanum CJK glyphs are one em wide, so a 100pt box holds 10 per line.
+    end_y, lines = showcase_pages.draw_text(
+        scratch_canvas, "가" * 25, 0, 500, 100, size=10, leading=16)
+
+    assert lines == 3
+    assert end_y == 468.0          # 500 - 16 * 2
+
+
+def test_draw_text_starts_a_new_line_at_each_newline(scratch_canvas):
+    end_y, lines = showcase_pages.draw_text(
+        scratch_canvas, "가\n나\n다", 0, 500, 100, size=10, leading=16)
+
+    assert lines == 3
+    assert end_y == 468.0
+
+
+def test_draw_text_respects_max_lines(scratch_canvas):
+    end_y, lines = showcase_pages.draw_text(
+        scratch_canvas, "가" * 500, 0, 500, 100, size=10, leading=16, max_lines=3)
+
+    assert lines == 3
+    assert end_y == 468.0
