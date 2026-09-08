@@ -36,3 +36,43 @@ def test_load_showcase_content_names_the_missing_key():
 
     with pytest.raises(KeyError, match="working_method"):
         showcase_pages.load_showcase_content(data)
+
+
+def test_split_projects_separates_production_titles_and_keeps_site_order():
+    projects = [
+        {"title": "글로벌 유튜브 브랜디드 콘텐츠 〈Banana Salon〉 기획"},
+        {"title": "산꾼도시여자들"},
+        {"title": "빙그레우스 유튜브 채널"},
+        {"title": "샤이니의 빛돌기획"},
+    ]
+
+    main, production, missing = showcase_pages.split_projects(
+        projects, ["산꾼도시여자들", "샤이니의 빛돌기획"])
+
+    assert [p["title"] for p in main] == [
+        "글로벌 유튜브 브랜디드 콘텐츠 〈Banana Salon〉 기획",
+        "빙그레우스 유튜브 채널",
+    ]
+    assert [p["title"] for p in production] == ["산꾼도시여자들", "샤이니의 빛돌기획"]
+    assert missing == []
+
+
+def test_split_projects_normalises_whitespace_when_matching():
+    projects = [{"title": "샤이니의   빛돌기획 "}, {"title": "다른 프로젝트"}]
+
+    main, production, missing = showcase_pages.split_projects(
+        projects, ["샤이니의 빛돌기획"])
+
+    assert [p["title"] for p in production] == ["샤이니의   빛돌기획 "]
+    assert [p["title"] for p in main] == ["다른 프로젝트"]
+    assert missing == []
+
+
+def test_split_projects_reports_titles_the_site_does_not_have():
+    projects = [{"title": "다른 프로젝트"}]
+
+    main, production, missing = showcase_pages.split_projects(projects, ["없는 제목"])
+
+    assert production == []
+    assert [p["title"] for p in main] == ["다른 프로젝트"]
+    assert missing == ["없는 제목"]
