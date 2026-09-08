@@ -250,26 +250,39 @@ def render_profile(doc, content):
     c.setFont("SansB", 9)
     c.setFillColor(base.ACCENT)
     c.drawString(mid_x + 18, base_y + box_h - 28, "EDUCATION & LANGUAGE")
+
+    # Education and language entries come from the live site scrape (currently
+    # 2 and 3 items, versus the single entry each the original layout assumed),
+    # so this block's height varies run to run. The separators below are
+    # anchored to the actual last baseline drawn (via draw_text's return value)
+    # rather than the fixed offsets the original used, with gaps (23/26/40/26)
+    # matching the visual spacing build_portfolio_pdf.py:268-326 used for its
+    # single-entry case.
     yy = base_y + box_h - 62
+    last_edu_yy = yy
     for edu in doc.data["education"]:
-        yy, _ = draw_text(c, f"{edu['main']}\n{edu['period']}", mid_x + 18, yy,
-                           col_w - 36, size=9, leading=15, font="SansB")
-        yy -= 15
+        last_edu_yy, _ = draw_text(c, f"{edu['main']}\n{edu['period']}", mid_x + 18, yy,
+                                    col_w - 36, size=9, leading=15, font="SansB")
+        yy = last_edu_yy - 15
+    sep1_y = last_edu_yy - 23
     c.setStrokeColor(base.BORDER)
-    c.line(mid_x + 18, base_y + 218, mid_x + col_w - 18, base_y + 218)
-    yy = base_y + 192
-    for award in doc.data["awards"]:
-        yy, _ = draw_text(c, f"{award['main']}\n{award['period']}", mid_x + 18, yy,
-                           col_w - 36, size=9, leading=20)
-        yy -= 20
+    c.line(mid_x + 18, sep1_y, mid_x + col_w - 18, sep1_y)
+
+    yy = sep1_y - 26
+    last_lang_yy = yy
+    for lang in doc.data["language"]:
+        last_lang_yy, _ = draw_text(c, f"{lang['main']} {lang['sub']}".strip(), mid_x + 18, yy,
+                                     col_w - 36, size=9, leading=20)
+        yy = last_lang_yy - 20
+    sep2_y = last_lang_yy - 40
     c.setStrokeColor(base.BORDER)
-    c.line(mid_x + 18, base_y + 112, mid_x + col_w - 18, base_y + 112)
+    c.line(mid_x + 18, sep2_y, mid_x + col_w - 18, sep2_y)
     draw_text(c, "Premiere Pro · Photoshop\n데이터 분석 · AI 도구 활용", mid_x + 18,
-              base_y + 86, col_w - 36, size=8.7, leading=18)
+              sep2_y - 26, col_w - 36, size=8.7, leading=18)
 
     # CORE CAPABILITIES
     right_x = mid_x + col_w + gap
-    c.setFillColor(base.SURFACE)
+    c.setFillColor(base.BG_ALT)
     c.roundRect(right_x, base_y, col_w, box_h, 12, fill=1, stroke=0)
     c.setFont("SansB", 9)
     c.setFillColor(base.ACCENT)
