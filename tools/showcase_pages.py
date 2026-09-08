@@ -121,9 +121,14 @@ def draw_text(c, text, x, y, width, size=10, leading=16, font="Sans", color=None
 
 
 def eyebrow(c, text, x, y):
-    c.setFont("SansB", 7.5)
+    """Accent-outlined pill label, as in build_portfolio_pdf.eyebrow (151-158)."""
+    w = pdfmetrics.stringWidth(text, "SansB", 8) + 18
+    c.setStrokeColor(base.ACCENT)
+    c.setLineWidth(0.8)
+    c.roundRect(x, y - 5, w, 19, 9, fill=0, stroke=1)
+    c.setFont("SansB", 8)
     c.setFillColor(base.ACCENT)
-    c.drawString(x, y, text)
+    c.drawString(x + 9, y, text)
 
 
 def title(c, text, x=base.MARGIN, y=base.PAGE_H - 72, size=26,
