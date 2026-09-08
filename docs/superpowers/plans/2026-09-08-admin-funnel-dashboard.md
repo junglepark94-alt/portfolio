@@ -993,15 +993,12 @@ Browser pane의 `preview_start`로 `portfolio`를 띄운다. Bash로 서버를 �
 
 `computer {action: "screenshot"}`로 퍼널 섹션을 캡처해 `SendUserFile`로 사용자에게 보낸다.
 
-- [ ] **Step 5: 남은 변경이 있으면 커밋**
+- [ ] **Step 5: 작업 트리가 깨끗한지 확인**
 
 ```bash
 git status --short
 ```
 
-`.claude/launch.json`을 새로 만들었다면 커밋한다.
-
-```bash
-git add .claude/launch.json
-git commit -m "chore: add the local preview launch config"
-```
+`.claude/launch.json`은 `.gitignore`가 무시하는 경로다. 커밋하지 않는다.
+Task 6까지의 커밋 외에 추적 대상 변경이 남아 있으면 안 된다. 남아 있다면
+그것이 무엇인지 보고한다.
