@@ -5,7 +5,13 @@ The project detail pages come from build_general_portfolio_pdf.Doc.project and a
 not touched here. This module only draws the seven hand-laid-out pages around them:
 cover, profile, impact, experience map, production foundation, working method, closing.
 
-Editorial copy lives in data/hyundai_application_2026.json, not in this file.
+Editorial copy is a mix of sources. The impact tiles/columns, the experience-map
+cards, and the working-method cards are pulled from
+data/hyundai_application_2026.json via load_showcase_content(). The cover headline,
+the profile intro paragraph, the core-capabilities list, the impact page's column
+copy, all seven page titles/eyebrows, and the closing page's copy are hardcoded in
+this module below. Experience, education, language, awards and project content
+come from the scraped site data (doc.data), not from this file or the JSON.
 """
 
 import io
@@ -230,7 +236,21 @@ def render_profile(doc, content):
     c.setFillColor(base.ACCENT)
     c.drawString(base.MARGIN + 18, base_y + box_h - 28, "EXPERIENCE")
     yy = base_y + box_h - 60
+    # Inner floor: the box's base_y plus the same top inset the header uses
+    # (base_y + box_h - 28), i.e. base_y + 28. No entry's block may end below it.
+    exp_floor = base_y + 28
     for exp in doc.data["experience"]:
+        # exp["role"] is clamped to max_lines=1 below, so its block is always
+        # exactly one line -- the role line always lands at yy - 20.
+        role_y_pred = yy - 20
+        bullets_text = " · ".join(exp["bullets"])
+        bullet_lines = min(len(_wrap(bullets_text, col_w - 36, "Sans", 7.7)), 4)
+        bullet_y_pred = (role_y_pred - 17) - (bullet_lines - 1) * 12.5
+
+        # Break before drawing an entry whose block would cross the floor.
+        if bullet_y_pred < exp_floor:
+            break
+
         c.setFont("SansB", 12)
         c.setFillColor(base.TEXT)
         c.drawString(base.MARGIN + 18, yy, exp["company"])
@@ -238,8 +258,8 @@ def render_profile(doc, content):
         c.setFillColor(base.MUTED)
         c.drawRightString(base.MARGIN + col_w - 18, yy, exp["period"].replace("–", "-"))
         yy, _ = draw_text(c, exp["role"], base.MARGIN + 18, yy - 20, col_w - 36,
-                           size=8.5, leading=13, font="SansB")
-        yy, _ = draw_text(c, " · ".join(exp["bullets"]), base.MARGIN + 18, yy - 17,
+                           size=8.5, leading=13, font="SansB", max_lines=1)
+        yy, _ = draw_text(c, bullets_text, base.MARGIN + 18, yy - 17,
                            col_w - 36, size=7.7, leading=12.5, color=base.MUTED, max_lines=4)
         yy -= 18
 
@@ -258,27 +278,54 @@ def render_profile(doc, content):
     # rather than the fixed offsets the original used, with gaps (23/26/40/26)
     # matching the visual spacing build_portfolio_pdf.py:268-326 used for its
     # single-entry case.
+    # Same inner floor as the EXPERIENCE box: base_y plus the header's top inset.
+    edu_lang_floor = base_y + 28
+
     yy = base_y + box_h - 62
     last_edu_yy = yy
     for edu in doc.data["education"]:
-        last_edu_yy, _ = draw_text(c, f"{edu['main']} {edu['sub']}\n{edu['period']}", mid_x + 18, yy,
+        text = f"{edu['main']} {edu['sub']}\n{edu['period']}"
+        lines = len(_wrap(text, col_w - 36, "SansB", 9))
+        end_y_pred = yy - (lines - 1) * 15
+
+        # Break before drawing an entry whose block would cross the floor.
+        if end_y_pred < edu_lang_floor:
+            break
+
+        last_edu_yy, _ = draw_text(c, text, mid_x + 18, yy,
                                     col_w - 36, size=9, leading=15, font="SansB")
         yy = last_edu_yy - 15
     sep1_y = last_edu_yy - 23
-    c.setStrokeColor(base.BORDER)
-    c.line(mid_x + 18, sep1_y, mid_x + col_w - 18, sep1_y)
 
-    yy = sep1_y - 26
-    last_lang_yy = yy
-    for lang in doc.data["language"]:
-        last_lang_yy, _ = draw_text(c, f"{lang['main']} {lang['sub']}".strip(), mid_x + 18, yy,
-                                     col_w - 36, size=9, leading=20)
-        yy = last_lang_yy - 20
-    sep2_y = last_lang_yy - 40
-    c.setStrokeColor(base.BORDER)
-    c.line(mid_x + 18, sep2_y, mid_x + col_w - 18, sep2_y)
-    draw_text(c, "Premiere Pro · Photoshop\n데이터 분석 · AI 도구 활용", mid_x + 18,
-              sep2_y - 26, col_w - 36, size=8.7, leading=18)
+    if sep1_y >= edu_lang_floor:
+        c.setStrokeColor(base.BORDER)
+        c.line(mid_x + 18, sep1_y, mid_x + col_w - 18, sep1_y)
+
+        yy = sep1_y - 26
+        last_lang_yy = yy
+        for lang in doc.data["language"]:
+            text = f"{lang['main']} {lang['sub']}".strip()
+            lines = len(_wrap(text, col_w - 36, "Sans", 9))
+            end_y_pred = yy - (lines - 1) * 20
+
+            if end_y_pred < edu_lang_floor:
+                break
+
+            last_lang_yy, _ = draw_text(c, text, mid_x + 18, yy,
+                                         col_w - 36, size=9, leading=20)
+            yy = last_lang_yy - 20
+        sep2_y = last_lang_yy - 40
+
+        if sep2_y >= edu_lang_floor:
+            c.setStrokeColor(base.BORDER)
+            c.line(mid_x + 18, sep2_y, mid_x + col_w - 18, sep2_y)
+
+            static_text = "Premiere Pro · Photoshop\n데이터 분석 · AI 도구 활용"
+            static_lines = len(_wrap(static_text, col_w - 36, "Sans", 8.7))
+            static_end_pred = (sep2_y - 26) - (static_lines - 1) * 18
+            if static_end_pred >= edu_lang_floor:
+                draw_text(c, static_text, mid_x + 18,
+                          sep2_y - 26, col_w - 36, size=8.7, leading=18)
 
     # CORE CAPABILITIES
     right_x = mid_x + col_w + gap
@@ -405,12 +452,10 @@ def _mini_case(doc, project, x, y, width, height):
     photo = base.cached_image(doc.data["site"], images[0], 400, doc.quality) if images else None
     draw_image_cover(c, photo, x, y + height - 122, width, 122, radius=10)
 
-    c.setFont("SansB", 12)
     c.setFillColor(base.TEXT)
     title_y, _ = draw_text(c, project["title"], x + 16, y + height - 145, width - 32,
                             size=11.5, leading=16, font="SansB", max_lines=2)
 
-    c.setFont("Sans", 7.5)
     c.setFillColor(base.MUTED)
     role_y = title_y - 22
     role_y, _ = draw_text(c, project.get("role") or "", x + 16, role_y, width - 32,
