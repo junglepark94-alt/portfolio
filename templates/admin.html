@@ -233,13 +233,17 @@
       </thead>
       <tbody id="projectTbody">
         {% for p in projects %}
-        <tr data-id="{{ p.id }}">
+        <tr data-id="{{ p.id }}"{% if p.is_hidden %} class="row-hidden"{% endif %}>
           <td style="text-align:center;"><span class="drag-handle" title="드래그하여 순서 변경">⠿</span></td>
-          <td>{{ p.title }}</td>
+          <td>{{ p.title }}{% if p.is_hidden %} <span class="hidden-badge" title="공개 페이지에 표시되지 않습니다">숨김</span>{% endif %}</td>
           <td>{{ p.period or '—' }}</td>
           <td class="td-muted">{{ p.tech_stack }}</td>
           <td>
             <a href="{{ url_for('project_edit', pid=p.id) }}" class="btn-sm">수정</a>
+            <form method="POST" action="{{ url_for('project_toggle_hidden', pid=p.id) }}" style="display:inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+              <button type="submit" class="btn-sm" title="{{ '공개 페이지에 다시 표시' if p.is_hidden else '공개 페이지에서 숨기기 (데이터는 유지)' }}">{{ '공개' if p.is_hidden else '숨기기' }}</button>
+            </form>
             <form method="POST" action="{{ url_for('project_delete', pid=p.id) }}" style="display:inline" onsubmit="return confirm('삭제하시겠습니까?')">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
               <button type="submit" class="btn-sm btn-danger">삭제</button>

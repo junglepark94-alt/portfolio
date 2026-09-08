@@ -229,6 +229,7 @@ class Project(db.Model):
     kpi_en = db.Column(db.Text, default='')
     my_role_en = db.Column(db.String(200), default='')
     category_en = db.Column(db.String(100), default='')
+    is_hidden = db.Column(db.Boolean, default=False)  # True면 공개 페이지에서 제외 (관리자에서만 보임)
     images = db.relationship('ProjectImage', backref='project',
                              cascade='all, delete-orphan',
                              order_by='ProjectImage.sort_order, ProjectImage.id',
@@ -941,6 +942,7 @@ def init_db():
             "ALTER TABLE project ADD COLUMN my_role_en VARCHAR(200) DEFAULT ''",
             "ALTER TABLE project ADD COLUMN category_en VARCHAR(100) DEFAULT ''",
             "ALTER TABLE gallery_item ADD COLUMN title_en VARCHAR(200) DEFAULT ''",
+            "ALTER TABLE project ADD COLUMN is_hidden BOOLEAN DEFAULT FALSE",
         ]:
             try:
                 conn.execute(db.text(sql))
@@ -1077,9 +1079,16 @@ def inject_globals():
 
 # ── Public Routes ────────────────────────────────────────
 
+def _visible_projects():
+    """공개 페이지용 프로젝트 목록. 숨김 처리된 항목(is_hidden=True)은 제외한다."""
+    return (Project.query
+            .filter(db.or_(Project.is_hidden.is_(None), Project.is_hidden.is_(False)))
+            .order_by(Project.order, Project.created_at.desc()).all())
+
+
 def _render_index(lang):
     track_visit()
-    projects = Project.query.order_by(Project.order, Project.created_at.desc()).all()
+    projects = _visible_projects()
     gallery_items = GalleryItem.query.order_by(GalleryItem.sort_order, GalleryItem.created_at).all()
     profile = db.session.get(Profile, 1)
     return render_template(
@@ -1441,6 +1450,17 @@ def project_import_copy(pid):
         db.session.commit()
         flash('기준 문안을 불러와 저장했습니다. 필요한 부분을 고친 뒤 다시 저장하세요.')
     return redirect(url_for('project_edit', pid=pid))
+
+
+@app.route('/admin/project/<int:pid>/toggle-hidden', methods=['POST'])
+@login_required
+def project_toggle_hidden(pid):
+    """프로젝트를 공개 페이지에서 숨기거나 다시 공개한다. 데이터는 그대로 남는다."""
+    p = Project.query.get_or_404(pid)
+    p.is_hidden = not bool(p.is_hidden)
+    db.session.commit()
+    flash('프로젝트를 숨겼습니다.' if p.is_hidden else '프로젝트를 다시 공개했습니다.')
+    return redirect(url_for('admin_dashboard'))
 
 
 @app.route('/admin/project/<int:pid>/delete', methods=['POST'])

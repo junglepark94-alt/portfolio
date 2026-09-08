@@ -1150,6 +1150,19 @@ ul { list-style: none; }
   transition: opacity 0.15s;
 }
 .btn-sm:hover { opacity: 0.75; }
+.row-hidden td { opacity: 0.55; }
+.row-hidden td:last-child { opacity: 1; }
+.hidden-badge {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--muted);
+  border: 1px solid var(--border, currentColor);
+  vertical-align: middle;
+}
 .btn-danger { background: var(--danger-bg); color: var(--danger); }
 
 /* ── Lang Toggle ────────────────────────────── */
