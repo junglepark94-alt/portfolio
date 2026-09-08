@@ -384,3 +384,184 @@ def render_experience_map(doc, content):
                   color=base.MUTED)
 
     doc.footer("BRAND & CONTENT PORTFOLIO")
+
+
+def _mini_case(doc, project, x, y, width, height):
+    """Ported from build_portfolio_pdf.mini_case (220-236).
+
+    The original reads a JSON project (title_ko/overview/results/category_ko);
+    this receives a scraped project dict instead, per the field mapping in
+    task-6-brief.md:
+      title_ko -> title, overview -> desc, results -> split_kpi(kpi)[1] bullets,
+      category_ko -> category, role -> role. The image comes from the first
+      scraped image (there is no asset(key) lookup here).
+    """
+    c = doc.c
+    c.setFillColor(base.SURFACE)
+    c.roundRect(x, y, width, height, 10, fill=1, stroke=0)
+
+    images = project.get("images") or []
+    photo = base.cached_image(doc.data["site"], images[0], 400, doc.quality) if images else None
+    draw_image_cover(c, photo, x, y + height - 122, width, 122, radius=10)
+
+    c.setFont("SansB", 12)
+    c.setFillColor(base.TEXT)
+    title_y, _ = draw_text(c, project["title"], x + 16, y + height - 145, width - 32,
+                            size=11.5, leading=16, font="SansB", max_lines=2)
+
+    c.setFont("Sans", 7.5)
+    c.setFillColor(base.MUTED)
+    role_y = title_y - 22
+    c.drawString(x + 16, role_y, project.get("role") or "")
+
+    desc_y, _ = draw_text(c, project.get("desc") or "", x + 16, role_y - 22, width - 32,
+                           size=8.1, leading=13, color=base.MUTED, max_lines=4)
+
+    _, bullets = base.split_kpi(project.get("kpi"))
+    yy = desc_y - 24
+    for item in bullets[:3]:
+        c.setFillColor(base.ACCENT)
+        c.circle(x + 18, yy + 2, 1.8, fill=1, stroke=0)
+        draw_text(c, item, x + 27, yy, width - 42, size=8, leading=12, max_lines=1)
+        yy -= 17
+
+
+def render_production_foundation(doc, content, production):
+    """Ported from build_portfolio_pdf.build_pdf, the '13 Production foundation'
+    block (427-433), plus its mini_case helper (220-248)."""
+    c = doc.c
+    doc.begin_page()
+    eyebrow(c, "PRODUCTION FOUNDATION", base.MARGIN, base.PAGE_H - 58)
+    title(c, "사람과 이야기를 끝까지 완성하는 제작 현장에서 시작했습니다",
+          y=base.PAGE_H - 96, size=22)
+
+    cells = card_grid(base.MARGIN, 66, base.PAGE_W - 2 * base.MARGIN, 390,
+                       cols=2, rows=1, gap=24)
+    for project, (x, y, w, h) in zip(production, cells):
+        _mini_case(doc, project, x, y, w, h)
+
+    doc.footer("BRAND & CONTENT PORTFOLIO")
+
+
+def render_working_method(doc, content):
+    """Ported from build_portfolio_pdf.build_pdf, the '14 How I work' block
+    (435-461)."""
+    c = doc.c
+    doc.begin_page()
+    eyebrow(c, "WORKING METHOD", base.MARGIN, base.PAGE_H - 58)
+    title(c, "감각으로 시작하되, 고객 행동과 데이터로 끝까지 검증합니다",
+          y=base.PAGE_H - 96, size=22)
+
+    # The brief's literal card_grid(..., 155, ..., 460, ...) puts the grid's
+    # top edge at 155 + 460 = 615pt, above PAGE_H (~595pt) — the cards then
+    # overflow the page and their opaque fill paints over the eyebrow/title
+    # above them. The original build_portfolio_pdf.py used a 330pt-tall card
+    # starting at y=118 for this row (435-461); reuse those figures, which
+    # also happen to match this port's top-anchored offsets below exactly
+    # (h-48/h-82/h-123 with h=330 reproduce the original's absolute y
+    # positions of 282/248/207 measured from the card's y=118 origin).
+    cells = card_grid(base.MARGIN, 118, base.PAGE_W - 2 * base.MARGIN, 330,
+                       cols=3, rows=1, gap=24)
+    for pillar, (x, y, w, h) in zip(content["working_method"], cells):
+        c.setFillColor(base.SURFACE)
+        c.roundRect(x, y, w, h, 12, fill=1, stroke=0)
+        c.setFont("SerifXB", 26)
+        c.setFillColor(base.ACCENT)
+        c.drawString(x + 18, y + h - 48, pillar["step"])
+        c.setFont("SansB", 9)
+        c.setFillColor(base.ACCENT)
+        c.drawString(x + 18, y + h - 82, pillar["label"])
+        draw_text(c, pillar["body"], x + 18, y + h - 123, w - 36, size=10, leading=18,
+                  font="SansB")
+        line_y = y + 97
+        c.setStrokeColor(base.BORDER)
+        c.line(x + 18, line_y, x + w - 18, line_y)
+        c.setFont("SansB", 8)
+        c.setFillColor(base.MUTED)
+        c.drawString(x + 18, line_y - 22, "EVIDENCE")
+        draw_text(c, pillar["evidence"], x + 18, line_y - 44, w - 36, size=8.5,
+                  leading=15, color=base.MUTED)
+
+    doc.footer("BRAND & CONTENT PORTFOLIO")
+
+
+def render_closing(doc, content):
+    """Ported from build_portfolio_pdf.build_pdf, the '15 Closing' block
+    (463-496). Contact and awards come from the scraped site data
+    (doc.data["email"], doc.data["linkedin"], doc.data["site"],
+    doc.data["awards"]) instead of the original static JSON contact/awards
+    blocks. Awards items carry period/main/sub (from _list_items), which map
+    to the original's year/title/organization. A site QR code is added under
+    the recognition card, per the brief."""
+    c = doc.c
+    doc.begin_page()
+    c.setFont("SansB", 8)
+    c.setFillColor(base.ACCENT)
+    c.drawString(base.MARGIN, base.PAGE_H - 58, "THANK YOU · 2026")
+    draw_text(c, "콘텐츠에서 공간으로,\n공간에서 다시 콘텐츠로.",
+              base.MARGIN, base.PAGE_H - 125, 520, size=31, leading=45, font="SerifXB")
+    draw_text(c, "사람이 머물고, 참여하고, 다시 찾는 브랜드 경험을 설계합니다.",
+              base.MARGIN, 320, 530, size=13, leading=20, color=base.MUTED)
+    c.setFont("SerifXB", 18)
+    c.setFillColor(base.TEXT)
+    c.drawString(base.MARGIN, 230, "박종걸 · Jonggeol Park")
+
+    # Strip scheme and www prefix from LinkedIn URL
+    linkedin = doc.data["linkedin"]
+    linkedin = re.sub(r'^https?://', '', linkedin)
+    linkedin = re.sub(r'^www\.', '', linkedin)
+    contacts = [
+        ("EMAIL", doc.data["email"]),
+        ("PORTFOLIO", doc.data["site"].replace("https://", "")),
+        ("LINKEDIN", linkedin),
+    ]
+    yy = 187
+    for label, value in contacts:
+        c.setFont("SansB", 7.5)
+        c.setFillColor(base.ACCENT)
+        c.drawString(base.MARGIN, yy, label)
+        c.setFont("Sans", 9)
+        c.setFillColor(base.TEXT)
+        c.drawString(base.MARGIN + 78, yy, value)
+        yy -= 28
+    c.linkURL(doc.data["site"], (base.MARGIN + 78, 145, base.MARGIN + 400, 164), relative=0)
+
+    c.setFillColor(base.SURFACE)
+    c.roundRect(548, 112, 249, 330, 12, fill=1, stroke=0)
+    c.setFont("SansB", 8)
+    c.setFillColor(base.ACCENT)
+    c.drawString(568, 408, "SELECTED RECOGNITION")
+    # The original's draw_text returns the baseline *after* the last line
+    # (y - n*leading); this port's draw_text (line 107) returns the last
+    # baseline actually drawn (y - (n-1)*leading), one leading short. Porting
+    # the original's tight "yy - 2" / "- 20" offsets verbatim collapsed
+    # multi-line award titles into their own subtitle line. Add back each
+    # text's own leading before starting the next block instead.
+    yy = 374
+    # Sort awards by year (most recent first), being defensive about parsing
+    def extract_year(award):
+        match = re.search(r'\d{4}', award.get("period", ""))
+        return int(match.group()) if match else 0
+    sorted_awards = sorted(doc.data["awards"], key=extract_year, reverse=True)
+    for award in sorted_awards:
+        c.setFont("SerifB", 13)
+        c.setFillColor(base.ACCENT)
+        c.drawString(568, yy, award["period"])
+        main_y, _ = draw_text(c, award["main"], 620, yy, 155, size=9, leading=14,
+                               font="SansB")
+        sub_y, _ = draw_text(c, award["sub"], 620, main_y - 14, 155, size=7.5,
+                              leading=12, color=base.MUTED)
+        yy = sub_y - 30
+
+    # The brief's literal doc.qr(..., PAGE_W - MARGIN - 78, 96, 78) draws a
+    # 78pt QR (plus its own 6pt quiet-zone padding on every side) reaching
+    # from y=90 to y=180 -- 68pt into the recognition card above it, which
+    # sits at y=112. Shrink and drop the QR so its padded box (y-6 to
+    # y+size+6) clears the card's bottom edge (112) with a couple points to
+    # spare, while staying above the footer rule at y=32, and center it
+    # under the card horizontally instead of right-aligning it off the card.
+    qr_size = 60
+    qr_x = 548 + (249 - qr_size) / 2
+    doc.qr(doc.data["site"], qr_x, 44, qr_size)
+
+    doc.footer("BRAND & CONTENT PORTFOLIO")
