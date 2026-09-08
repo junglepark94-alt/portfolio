@@ -982,6 +982,9 @@ class Doc:
         global first_page
         if self.layout == 'showcase':
             return self._build_showcase()
+        if self.layout == 'astra':
+            import astra_pages
+            return astra_pages.build(self, self.content)
         self.cover()
         self.profile()
         self.index_page()
@@ -1057,6 +1060,12 @@ def build(site, lang, out, max_mb=None, layout='general'):
         path = os.path.join(ROOT, 'data', 'hyundai_application_2026.json')
         with open(path, encoding='utf-8') as fh:
             content = sp.load_showcase_content(_json.load(fh))
+    elif layout == 'astra':
+        import json as _json
+        import astra_pages
+        path = os.path.join(ROOT, 'data', 'astra_portfolio.json')
+        with open(path, encoding='utf-8') as fh:
+            content = astra_pages.load_astra_content(_json.load(fh))
     print('scraping', site, lang)
     data = scrape(site, lang)
     print(f"  {data['name']} · {len(data['projects'])} projects · {len(data['experience'])} jobs")
@@ -1081,7 +1090,7 @@ if __name__ == '__main__':
     ap.add_argument('--out', default=None, help='output PDF path')
     ap.add_argument('--max-mb', type=float, default=None,
                     help='shrink images until the PDF fits this size, e.g. --max-mb 2')
-    ap.add_argument('--layout', choices=['general', 'showcase'], default='general',
+    ap.add_argument('--layout', choices=['general', 'showcase', 'astra'], default='general',
                     help="'showcase' combines the editorial intro/closing pages "
                          "with the project detail pages")
     args = ap.parse_args()

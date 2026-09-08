@@ -1,0 +1,465 @@
+# -*- coding: utf-8 -*-
+"""Page renderers for the `astra` portfolio PDF layout.
+
+An editorial layout: a dark cover, a profile page, an overview with a clickable
+table of contents, one claim-headline page per project, a production page, a
+dark "how I work" page and a dark EOD/contact page.
+
+Copy comes from data/astra_portfolio.json. Images, links, experience, education
+and awards come from the scraped site. Every image is drawn with a crop-to-fill
+box (never letterboxed), so mixed source aspect ratios do not leave bars.
+"""
+import re
+from datetime import date
+
+import qrcode
+from reportlab.lib.colors import HexColor
+from reportlab.pdfbase import pdfmetrics
+
+import build_general_portfolio_pdf as base
+from showcase_pages import _norm, _wrap, draw_image_cover, draw_text
+
+# ── Palette (sampled from the reference render) ───────────────────────
+LIGHT_BG = HexColor("#f7f5ef")
+DARK_BG = HexColor("#252722")
+TEXT = HexColor("#252722")
+TEXT_L = HexColor("#f7f5ef")           # text on dark pages
+MUTED = HexColor("#8f918a")
+MUTED_L = HexColor("#a3a59e")
+ACCENT = HexColor("#c44f2f")           # on light pages
+ACCENT_L = HexColor("#f08964")         # on dark pages
+RULE = HexColor("#dedbd2")
+RULE_L = HexColor("#3e403b")
+CHIP = HexColor("#eceee7")
+
+W, H, M = base.PAGE_W, base.PAGE_H, 40
+RIGHT = W - M                          # 802
+COL2 = 430                             # right column x on two-column pages
+COL_W = RIGHT - COL2                   # 372
+
+REQUIRED_KEYS = ("cover", "profile", "overview", "projects", "production", "method", "eod")
+
+
+def load_astra_content(data):
+    """Validate the parsed astra_portfolio.json; KeyError names the first missing key."""
+    for key in REQUIRED_KEYS:
+        if key not in data:
+            raise KeyError(key)
+    return data
+
+
+# ── Small drawing helpers ─────────────────────────────────────────────
+
+def _t(c, s, x, y, font, size, color):
+    c.setFont(font, size)
+    c.setFillColor(color)
+    c.drawString(x, y, s)
+
+
+def _rt(c, s, x, y, font, size, color):
+    c.setFont(font, size)
+    c.setFillColor(color)
+    c.drawRightString(x, y, s)
+
+
+def _rule(c, x1, x2, y, color, width=0.6):
+    c.setStrokeColor(color)
+    c.setLineWidth(width)
+    c.line(x1, y, x2, y)
+
+
+def _link_out(c, url, x, y, w, h):
+    if url:
+        c.linkURL(url, (x, y, x + w, y + h), relative=0, thickness=0)
+
+
+def _link_in(c, key, x, y, w, h):
+    c.linkRect("", key, (x, y, x + w, y + h), relative=1, thickness=0)
+
+
+def _arrow_link(c, label, x, y, url=None, dest=None, font="SansB", size=7, color=ACCENT):
+    """`label  >` in accent; returns the x where the next link may start."""
+    s = f"{label}  >"
+    _t(c, s, x, y, font, size, color)
+    w = pdfmetrics.stringWidth(s, font, size)
+    if url:
+        _link_out(c, url, x, y - 3, w, size + 5)
+    elif dest:
+        _link_in(c, dest, x, y - 3, w, size + 5)
+    return x + w + 26
+
+
+def _qr(c, url, x, y, size, fg=DARK_BG, bg=TEXT_L):
+    q = qrcode.QRCode(border=0)
+    q.add_data(url)
+    q.make(fit=True)
+    m = q.get_matrix()
+    cell = size / len(m)
+    c.setFillColor(bg)
+    c.rect(x - 6, y - 6, size + 12, size + 12, stroke=0, fill=1)
+    c.setFillColor(fg)
+    for r, row in enumerate(m):
+        for col, on in enumerate(row):
+            if on:
+                c.rect(x + col * cell, y + size - (r + 1) * cell, cell, cell, stroke=0, fill=1)
+    _link_out(c, url, x - 6, y - 6, size + 12, size + 12)
+
+
+# ── Page chrome ───────────────────────────────────────────────────────
+
+def _chrome(doc, label, dark=False):
+    """Running header + footer. Page count uses the two-pass total when known."""
+    c = doc.c
+    fg, mu, ru = (TEXT_L, MUTED_L, RULE_L) if dark else (TEXT, MUTED, RULE)
+    _t(c, "JONGGEOL PARK", M, H - 34, "SansB", 6.5, fg)
+    _t(c, label, 240, H - 34, "Sans", 6.5, mu)
+    _rule(c, M, RIGHT, H - 47, ru)
+    _rule(c, M, RIGHT, 31, ru)
+    _t(c, "BRAND MARKETING / CONTENT STRATEGY", M, 18, "Sans", 6, mu)
+    _t(c, f"{date.today():%Y.%m}  /  PORTFOLIO", 600, 18, "Sans", 6, mu)
+    total = f"{doc.total:02d}" if doc.total else "--"
+    _rt(c, f"{doc.page_no:02d} / {total}", RIGHT, 18, "SansB", 7, fg)
+
+
+def _page(doc, key, label, dark=False):
+    doc.begin_page(bg=DARK_BG if dark else LIGHT_BG)
+    doc.c.bookmarkPage(key)
+    _chrome(doc, label, dark)
+
+
+# ── Site lookups ──────────────────────────────────────────────────────
+
+def _site_project(doc, title):
+    wanted = _norm(title)
+    for p in doc.data.get("projects") or []:
+        if _norm(p.get("title")) == wanted:
+            return p
+    return None
+
+
+def _image(doc, project, index, width_pt=560):
+    images = (project or {}).get("images") or []
+    if index >= len(images):
+        return None
+    return base.cached_image(doc.data["site"], images[index], width_pt, doc.quality)
+
+
+def _link_urls(project, labels):
+    """URLs for the requested link labels, in order; falls back to the site's first links."""
+    site = (project or {}).get("links") or []
+    out = []
+    for label in labels:
+        want = _norm(label)
+        hit = next((l for l in site if _norm(l.get("label")) == want), None)
+        hit = hit or next((l for l in site if _norm(l.get("label")).startswith(want)), None)
+        out.append((label, hit["url"] if hit else None))
+    return out
+
+
+# ── Pages ─────────────────────────────────────────────────────────────
+
+def render_cover(doc, content):
+    c, cv = doc.c, content["cover"]
+    _page(doc, "page-cover", "PORTFOLIO 2026", dark=True)
+
+    y = 490
+    for line in cv["headline"]:
+        _t(c, line, M, y, "SansXB", 30, TEXT_L)
+        y -= 38
+    y -= 14
+    for i, line in enumerate(cv["headline_accent"]):
+        _t(c, line, M, y, "SansXB", 30, ACCENT_L if i == len(cv["headline_accent"]) - 1 else TEXT_L)
+        y -= 38
+    draw_text(c, cv["sub"], M, 300, 400, size=9.5, leading=16, color=MUTED_L)
+    _t(c, doc.data["name"], M, 190, "SansXB", 19, TEXT_L)
+    _t(c, "Jonggeol Park", M, 172, "Sans", 8.5, MUTED_L)
+
+    # Portrait from the site, cropped to fill a fixed box so it never letterboxes.
+    photo = base.cached_image(doc.data["site"], doc.data["photo"], 600, doc.quality) if doc.data.get("photo") else None
+    px, pw, ptop, ph = 500, RIGHT - 500, 505, 330
+    if photo:
+        draw_image_cover(c, photo, px, ptop - ph, pw, ph, radius=4)
+    _rule(c, px, RIGHT, 160, RULE_L)
+    _t(c, "SELECTED EXPERIENCE", px, 146, "SansB", 6.5, ACCENT_L)
+    yy = 126
+    for line in cv["experience"]:
+        _t(c, line, px, yy, "Sans", 8.5, TEXT_L)
+        yy -= 16
+    _t(c, cv["tags"], px, yy - 6, "Sans", 6.5, MUTED_L)
+
+
+def render_profile(doc, content):
+    c, d, pf = doc.c, doc.data, content["profile"]
+    _page(doc, "page-profile", pf["label"])
+
+    _t(c, pf["headline"][0], M, 500, "SansXB", 21, TEXT)
+    _t(c, pf["headline"][1], M, 473, "SansXB", 21, TEXT)
+    _t(c, d["name"], M, 428, "SansXB", 18, TEXT)
+    _t(c, "Jonggeol Park", M + pdfmetrics.stringWidth(d["name"], "SansXB", 18) + 14, 428, "Sans", 8.5, MUTED)
+
+    # Left: experience from the site. Vertical flow follows the drawn text.
+    _t(c, "EXPERIENCE", M, 376, "SansB", 6.5, ACCENT)
+    yy = 346
+    for exp in d.get("experience") or []:
+        _t(c, exp["company"], M, yy, "SansXB", 14, TEXT)
+        _t(c, exp["period"], M + 124, yy, "Sans", 7.5, MUTED)
+        yy, _ = draw_text(c, exp.get("role") or "", M, yy - 23, 360, size=8.3, leading=12, font="SansB")
+        body = " · ".join(exp.get("bullets") or [])
+        yy, _ = draw_text(c, body, M, yy - 17, 360, size=7.6, leading=13, color=MUTED, max_lines=3)
+        yy -= 48
+        if yy < 120:
+            break
+
+    # Right: education + language, then recognition (most recent first).
+    x = COL2
+    _t(c, "EDUCATION / LANGUAGE", x, 376, "SansB", 6.5, ACCENT)
+    ry = 350
+    for edu in d.get("education") or []:
+        line = " ".join(s for s in (edu.get("main"), edu.get("sub")) if s)
+        _t(c, f"{line} / {edu.get('period', '')}".strip(" /"), x, ry, "Sans", 8.2, TEXT)
+        ry -= 18
+    for lang in d.get("language") or []:
+        line = " ".join(s for s in (lang.get("main"), lang.get("sub")) if s)
+        period = lang.get("period") or ""
+        _t(c, f"{line} / {period}".strip(" /"), x, ry, "Sans", 8.2, TEXT)
+        ry -= 18
+
+    ry -= 28
+    _t(c, "SELECTED RECOGNITION", x, ry, "SansB", 6.5, ACCENT)
+    ry -= 24
+    for aw in _awards_desc(d.get("awards") or []):
+        year = _year(aw.get("period") or aw.get("main") or "")
+        main = aw.get("main") or ""
+        line = main if main.startswith(str(year)) else f"{year} {main}".strip()
+        ry, _ = draw_text(c, line, x, ry, COL_W, size=8.2, leading=12, max_lines=1)
+        ry -= 18
+        if ry < 110:
+            break
+
+    # Compact contact line that follows the content instead of sitting at a
+    # fixed height (no empty band); the full contact block with QR is on the EOD page.
+    cy = max(90, min(yy + 20, ry) - 30)
+    _rule(c, M, RIGHT, cy, RULE)
+    xx = M
+    for label, url in ((d.get("email"), f"mailto:{d.get('email')}"),
+                       (d["site"].replace("https://", ""), d["site"]),
+                       ("LinkedIn / Jonggeol Park", d.get("linkedin"))):
+        if label:
+            xx = _arrow_link(c, label, xx, cy - 20, url=url)
+
+
+def _year(s):
+    m = re.search(r"(20\d\d|19\d\d)", s or "")
+    return int(m.group(1)) if m else 0
+
+
+def _awards_desc(awards):
+    return sorted(awards, key=lambda a: _year(a.get("period") or a.get("main") or ""), reverse=True)
+
+
+def render_overview(doc, content, first_project_page, tail_page):
+    c, ov = doc.c, content["overview"]
+    _page(doc, "page-overview", ov["label"])
+
+    _t(c, ov["headline"], M, 497, "SansXB", 22, TEXT)
+    draw_text(c, ov["sub"], M, 470, 700, size=8.5, leading=13, color=MUTED)
+
+    col_w, gap = 245, 20
+    for i, (value, label) in enumerate(ov["stats"]):
+        x = M + i * (col_w + gap)
+        _rule(c, x, x + col_w, 440, ACCENT, 1.5)
+        _t(c, value, x, 405, "SansXB", 28, TEXT)
+        draw_text(c, label, x, 385, col_w, size=8, leading=13, color=MUTED)
+
+    _t(c, ov["work_label"], M, 322, "SansB", 6.5, ACCENT)
+    y = 300
+    for g in ov["groups"]:
+        if g.get("tail"):
+            first, last = tail_page, tail_page + 2
+        else:
+            first = first_project_page + g["first_project"]
+            last = first + g["count"] - 1
+        _t(c, g["num"], M, y, "SansB", 8, ACCENT)
+        _t(c, g["title"], M + 40, y, "SansB", 9, TEXT)
+        _t(c, g["items"], 330, y, "Sans", 7.8, MUTED)
+        _rt(c, f"{first:02d} - {last:02d}", RIGHT, y, "SansB", 7.5, TEXT)
+        _rule(c, M, RIGHT, y - 14, RULE)
+        _link_in(c, f"page-{first}", M, y - 12, RIGHT - M, 28)
+        y -= 42
+
+    foot = ov["footnote"].replace("{date}", f"{date.today():%Y.%m.%d}")
+    draw_text(c, foot, M, 52, RIGHT - M, size=5.8, leading=9, color=MUTED, max_lines=2)
+
+
+def render_project(doc, content, idx, total, pj):
+    """One claim-headline project page. Left: media + stats + links. Right: sections."""
+    c = doc.c
+    site = _site_project(doc, pj["site_title"])
+    _page(doc, f"page-{doc.page_no + 1}", pj["label"])
+
+    _rt(c, f"{idx:02d} / {total:02d}", RIGHT, 508, "SansB", 8, ACCENT)
+    _t(c, pj["headline"][0], M, 500, "SansXB", 21, TEXT)
+    _t(c, pj["headline"][1], M, 473, "SansXB", 21, TEXT)
+    _t(c, pj["name"], M, 440, "SansB", 10.5, ACCENT)
+    _t(c, (site or {}).get("period") or "", COL2, 440, "Sans", 8, MUTED)
+
+    # Left column media. Hero is always a 16:9 crop-to-fill box; the row below
+    # is two cropped thumbnails when the site has them, otherwise topic chips.
+    lx, lw = M, 350
+    hero_h = 188                           # a hair under 16:9 (197) so the stats row clears the thumbs
+    hero_top = 420
+    hero = _image(doc, site, 0, 700)
+    if hero:
+        draw_image_cover(c, hero, lx, hero_top - hero_h, lw, hero_h, radius=3, focus_y=0.35)
+    row_top = hero_top - hero_h - 8
+    extra = [_image(doc, site, i, 340) for i in (1, 2, 3)]
+    extra = [t for t in extra if t]
+    if len(extra) >= 2:
+        # Three 16:9 cells when the site has the images (a 16:9 still then
+        # needs no crop at all); otherwise two cells. Portrait sources are
+        # cropped from the top, where a screenshot's picture sits, not its caption.
+        n = 3 if len(extra) >= 3 else 2
+        tw = (lw - 8 * (n - 1)) / n
+        th = min(63, round(tw * 9 / 16))
+        for i, t in enumerate(extra[:n]):
+            draw_image_cover(c, t, lx + i * (tw + 8), row_top - th, tw, th, radius=3, focus_y=0.18)
+    elif pj.get("chips"):
+        cw, ch = (lw - 16) / 3, 24
+        for i, chip in enumerate(pj["chips"][:3]):
+            x = lx + i * (cw + 8)
+            c.setFillColor(CHIP)
+            c.rect(x, row_top - ch, cw, ch, stroke=0, fill=1)
+            _t(c, chip, x + 10, row_top - ch + 8, "Sans", 7.2, TEXT)
+
+    # Stats
+    stat_w = lw / 3
+    for i, (value, label) in enumerate(pj["stats"][:3]):
+        x = lx + i * stat_w
+        size = 24 if pdfmetrics.stringWidth(value, "SansXB", 24) <= stat_w - 8 else 19
+        _t(c, value, x, 120, "SansXB", size, TEXT)
+        draw_text(c, label, x, 102, stat_w - 8, size=7.2, leading=11, color=MUTED, max_lines=2)
+
+    # Links
+    xx = lx
+    for label, url in _link_urls(site, pj.get("links") or [])[:2]:
+        xx = _arrow_link(c, label, xx, 62, url=url)
+
+    # Footnote
+    draw_text(c, pj.get("footnote") or "", M, 46, RIGHT - M, size=5.8, leading=9, color=MUTED, max_lines=2)
+
+    # Right column sections, flowing from the top.
+    y = 406
+    for label, body in pj["sections"]:
+        _t(c, label, COL2, y, "SansB", 7.2, ACCENT)
+        y, _ = draw_text(c, body, COL2, y - 16, COL_W, size=8.3, leading=12.5, max_lines=4)
+        y -= 26
+
+    # Highlight block anchored near the bottom of the column.
+    hy = min(150, y - 4)
+    _rule(c, COL2, RIGHT, hy, ACCENT, 0.8)
+    _t(c, pj["highlight"][0], COL2, hy - 22, "SansB", 9.5, TEXT)
+    draw_text(c, pj["highlight"][1], COL2, hy - 38, COL_W, size=7.8, leading=11, color=MUTED, max_lines=2)
+    role = (site or {}).get("role") or ""
+    _t(c, "역할", COL2, 68, "SansB", 7, MUTED)
+    _t(c, role, COL2 + 24, 68, "Sans", 7, MUTED)
+
+
+def render_production(doc, content):
+    c, pr = doc.c, content["production"]
+    _page(doc, f"page-{doc.page_no + 1}", pr["label"])
+
+    _t(c, pr["headline"], M, 500, "SansXB", 21, TEXT)
+    draw_text(c, pr["sub"], M, 475, 700, size=8.5, leading=13, color=MUTED)
+
+    card_w = COL_W
+    img_h = round(card_w * 9 / 16)       # 209
+    for i, card in enumerate(pr["cards"][:2]):
+        x = M + i * (card_w + 18)
+        site = _site_project(doc, card["site_title"])
+        img = _image(doc, site, 0, 700)
+        if img:
+            draw_image_cover(c, img, x, 440 - img_h, card_w, img_h, radius=3)
+        _t(c, card["name"], x, 205, "SansXB", 13, TEXT)
+        _rt(c, card["period"], x + card_w, 205, "Sans", 7.5, MUTED)
+        draw_text(c, card["desc"], x, 182, card_w, size=8, leading=13, max_lines=2)
+        value, label = card["stat"]
+        _t(c, value, x, 118, "SansXB", 24, ACCENT)
+        vw = pdfmetrics.stringWidth(value, "SansXB", 24)
+        draw_text(c, label, x + vw + 14, 126, card_w - vw - 14, size=7.5, leading=11, color=MUTED, max_lines=2)
+        xx = x
+        for lab, url in _link_urls(site, card.get("links") or [])[:2]:
+            xx = _arrow_link(c, lab, xx, 70, url=url)
+
+    draw_text(c, pr.get("footnote") or "", M, 48, RIGHT - M, size=5.8, leading=9, color=MUTED, max_lines=2)
+
+
+def render_method(doc, content, first_project_page):
+    c, me = doc.c, content["method"]
+    _page(doc, f"page-{doc.page_no + 1}", me["label"], dark=True)
+
+    _t(c, me["headline"][0], M, 498, "SansXB", 22, TEXT_L)
+    _t(c, me["headline"][1], M, 470, "SansXB", 22, TEXT_L)
+
+    col_w, gap = 232, 30
+    for i, st in enumerate(me["steps"][:3]):
+        x = M + i * (col_w + gap)
+        _t(c, st["num"], x, 366, "SansXB", 34, ACCENT_L)
+        _rule(c, x, x + col_w, 334, RULE_L)
+        _t(c, st["title"], x, 311, "SansB", 12, TEXT_L)
+        draw_text(c, st["body"], x, 284, col_w, size=8.3, leading=13, color=MUTED_L)
+        _t(c, f"실제 적용  /  {st['case']}", x, 222, "SansB", 6.8, ACCENT_L)
+        y, _ = draw_text(c, st["applied"], x, 204, col_w, size=7.8, leading=12, color=TEXT_L, max_lines=4)
+        y -= 20
+        for line in st["result"].split("\n"):
+            _t(c, "→ " + line, x, y, "SansB", 7.6, ACCENT_L)
+            y -= 12
+        _arrow_link(c, "사례로 이동", x, y - 14, dest=f"page-{first_project_page + st['project']}",
+                    color=TEXT_L)
+
+
+def render_eod(doc, content):
+    c, d, eo = doc.c, doc.data, content["eod"]
+    _page(doc, f"page-{doc.page_no + 1}", "END OF DOCUMENT", dark=True)
+
+    _t(c, eo["mark"], M, 430, "SansXB", 58, ACCENT_L)
+    _t(c, eo["headline"][0], M, 370, "SansXB", 22, TEXT_L)
+    _t(c, eo["headline"][1], M, 342, "SansXB", 22, TEXT_L)
+    draw_text(c, eo["sub"], M, 300, 420, size=9, leading=15, color=MUTED_L)
+
+    y = 200
+    rows = (("EMAIL", d.get("email"), f"mailto:{d.get('email')}"),
+            ("PORTFOLIO", d["site"].replace("https://", ""), d["site"]),
+            ("LINKEDIN", (d.get("linkedin") or "").replace("https://", "").replace("www.", ""), d.get("linkedin")))
+    for label, value, url in rows:
+        if not value:
+            continue
+        _t(c, label, M, y, "SansB", 6.5, ACCENT_L)
+        _t(c, value, M + 80, y, "Sans", 9, TEXT_L)
+        _link_out(c, url, M + 80, y - 3, pdfmetrics.stringWidth(value, "Sans", 9), 14)
+        y -= 26
+
+    qx, qs = RIGHT - 96, 96
+    _qr(c, d["site"], qx, 110, qs)
+    draw_text(c, eo["site_note"], COL2, 160, qx - COL2 - 24, size=7.5, leading=12, color=MUTED_L)
+
+
+# ── Document assembly ─────────────────────────────────────────────────
+
+def build(doc, content):
+    """Render the whole astra document. Returns (page_count, {project_index: page_no})."""
+    n_proj = len(content["projects"])
+    first_project_page = 4                       # cover, profile, overview, then projects
+    tail_page = first_project_page + n_proj      # production page
+
+    render_cover(doc, content)
+    render_profile(doc, content)
+    render_overview(doc, content, first_project_page, tail_page)
+    started = {}
+    for i, pj in enumerate(content["projects"], 1):
+        started[i] = doc.page_no + 1
+        render_project(doc, content, i, n_proj, pj)
+    render_production(doc, content)
+    render_method(doc, content, first_project_page)
+    render_eod(doc, content)
+    doc.c.save()
+    return doc.page_no, started

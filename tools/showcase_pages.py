@@ -183,8 +183,13 @@ def title(c, text, x=base.MARGIN, y=base.PAGE_H - 72, size=26,
     return y
 
 
-def draw_image_cover(c, image_path, x, y, width, height, radius=8):
-    """Ported from build_portfolio_pdf.draw_image_cover (110-138)."""
+def draw_image_cover(c, image_path, x, y, width, height, radius=8, focus_y=0.5):
+    """Ported from build_portfolio_pdf.draw_image_cover (110-138).
+
+    Crops the source to fill the box (never letterboxes). `focus_y` picks where a
+    vertical crop is taken from: 0.5 keeps the middle, smaller values keep more
+    of the top — useful for portrait screenshots whose picture sits above a caption.
+    """
     if not image_path or not Path(image_path).exists():
         c.setFillColor(base.BG_ALT)
         c.roundRect(x, y, width, height, radius, fill=1, stroke=0)
@@ -199,7 +204,7 @@ def draw_image_cover(c, image_path, x, y, width, height, radius=8):
             image = image.crop((left, 0, left + crop_width, image.height))
         else:
             crop_height = int(image.width / target_ratio)
-            top = (image.height - crop_height) // 2
+            top = int((image.height - crop_height) * focus_y)
             image = image.crop((0, top, image.width, top + crop_height))
         image.thumbnail((int(width * 2.2), int(height * 2.2)), Image.Resampling.LANCZOS)
         buffer = io.BytesIO()
