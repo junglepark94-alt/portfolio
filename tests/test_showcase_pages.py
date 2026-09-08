@@ -76,3 +76,22 @@ def test_split_projects_reports_titles_the_site_does_not_have():
     assert production == []
     assert [p["title"] for p in main] == ["다른 프로젝트"]
     assert missing == ["없는 제목"]
+
+
+def test_card_grid_lays_cards_left_to_right_top_row_first():
+    cells = showcase_pages.card_grid(0, 0, 100, 100, cols=2, rows=2, gap=10)
+
+    assert len(cells) == 4
+    assert cells[0] == (0.0, 55.0, 45.0, 45.0)     # top-left
+    assert cells[1] == (55.0, 55.0, 45.0, 45.0)    # top-right
+    assert cells[2] == (0.0, 0.0, 45.0, 45.0)      # bottom-left
+    assert cells[3] == (55.0, 0.0, 45.0, 45.0)     # bottom-right
+
+
+def test_card_grid_single_row_splits_width_only():
+    cells = showcase_pages.card_grid(44, 200, 700, 140, cols=4, rows=1, gap=16)
+
+    assert len(cells) == 4
+    assert cells[0] == (44.0, 200.0, 163.0, 140.0)
+    assert cells[3][0] == 44.0 + 3 * (163.0 + 16)
+    assert all(cell[3] == 140.0 for cell in cells)

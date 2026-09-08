@@ -55,3 +55,23 @@ def split_projects(projects, production_titles):
     picked = {id(p) for p in production}
     main = [p for p in projects if id(p) not in picked]
     return main, production, missing
+
+
+def card_grid(x, y, width, height, cols, rows, gap):
+    """Even card grid inside the given box, listed left-to-right, top row first.
+
+    (x, y) is the bottom-left corner, matching reportlab's coordinate system.
+    """
+    cell_w = (width - gap * (cols - 1)) / cols
+    cell_h = (height - gap * (rows - 1)) / rows
+    cells = []
+    for row in range(rows):
+        top_first = rows - 1 - row
+        for col in range(cols):
+            cells.append((
+                float(x + col * (cell_w + gap)),
+                float(y + top_first * (cell_h + gap)),
+                float(cell_w),
+                float(cell_h),
+            ))
+    return cells
