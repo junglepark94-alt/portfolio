@@ -400,13 +400,18 @@ def render_project(doc, content, idx, total, pj):
         focuses = [None] * len(tiles)
     tiles, focuses = tiles[:3], focuses[:3]
 
-    vertical = sum(1 for t in tiles if _aspect(t) < 0.8) >= 2
-    # Vertical stills need tall cells, so the hero gives up height to them;
-    # landscape stills fill a 16:9 cell with no crop at all.
-    hero_h, tile_h = (145, 127) if vertical else (188, 63)
+    # Only genuinely tall stills switch the row to tall cells. Near-square site
+    # photos (~0.75) must not, or they drag the hero into a squashed band.
+    vertical = sum(1 for t in tiles if _aspect(t) < 0.7) >= 2
+    # Vertical stills need tall cells, so the hero gives up height to them.
+    # Otherwise the hero is a true 16:9 box, which a video still fills uncropped.
+    hero_h, tile_h = (140, 120) if vertical else (197, 63)
     hero = _image(doc, site, 0, 700)
     if hero:
-        draw_image_cover(c, hero, lx, hero_top - hero_h, lw, hero_h, radius=3, focus_y=0.35)
+        # `hero_focus` says which band of the still to keep when the box is
+        # shorter than the source — e.g. 1.0 to hold on to a caption at its foot.
+        draw_image_cover(c, hero, lx, hero_top - hero_h, lw, hero_h, radius=3,
+                         focus_y=pj.get("hero_focus", 0.35))
     row_top = hero_top - hero_h - 8
     if len(tiles) >= 2:
         n = len(tiles)
@@ -438,8 +443,8 @@ def render_project(doc, content, idx, total, pj):
     for i, (value, label) in enumerate(pj["stats"][:3]):
         x = lx + i * stat_w
         size = 24 if pdfmetrics.stringWidth(value, "SansXB", 24) <= stat_w - 8 else 19
-        _t(c, value, x, 120, "SansXB", size, TEXT)
-        draw_text(c, label, x, 102, stat_w - 8, size=7.6, leading=11.5, color=MUTED, max_lines=2)
+        _t(c, value, x, 112, "SansXB", size, TEXT)
+        draw_text(c, label, x, 94, stat_w - 8, size=7.6, leading=11.5, color=MUTED, max_lines=2)
 
     # Links
     xx = lx

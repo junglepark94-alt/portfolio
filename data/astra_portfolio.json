@@ -72,6 +72,7 @@
       "label": "DOMESTIC / CHARACTER IP",
       "headline": ["정보를 전달하던 채널에,", "다음 편을 기다릴 이유를 만들다."],
       "name": "빙그레우스 유튜브",
+      "hero_focus": 1.0,
       "tiles": [{"file": "binggraeus_1.jpg", "focus": 0.1}, "binggraeus_2.jpg", {"file": "binggraeus_3.jpg", "focus": 0.0}],
       "chips": ["정보성 콘텐츠", "캐릭터 서사", "재방문"],
       "stats": [["3,617%", "재방문 시청자 증가"], ["3,255%", "순 시청자 증가"], ["87.8%", "평균 영상 재생률"]],
