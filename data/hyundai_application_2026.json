@@ -22,6 +22,49 @@
     "popup_commerce_revenue": "3.2억 원",
     "export_market_viewer_share": "80%+"
   },
+  "experience_map": [
+    {
+      "eyebrow": "01 · DOMESTIC BRAND IP",
+      "heading": "국내 캐릭터 IP 채널",
+      "body": "목적: 검색과 재방문을 통한 팬덤 형성\n방식: 버추얼 캐릭터·연속 세계관·제품 스토리텔링\n성과: 순 시청자 3,255%·재방문 3,617% 증가"
+    },
+    {
+      "eyebrow": "02 · GLOBAL BRAND CHANNEL",
+      "heading": "글로벌 수출 브랜드 채널",
+      "body": "목적: 국가별 제품 인지도와 오가닉 구독자 확보\n방식: 현지 문화 코드·크리에이터·플랫폼 알고리즘\n성과: 콘텐츠 5,200만+ 조회·수출국 시청 비중 80%+"
+    },
+    {
+      "eyebrow": "03 · BRAND EXPERIENCE",
+      "heading": "오프라인 브랜드 경험",
+      "body": "목적: 온라인 팬덤을 체험·상품·커머스로 확장\n방식: 세계관 기반 공간·동선·MD·공유 장치 통합\n성과: 방문객 3.3만 명·연계 매출 3.2억 원"
+    },
+    {
+      "eyebrow": "04 · PRODUCTION",
+      "heading": "방송·브랜디드 콘텐츠 제작",
+      "body": "목적: 출연자의 매력과 프로그램 기대감 극대화\n방식: 기획·촬영·편집·티저·예고·후반 관리\n경험: Mnet·tvN 음악·푸드·야외 버라이어티"
+    }
+  ],
+  "working_method": [
+    {
+      "step": "01",
+      "label": "DEFINE",
+      "body": "조회수보다 먼저 고객 행동과 성공 지표를 정의합니다. 검색·재방문·구독·타깃 국가 비중·현장 참여를 목적에 맞게 선택합니다.",
+      "evidence": "국내 IP 채널과 글로벌 채널에 서로 다른 KPI 적용"
+    },
+    {
+      "step": "02",
+      "label": "DESIGN & DELIVER",
+      "body": "인사이트를 포맷, 출연자, 유통, 공간, 상품까지 연결하고 유관부서와 에이전시를 하나의 실행 기준으로 정렬합니다.",
+      "evidence": "PD 제작 경험 + 브랜드 캠페인 총괄 경험"
+    },
+    {
+      "step": "03",
+      "label": "MEASURE & TOOL",
+      "body": "공개 후 데이터를 다음 기획에 반영하고 반복 업무는 도구화합니다. 광고 성과 대시보드와 콘텐츠 수집 자동화 도구를 직접 구현했습니다.",
+      "evidence": "분석 속도 향상 · 사내 뉴스레터 작성 시간 70% 단축"
+    }
+  ],
+  "showcase_production_titles": ["산꾼도시여자들", "샤이니의 빛돌기획"],
   "site_copy": {
     "hero_role_ko": "브랜드 마케팅 · 콘텐츠 전략",
     "hero_role_en": "Brand Marketing · Content Strategy",
