@@ -9,6 +9,7 @@ import re
 import json
 import base64
 import threading
+import secrets
 
 KST = timezone(timedelta(hours=9))
 
@@ -294,9 +295,58 @@ class DailyVisit(db.Model):
     count = db.Column(db.Integer, default=0)
 
 
+FUNNEL_STAGES = ('visit', 'projects_view', 'project_detail', 'convert')
+TRACKABLE_STAGES = ('projects_view', 'project_detail', 'convert')
+CONVERT_KINDS = ('resume', 'email', 'linkedin', 'github', 'blog', 'remember')
+VISIT_EVENT_RETENTION_DAYS = 180
+
+
+class VisitEvent(db.Model):
+    """퍼널 단계별 익명 이벤트. 세션당 (stage, project_id, detail) 조합 1회."""
+    __tablename__ = 'visit_event'
+    id = db.Column(db.Integer, primary_key=True)
+    session_key = db.Column(db.String(16), index=True, nullable=False)
+    stage = db.Column(db.String(24), index=True, nullable=False)
+    project_id = db.Column(db.Integer, default=0, nullable=False)
+    detail = db.Column(db.String(32), default='', nullable=False)
+    date = db.Column(db.String(10), index=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    __table_args__ = (
+        db.UniqueConstraint('session_key', 'stage', 'project_id', 'detail',
+                            name='uq_visit_event_session_stage'),
+    )
+
+
+def _session_key():
+    """익명 세션 키. IP·UA는 저장하지 않는다."""
+    key = session.get('sk')
+    if not key:
+        key = secrets.token_hex(8)
+        session['sk'] = key
+    return key
+
+
+def record_event(stage, project_id=0, detail=''):
+    """이벤트 1건 기록. 중복(유니크 제약 위반)과 그 밖의 실패는 조용히 무시한다."""
+    try:
+        db.session.add(VisitEvent(
+            session_key=_session_key(),
+            stage=stage,
+            project_id=int(project_id or 0),
+            detail=detail or '',
+            date=_today_kst(),
+        ))
+        db.session.commit()
+        return True
+    except Exception:
+        db.session.rollback()
+        return False
+
+
 def track_visit():
     """공개 페이지 방문 기록. 같은 세션은 하루 1회만 카운트."""
     try:
+        record_event('visit')
         today = _today_kst()
         key = f'v_{today}'
         if session.get(key):
