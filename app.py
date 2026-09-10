@@ -9,8 +9,9 @@ import re
 import json
 import base64
 import threading
-from analytics import build_funnel_stats
+from analytics import build_funnel_stats, build_source_stats
 import secrets
+from urllib.parse import urlparse
 
 KST = timezone(timedelta(hours=9))
 
@@ -313,6 +314,8 @@ class VisitEvent(db.Model):
     detail = db.Column(db.String(32), default='', nullable=False)
     date = db.Column(db.String(10), index=True, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    # 유입 경로. visit 이벤트에만 채운다: ?src= 파라미터 > Referer 호스트 > '' (직접 유입)
+    source = db.Column(db.String(40), default='', nullable=False)
     __table_args__ = (
         db.UniqueConstraint('session_key', 'stage', 'project_id', 'detail', 'date',
                             name='uq_visit_event_session_stage'),
@@ -328,7 +331,31 @@ def _session_key():
     return key
 
 
-def record_event(stage, project_id=0, detail=''):
+SOURCE_MAX_LEN = 40
+_SOURCE_ALLOWED = re.compile(r'[^a-z0-9._-]')
+
+
+def _visit_source():
+    """방문 유입 경로. ?src= 파라미터가 있으면 그것을, 없으면 외부 Referer의 호스트를 쓴다.
+
+    자기 사이트 안에서의 이동(Referer 호스트 == 요청 호스트)은 직접 유입('')으로 본다.
+    """
+    src = _SOURCE_ALLOWED.sub('', (request.args.get('src') or '').strip().lower())
+    if src:
+        return src[:SOURCE_MAX_LEN]
+    try:
+        host = (urlparse(request.referrer or '').hostname or '').lower()
+    except ValueError:
+        host = ''
+    if host.startswith('www.'):
+        host = host[4:]
+    own_host = (request.host or '').split(':')[0].lower()
+    if not host or host == own_host:
+        return ''
+    return _SOURCE_ALLOWED.sub('', host)[:SOURCE_MAX_LEN]
+
+
+def record_event(stage, project_id=0, detail='', source=''):
     """이벤트 1건 기록. 중복(유니크 제약 위반)과 그 밖의 실패는 조용히 무시한다."""
     try:
         db.session.add(VisitEvent(
@@ -337,6 +364,7 @@ def record_event(stage, project_id=0, detail=''):
             project_id=int(project_id or 0),
             detail=detail or '',
             date=_today_kst(),
+            source=source or '',
         ))
         db.session.commit()
         return True
@@ -372,7 +400,7 @@ def track_visit():
     """공개 페이지 방문 기록. 같은 세션은 하루 1회만 카운트."""
     prune_visit_events()
     try:
-        record_event('visit')
+        record_event('visit', source=_visit_source())
         today = _today_kst()
         key = f'v_{today}'
         if session.get(key):
@@ -943,6 +971,7 @@ def init_db():
             "ALTER TABLE project ADD COLUMN category_en VARCHAR(100) DEFAULT ''",
             "ALTER TABLE gallery_item ADD COLUMN title_en VARCHAR(200) DEFAULT ''",
             "ALTER TABLE project ADD COLUMN is_hidden BOOLEAN DEFAULT FALSE",
+            "ALTER TABLE visit_event ADD COLUMN source VARCHAR(40) DEFAULT ''",
         ]:
             try:
                 conn.execute(db.text(sql))
@@ -1171,7 +1200,7 @@ def admin_dashboard():
     since_7 = (today - timedelta(days=6)).strftime('%Y-%m-%d')
     event_rows = db.session.query(
         VisitEvent.session_key, VisitEvent.stage,
-        VisitEvent.project_id, VisitEvent.detail, VisitEvent.date,
+        VisitEvent.project_id, VisitEvent.detail, VisitEvent.date, VisitEvent.source,
     ).filter(VisitEvent.date >= since_30).all()
     events_30 = [row[:4] for row in event_rows]
     events_7 = [row[:4] for row in event_rows if row[4] >= since_7]
@@ -1179,6 +1208,10 @@ def admin_dashboard():
         '7': build_funnel_stats(events_7, titles),
         '30': build_funnel_stats(events_30, titles),
     }
+    funnel['7']['sources'] = build_source_stats(
+        [row[:4] + (row[5],) for row in event_rows if row[4] >= since_7])
+    funnel['30']['sources'] = build_source_stats(
+        [row[:4] + (row[5],) for row in event_rows])
     funnel_meta = {'since': db.session.query(db.func.min(VisitEvent.date)).scalar() or '-'}
 
     return render_template('admin.html', projects=projects, profile=profile,

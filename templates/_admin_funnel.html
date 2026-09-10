@@ -61,6 +61,27 @@
           <p class="funnel-empty">아직 열람 기록이 없습니다.</p>
           {% endif %}
         </section>
+        <section class="funnel-sources">
+          <h4 class="funnel-h">유입 경로</h4>
+          {% if f.sources %}
+          <table class="funnel-table">
+            <thead><tr><th>출처</th><th class="num">세션</th><th class="num">비율</th><th class="num">전환</th></tr></thead>
+            <tbody>
+              {% for s in f.sources %}
+              <tr>
+                <td>{{ s.label }}</td>
+                <td class="num">{{ s.count }}</td>
+                <td class="num">{{ s.share }}%</td>
+                <td class="num">{{ s.converted }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          <p class="funnel-note">게시 링크에 붙일 값 · 리멤버 <code>?src=remember</code> · 잡코리아 <code>?src=jobkorea</code> · 사람인 <code>?src=saramin</code> · 링크드인 <code>?src=linkedin</code> · 원티드 <code>?src=wanted</code> · 지원서 <code>?src=hyundai</code></p>
+          {% else %}
+          <p class="funnel-empty">아직 유입 기록이 없습니다.</p>
+          {% endif %}
+        </section>
       </div>
       {% endif %}
     </div>
@@ -87,6 +108,11 @@
   .funnel-table { width:100%; border-collapse:collapse; font-size:0.84rem; }
   .funnel-table td { padding:0.42rem 0; border-bottom:1px solid var(--border); color:var(--text-2); }
   .funnel-table td.num { text-align:right; font-weight:600; color:var(--text); width:4rem; }
+  .funnel-table th { font-size:0.74rem; font-weight:500; color:var(--muted); text-align:left; padding:0 0 0.3rem; }
+  .funnel-table th.num { text-align:right; width:4rem; }
+  .funnel-sources { grid-column:1 / -1; }
+  .funnel-note { font-size:0.75rem; color:var(--muted); margin:0.5rem 0 0; }
+  .funnel-note code { font-size:0.74rem; }
   @media (max-width:640px) { .funnel-grid { grid-template-columns:1fr; } }
 </style>
 

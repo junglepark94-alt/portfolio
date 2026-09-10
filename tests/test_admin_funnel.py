@@ -234,3 +234,100 @@ def test_main_js_sends_all_three_client_stages():
     assert "'project_detail'" in js
     assert "'convert'" in js
     assert 'IntersectionObserver' in js
+
+
+# ── 유입 경로 (source) ─────────────────────────────────────
+
+def test_index_stores_the_referrer_host_as_the_visit_source(client):
+    client.get('/', headers={'Referer': 'https://www.linkedin.com/in/someone/'})
+
+    row = VisitEvent.query.filter_by(stage='visit').one()
+    assert row.source == 'linkedin.com'
+
+
+def test_src_query_param_takes_priority_over_the_referrer(client):
+    client.get('/?src=Hyundai', headers={'Referer': 'https://www.linkedin.com/'})
+
+    assert VisitEvent.query.filter_by(stage='visit').one().source == 'hyundai'
+
+
+def test_src_query_param_is_sanitized_and_capped(client):
+    client.get('/?src=' + 'Ab<script>-_.x' + 'y' * 80)
+
+    source = VisitEvent.query.filter_by(stage='visit').one().source
+    assert source.startswith('abscript-_.x')
+    assert len(source) == 40
+
+
+def test_own_host_referrer_and_missing_referrer_count_as_direct(client):
+    client.get('/en', headers={'Referer': 'http://localhost/'})
+    assert VisitEvent.query.filter_by(stage='visit').one().source == ''
+
+    VisitEvent.query.delete()
+    db.session.commit()
+    with client.session_transaction() as sess:
+        sess.clear()
+
+    client.get('/')
+    assert VisitEvent.query.filter_by(stage='visit').one().source == ''
+
+
+def test_source_stats_count_sessions_and_conversions_per_source():
+    from analytics import build_source_stats
+
+    events = [
+        ('s1', 'visit', 0, '', 'linkedin.com'), ('s1', 'convert', 0, 'resume', ''),
+        ('s2', 'visit', 0, '', 'linkedin.com'),
+        ('s3', 'visit', 0, '', 'hyundai'), ('s3', 'convert', 0, 'email', ''),
+        ('s4', 'visit', 0, '', ''),
+    ]
+
+    stats = build_source_stats(events)
+
+    assert stats[0] == {'source': 'linkedin.com', 'label': '링크드인',
+                        'count': 2, 'share': 50.0, 'converted': 1}
+    assert stats[1] == {'source': 'hyundai', 'label': 'hyundai',
+                        'count': 1, 'share': 25.0, 'converted': 1}
+    assert stats[2] == {'source': '', 'label': '직접 유입 · 알 수 없음',
+                        'count': 1, 'share': 25.0, 'converted': 0}
+
+
+def test_source_stats_are_empty_without_events():
+    from analytics import build_source_stats
+
+    assert build_source_stats([]) == []
+
+
+def test_admin_dashboard_renders_the_source_table(client, portfolio_app):
+    db.session.add(VisitEvent(session_key='s1', stage='visit', project_id=0, detail='',
+                              date=_today_kst(), source='blog.naver.com'))
+    db.session.commit()
+    _login(client)
+
+    html = client.get('/admin').get_data(as_text=True)
+
+    assert '유입 경로' in html
+    assert 'blog.naver.com' in html
+
+
+def test_source_stats_label_known_job_platforms_by_src_and_referrer_host():
+    from analytics import build_source_stats
+
+    events = [
+        ('s1', 'visit', 0, '', 'remember'), ('s2', 'visit', 0, '', 'rememberapp.co.kr'),
+        ('s3', 'visit', 0, '', 'jobkorea'), ('s4', 'visit', 0, '', 'jobkorea.co.kr'),
+        ('s5', 'visit', 0, '', 'saramin'), ('s6', 'visit', 0, '', 'saramin.co.kr'),
+        ('s7', 'visit', 0, '', 'linkedin'), ('s8', 'visit', 0, '', 'linkedin.com'),
+        ('s9', 'visit', 0, '', 'lnkd.in'),
+        ('s10', 'visit', 0, '', 'wanted'), ('s11', 'visit', 0, '', 'wanted.co.kr'),
+        ('s12', 'visit', 0, '', 'blog.naver.com'),
+    ]
+
+    stats = {row['source']: row['label'] for row in build_source_stats(events)}
+
+    assert stats['remember'] == stats['rememberapp.co.kr'] == '리멤버'
+    assert stats['jobkorea'] == stats['jobkorea.co.kr'] == '잡코리아'
+    assert stats['saramin'] == stats['saramin.co.kr'] == '사람인'
+    assert stats['linkedin'] == stats['linkedin.com'] == stats['lnkd.in'] == '링크드인'
+    assert stats['wanted'] == stats['wanted.co.kr'] == '원티드'
+    assert stats['blog.naver.com'] == 'blog.naver.com'

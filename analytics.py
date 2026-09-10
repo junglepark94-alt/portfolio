@@ -86,3 +86,50 @@ def build_funnel_stats(events, project_titles, top_n=8):
         'ranking': ranking,
         'sessions': len(best),
     }
+
+
+DIRECT_SOURCE_LABEL = '직접 유입 · 알 수 없음'
+
+# 게시 플랫폼 라벨. ?src= 값과 Referer 호스트 양쪽을 같은 이름으로 묶는다.
+SOURCE_LABELS = {
+    'remember': '리멤버', 'rememberapp.co.kr': '리멤버',
+    'jobkorea': '잡코리아', 'jobkorea.co.kr': '잡코리아', 'm.jobkorea.co.kr': '잡코리아',
+    'saramin': '사람인', 'saramin.co.kr': '사람인', 'm.saramin.co.kr': '사람인',
+    'linkedin': '링크드인', 'linkedin.com': '링크드인', 'lnkd.in': '링크드인',
+    'kr.linkedin.com': '링크드인',
+    'wanted': '원티드', 'wanted.co.kr': '원티드',
+}
+
+
+def build_source_stats(events):
+    """세션별 첫 유입 경로(visit 이벤트의 source)로 묶어 세션 수·전환 수를 센다.
+
+    events는 (session_key, stage, project_id, detail, source) 튜플.
+    source가 빈 문자열이면 Referer도 src 파라미터도 없던 직접 유입이다.
+    """
+    sources = {}
+    converted = set()
+
+    for session_key, stage, _project_id, _detail, source in events:
+        if stage == 'visit' and session_key not in sources:
+            sources[session_key] = source or ''
+        elif stage == 'convert':
+            converted.add(session_key)
+
+    counts = {}
+    for session_key, source in sources.items():
+        row = counts.setdefault(source, {'count': 0, 'converted': 0})
+        row['count'] += 1
+        if session_key in converted:
+            row['converted'] += 1
+
+    total = len(sources)
+    return sorted(
+        [{'source': source,
+          'label': SOURCE_LABELS.get(source, source) if source else DIRECT_SOURCE_LABEL,
+          'count': row['count'],
+          'share': _pct(row['count'], total),
+          'converted': row['converted']}
+         for source, row in counts.items()],
+        key=lambda row: (-row['count'], row['source'] == '', row['source']),  # 직접 유입은 동률 뒤로
+    )
