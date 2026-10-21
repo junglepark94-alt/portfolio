@@ -148,7 +148,7 @@ def test_site_projects_file_is_well_formed():
 
     data = json.load(open("data/site_projects.json", encoding="utf-8"))
     matches = [p["match"] for p in data["projects"]]
-    assert len(matches) == 12 and len(set(matches)) == 12
+    assert len(matches) == 13 and len(set(matches)) == 13
     for entry in data["projects"]:
         for field in ("description", "kpi", "detail_text", "description_en", "kpi_en", "detail_text_en"):
             assert entry[field].strip(), (entry["match"], field)
