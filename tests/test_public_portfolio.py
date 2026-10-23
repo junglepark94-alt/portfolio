@@ -201,11 +201,11 @@ def test_project_copy_overrides_apply_canonical_modal_content(portfolio_app):
         normalize_public_content()
         normalize_public_content()
 
-        assert project.kpi.startswith("568만 | ")
+        assert project.kpi.startswith("777만 | ")
         assert project.detail_text.startswith("## 배경과 과제")
-        assert project.kpi_en.startswith("5.68M | ")
+        assert project.kpi_en.startswith("7.77M | ")
         assert "## Background & Challenge" in project.detail_text_en
-        assert "67–82%" in project.kpi and "67–82%" in project.kpi_en
+        assert "79% | " in project.kpi and "79% | " in project.kpi_en
         # Banana Salon entry defines no link relabels, so links stay as they were
         assert json.loads(project.links_json)[0]["label"] == "영상 링크"
 
@@ -295,7 +295,7 @@ def test_canonical_sync_runs_once_and_keeps_admin_edits_afterwards(portfolio_app
         db.session.commit()
 
         assert sync_canonical_content_once() is True
-        assert project.kpi.startswith("568만 | ")          # 최초 1회는 기준 문안 적용
+        assert project.kpi.startswith("777만 | ")          # 최초 1회는 기준 문안 적용
         assert db.session.get(ContentSync, "seed_version").value.isdigit()
 
         project.kpi = "관리자가 고친 성과"
@@ -319,7 +319,7 @@ def test_admin_can_reimport_canonical_copy_for_one_project(portfolio_app):
         assert entry and entry["match"] == "Banana Salon"
         _apply_copy_entry(project, entry)
         db.session.commit()
-        assert project.kpi.startswith("568만 | ")
+        assert project.kpi.startswith("777만 | ")
         assert _find_copy_entry("전혀 다른 프로젝트") is None
 
 

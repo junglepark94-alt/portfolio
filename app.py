@@ -712,8 +712,6 @@ def normalize_profile_and_periods():
         if '샤이니의 빛돌기획' in project.title:
             project.title = 'tvN 예능 ‘샤이니의 빛돌기획’ 제작'
             project.title_en = 'SHINee Inc. — tvN Branded Entertainment'
-        if 'Banana Salon' in project.title or 'Banana Salon' in project.title_en:
-            project.period = '2026.07 – 진행 중'
 
 
 _TIKTOK_SHORT_RE = re.compile(r'https?://(?:vt|vm)\.tiktok\.com/[A-Za-z0-9]+/?|https?://(?:www\.)?tiktok\.com/t/[A-Za-z0-9]+/?')
