@@ -73,6 +73,7 @@ if (modal) {
     play: t('play', pageLang === 'en' ? 'Play' : '재생'),
     external: t('open_external', pageLang === 'en' ? 'Watch on YouTube' : 'YouTube에서 보기'),
     externalTiktok: t('open_tiktok', pageLang === 'en' ? 'Watch on TikTok' : 'TikTok에서 보기'),
+    externalInstagram: t('open_instagram', pageLang === 'en' ? 'Watch on Instagram' : 'Instagram에서 보기'),
   };
   let activeProjectCard = null;
   let anchorSections = [];
@@ -243,7 +244,7 @@ if (modal) {
     $('modalTags').innerHTML = tags.map(tag => `<span class="tag">${esc(tag)}</span>`).join('');
     let links = [];
     try { links = JSON.parse(d.links || '[]'); } catch (e) {}
-    const plainLinks = links.filter(lk => lk && lk.url && !extractYtId(lk.url) && !extractPlaylistId(lk.url) && !extractTiktokId(lk.url));
+    const plainLinks = links.filter(lk => lk && lk.url && !extractYtId(lk.url) && !extractPlaylistId(lk.url) && !extractTiktokId(lk.url) && !extractInstagramCode(lk.url));
     $('modalLinks').innerHTML = plainLinks.map(lk =>
       `<a href="${esc(lk.url)}" class="link-chip" target="_blank" rel="noopener">${esc(lk.label || lk.url)}<span class="chip-arrow">↗</span></a>`
     ).join('');
@@ -255,9 +256,11 @@ if (modal) {
       const vid = extractYtId(lk.url);
       const pid = !vid && extractPlaylistId(lk.url);
       const tid = !vid && !pid && extractTiktokId(lk.url);
+      const igid = !vid && !pid && !tid && extractInstagramCode(lk.url);
       if (vid) ytListEl.appendChild(createVideoItem(lk.label, lk.url, 'video', vid));
       else if (pid) ytListEl.appendChild(createVideoItem(lk.label, lk.url, 'playlist', pid));
-      else if (tid) ytListEl.appendChild(createTiktokItem(lk.label, lk.url, tid));
+      else if (tid) ytListEl.appendChild(createEmbedItem('tiktok', lk.label, lk.url, tid));
+      else if (igid) ytListEl.appendChild(createEmbedItem('instagram', lk.label, lk.url, igid));
     });
     show('secVideos', ytListEl.children.length > 0);
 
@@ -342,17 +345,31 @@ if (modal) {
     const m = url.match(/tiktok\.com\/(?:@[\w.-]+\/video|embed(?:\/v2)?|player\/v1)\/(\d{8,25})/);
     return m ? m[1] : null;
   }
-  // TikTok은 썸네일 API가 없어 공식 임베드 플레이어(표지·재생 버튼 포함)를 바로 띄운다.
-  function createTiktokItem(label, url, id) {
+  function extractInstagramCode(url) {
+    const m = url.match(/instagram\.com\/(?:[\w.]+\/)?(?:reels?|p|tv)\/([A-Za-z0-9_-]{5,})/);
+    return m ? m[1] : null;
+  }
+  // TikTok·Instagram은 썸네일 API가 없어 공식 임베드 플레이어(표지·재생 버튼 포함)를 바로 띄운다.
+  const EMBEDS = {
+    tiktok: {
+      src: id => `https://www.tiktok.com/player/v1/${id}?rel=0&description=0&music_info=0`,
+      external: () => modalText.externalTiktok,
+    },
+    instagram: {
+      src: id => `https://www.instagram.com/p/${id}/embed/`,
+      external: () => modalText.externalInstagram,
+    },
+  };
+  function createEmbedItem(kind, label, url, id) {
     const item = document.createElement('div');
-    item.className = 'video-item playing tiktok';
+    item.className = `video-item playing ${kind}`;
     item.innerHTML =
       `<div class="video-embed">
-         <iframe src="https://www.tiktok.com/player/v1/${id}?rel=0&description=0&music_info=0" title="${esc(label || 'TikTok')}" loading="lazy" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" allowfullscreen></iframe>
+         <iframe src="${EMBEDS[kind].src(id)}" title="${esc(label || kind)}" scrolling="no" allow="autoplay; encrypted-media; fullscreen; picture-in-picture"></iframe>
        </div>
        <div class="video-info">
          ${label ? `<div class="video-label">${esc(label)}</div>` : ''}
-         <a class="video-ext" href="${esc(url)}" target="_blank" rel="noopener">${esc(modalText.externalTiktok)} ↗</a>
+         <a class="video-ext" href="${esc(url)}" target="_blank" rel="noopener">${esc(EMBEDS[kind].external())} ↗</a>
        </div>`;
     return item;
   }
@@ -419,7 +436,33 @@ if (modal) {
     if (e.key === 'ArrowRight') openByOffset(1);
   });
 
+  // 카드에 마우스·포커스가 오면 TikTok·Instagram 임베드를 미리 연결·요청해 상세 화면의 로딩을 줄인다.
+  const warmed = new Set();
+  function warmLink(rel, href) {
+    if (warmed.has(href)) return;
+    warmed.add(href);
+    const el = document.createElement('link');
+    el.rel = rel; el.href = href;
+    if (rel === 'preconnect') el.crossOrigin = '';
+    document.head.appendChild(el);
+  }
+  function warmEmbeds(card) {
+    let links = [];
+    try { links = JSON.parse(card.dataset.links || '[]'); } catch (e) {}
+    links.forEach(lk => {
+      if (!lk || !lk.url) return;
+      const tid = extractTiktokId(lk.url);
+      const igid = !tid && extractInstagramCode(lk.url);
+      const kind = tid ? 'tiktok' : igid ? 'instagram' : null;
+      if (!kind) return;
+      warmLink('preconnect', kind === 'tiktok' ? 'https://www.tiktok.com' : 'https://www.instagram.com');
+      warmLink('prefetch', EMBEDS[kind].src(tid || igid));
+    });
+  }
+
   document.querySelectorAll('.project-card').forEach(card => {
+    card.addEventListener('pointerenter', () => warmEmbeds(card), { once: true });
+    card.addEventListener('focus', () => warmEmbeds(card), { once: true });
     card.style.cursor = 'pointer';
     card.addEventListener('click', e => {
       if (e.target.closest('a')) return;

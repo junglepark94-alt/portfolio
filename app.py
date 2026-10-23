@@ -36,6 +36,7 @@ UI_TEXT = {
         'views': '회',
         'open_external': 'YouTube에서 보기',
         'open_tiktok': 'TikTok에서 보기',
+        'open_instagram': 'Instagram에서 보기',
     },
     'en': {
         'view_details': 'View details',
@@ -57,6 +58,7 @@ UI_TEXT = {
         'views': 'views',
         'open_external': 'Watch on YouTube',
         'open_tiktok': 'Watch on TikTok',
+        'open_instagram': 'Watch on Instagram',
     },
 }
 
@@ -714,6 +716,54 @@ def normalize_profile_and_periods():
             project.period = '2026.07 – 진행 중'
 
 
+_TIKTOK_SHORT_RE = re.compile(r'https?://(?:vt|vm)\.tiktok\.com/[A-Za-z0-9]+/?|https?://(?:www\.)?tiktok\.com/t/[A-Za-z0-9]+/?')
+_TIKTOK_VIDEO_RE = re.compile(r'https://(?:www\.|m\.)?tiktok\.com/(@[\w.-]+)/video/(\d+)')
+
+
+def _expand_tiktok_short_url(url):
+    """vt.tiktok.com 같은 단축 링크를 tiktok.com/@계정/video/ID로 푼다. 실패하면 원래 값을 돌려준다."""
+    if not url or not _TIKTOK_SHORT_RE.fullmatch(url.strip()):
+        return url
+    import urllib.request as _req
+    try:
+        req = _req.Request(url.strip(), headers={'User-Agent': 'Mozilla/5.0'})
+        with _req.urlopen(req, timeout=6) as resp:
+            final = resp.geturl()
+    except Exception as exc:
+        print(f"[tiktok-expand] {url}: {exc!r}")
+        return url
+    m = _TIKTOK_VIDEO_RE.match(final)
+    return f'https://www.tiktok.com/{m.group(1)}/video/{m.group(2)}' if m else url
+
+
+def _expand_short_links_json(raw):
+    """링크 JSON 목록의 TikTok 단축 링크만 풀어서 돌려준다. 바뀐 게 없으면 입력 그대로."""
+    try:
+        links = json.loads(raw or '[]')
+    except (TypeError, ValueError):
+        return raw
+    if not isinstance(links, list):
+        return raw
+    changed = False
+    for link in links:
+        if isinstance(link, dict) and link.get('url'):
+            expanded = _expand_tiktok_short_url(link['url'])
+            if expanded != link['url']:
+                link['url'] = expanded
+                changed = True
+    return json.dumps(links, ensure_ascii=False) if changed else raw
+
+
+def expand_short_video_links():
+    """저장된 TikTok 단축 링크를 매 시작 시 정식 주소로 바꾼다. 풀린 뒤에는 대상이 남지 않아 반복 실행해도 안전하다."""
+    for project in Project.query.all():
+        for attr in ('links_json', 'links_en_json'):
+            raw = getattr(project, attr)
+            if raw and ('tiktok.com/' in raw):
+                setattr(project, attr, _expand_short_links_json(raw))
+    db.session.commit()
+
+
 def _relabel_links(raw, label_map):
     """Rename link labels in a links JSON list; leave unparsable input untouched."""
     if not label_map:
@@ -1095,6 +1145,11 @@ def init_db():
     except Exception as exc:
         db.session.rollback()
         print(f"[thumbnail-swap] skipped: {exc!r}")
+    try:
+        expand_short_video_links()
+    except Exception as exc:
+        db.session.rollback()
+        print(f"[tiktok-expand] skipped: {exc!r}")
 
 
 # ── Context Processor ────────────────────────────────────
@@ -1395,7 +1450,7 @@ def project_new():
         import json as _json
         labels = request.form.getlist('link_label')
         urls   = request.form.getlist('link_url')
-        links  = [{'label': l.strip(), 'url': u.strip()}
+        links  = [{'label': l.strip(), 'url': _expand_tiktok_short_url(u.strip())}
                   for l, u in zip(labels, urls) if l.strip() and u.strip()]
         en_labels = request.form.getlist('link_label_en')
         links_en  = [{'label': en_labels[i].strip() if i < len(en_labels) else '', 'url': lk['url']}
@@ -1441,7 +1496,7 @@ def project_edit(pid):
         import json as _json
         labels = request.form.getlist('link_label')
         urls   = request.form.getlist('link_url')
-        links  = [{'label': l.strip(), 'url': u.strip()}
+        links  = [{'label': l.strip(), 'url': _expand_tiktok_short_url(u.strip())}
                   for l, u in zip(labels, urls) if l.strip() and u.strip()]
         p.title = request.form['title']
         p.description = request.form['description']

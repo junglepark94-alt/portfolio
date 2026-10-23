@@ -50,6 +50,65 @@ def test_tiktok_links_render_as_embedded_players_not_resource_chips(client):
     assert '"open_tiktok": "Watch on TikTok"' in client.get("/en").get_data(as_text=True)
 
 
+def test_instagram_links_render_as_embedded_players(client):
+    js = open("static/js/main.js", encoding="utf-8").read()
+
+    assert "!extractInstagramCode(lk.url)" in js
+    assert "https://www.instagram.com/p/${id}/embed/" in js
+    assert '"open_instagram": "Watch on Instagram"' in client.get("/en").get_data(as_text=True)
+
+
+def test_tiktok_short_links_expand_to_canonical_video_urls(monkeypatch):
+    import json
+    import urllib.request
+
+    import app as app_module
+
+    class FakeResponse:
+        def __init__(self, url):
+            self._url = url
+
+        def geturl(self):
+            return self._url
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    requested = []
+
+    def fake_urlopen(req, timeout=None):
+        requested.append(req.full_url)
+        return FakeResponse("https://www.tiktok.com/@gabriela.vlogs/video/7620980666527763726?_r=1&_t=x")
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+
+    expand = app_module._expand_tiktok_short_url
+    assert expand("https://vt.tiktok.com/ZSgaLJYtH/") == "https://www.tiktok.com/@gabriela.vlogs/video/7620980666527763726"
+    # Full URLs and other hosts are never fetched.
+    assert expand("https://www.tiktok.com/@a/video/123456789") == "https://www.tiktok.com/@a/video/123456789"
+    assert expand("https://example.com/vt.tiktok.com/x") == "https://example.com/vt.tiktok.com/x"
+    assert requested == ["https://vt.tiktok.com/ZSgaLJYtH/"]
+
+    raw = json.dumps([{"label": "a", "url": "https://vt.tiktok.com/ZSgaLJYtH/"}, {"label": "b", "url": "https://naver.com"}])
+    out = json.loads(app_module._expand_short_links_json(raw))
+    assert out[0]["url"].endswith("/video/7620980666527763726") and out[1]["url"] == "https://naver.com"
+
+
+def test_tiktok_short_link_failure_keeps_original(monkeypatch):
+    import urllib.request
+
+    import app as app_module
+
+    def boom(req, timeout=None):
+        raise OSError("blocked")
+
+    monkeypatch.setattr(urllib.request, "urlopen", boom)
+    assert app_module._expand_tiktok_short_url("https://vt.tiktok.com/ZSgaLJYtH/") == "https://vt.tiktok.com/ZSgaLJYtH/"
+
+
 def test_public_content_normalization_is_targeted_and_idempotent(portfolio_app):
     with portfolio_app.app_context():
         profile = db.session.get(Profile, 1)
