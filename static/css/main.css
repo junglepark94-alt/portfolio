@@ -2061,6 +2061,7 @@ form[data-lang="en"] .lang-ko { display: none !important; }
 .video-embed { width: 100%; aspect-ratio: 16 / 9; background: #000; }
 .video-embed iframe { width: 100%; height: 100%; border: 0; display: block; }
 .video-item.playing .video-info { padding: 0.6rem 0.75rem 0.7rem; }
+.video-item.tiktok .video-embed { aspect-ratio: 9 / 16; max-width: 315px; margin: 0 auto; }
 
 /* Footer: prev / next project */
 .modal-footer {

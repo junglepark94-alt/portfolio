@@ -35,6 +35,7 @@ UI_TEXT = {
         'playlist': '재생목록',
         'views': '회',
         'open_external': 'YouTube에서 보기',
+        'open_tiktok': 'TikTok에서 보기',
     },
     'en': {
         'view_details': 'View details',
@@ -55,6 +56,7 @@ UI_TEXT = {
         'playlist': 'Playlist',
         'views': 'views',
         'open_external': 'Watch on YouTube',
+        'open_tiktok': 'Watch on TikTok',
     },
 }
 

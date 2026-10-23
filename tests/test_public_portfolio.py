@@ -42,6 +42,14 @@ def test_javascript_restores_focus_and_handles_keyboard_activation():
     assert "e.key === ' '" in js
 
 
+def test_tiktok_links_render_as_embedded_players_not_resource_chips(client):
+    js = open("static/js/main.js", encoding="utf-8").read()
+
+    assert "!extractTiktokId(lk.url)" in js
+    assert "https://www.tiktok.com/player/v1/${id}" in js
+    assert '"open_tiktok": "Watch on TikTok"' in client.get("/en").get_data(as_text=True)
+
+
 def test_public_content_normalization_is_targeted_and_idempotent(portfolio_app):
     with portfolio_app.app_context():
         profile = db.session.get(Profile, 1)

@@ -72,6 +72,7 @@ if (modal) {
     views: t('views', pageLang === 'en' ? 'views' : '회'),
     play: t('play', pageLang === 'en' ? 'Play' : '재생'),
     external: t('open_external', pageLang === 'en' ? 'Watch on YouTube' : 'YouTube에서 보기'),
+    externalTiktok: t('open_tiktok', pageLang === 'en' ? 'Watch on TikTok' : 'TikTok에서 보기'),
   };
   let activeProjectCard = null;
   let anchorSections = [];
@@ -242,7 +243,7 @@ if (modal) {
     $('modalTags').innerHTML = tags.map(tag => `<span class="tag">${esc(tag)}</span>`).join('');
     let links = [];
     try { links = JSON.parse(d.links || '[]'); } catch (e) {}
-    const plainLinks = links.filter(lk => lk && lk.url && !extractYtId(lk.url) && !extractPlaylistId(lk.url));
+    const plainLinks = links.filter(lk => lk && lk.url && !extractYtId(lk.url) && !extractPlaylistId(lk.url) && !extractTiktokId(lk.url));
     $('modalLinks').innerHTML = plainLinks.map(lk =>
       `<a href="${esc(lk.url)}" class="link-chip" target="_blank" rel="noopener">${esc(lk.label || lk.url)}<span class="chip-arrow">↗</span></a>`
     ).join('');
@@ -253,8 +254,10 @@ if (modal) {
       if (!lk || !lk.url) return;
       const vid = extractYtId(lk.url);
       const pid = !vid && extractPlaylistId(lk.url);
+      const tid = !vid && !pid && extractTiktokId(lk.url);
       if (vid) ytListEl.appendChild(createVideoItem(lk.label, lk.url, 'video', vid));
       else if (pid) ytListEl.appendChild(createVideoItem(lk.label, lk.url, 'playlist', pid));
+      else if (tid) ytListEl.appendChild(createTiktokItem(lk.label, lk.url, tid));
     });
     show('secVideos', ytListEl.children.length > 0);
 
@@ -334,6 +337,24 @@ if (modal) {
   function extractPlaylistId(url) {
     const m = url.match(/[?&]list=([a-zA-Z0-9_-]+)/);
     return m ? m[1] : null;
+  }
+  function extractTiktokId(url) {
+    const m = url.match(/tiktok\.com\/(?:@[\w.-]+\/video|embed(?:\/v2)?|player\/v1)\/(\d{8,25})/);
+    return m ? m[1] : null;
+  }
+  // TikTok은 썸네일 API가 없어 공식 임베드 플레이어(표지·재생 버튼 포함)를 바로 띄운다.
+  function createTiktokItem(label, url, id) {
+    const item = document.createElement('div');
+    item.className = 'video-item playing tiktok';
+    item.innerHTML =
+      `<div class="video-embed">
+         <iframe src="https://www.tiktok.com/player/v1/${id}?rel=0&description=0&music_info=0" title="${esc(label || 'TikTok')}" loading="lazy" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" allowfullscreen></iframe>
+       </div>
+       <div class="video-info">
+         ${label ? `<div class="video-label">${esc(label)}</div>` : ''}
+         <a class="video-ext" href="${esc(url)}" target="_blank" rel="noopener">${esc(modalText.externalTiktok)} ↗</a>
+       </div>`;
+    return item;
   }
   function fmtNum(n) {
     n = parseInt(n) || 0;
