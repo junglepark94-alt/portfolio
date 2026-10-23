@@ -196,8 +196,9 @@
     </div>
     <div class="projects-grid">
       {% for p in projects %}
-      {% set imgs = p.images %}
       {% set main_img = p.main_image %}
+      {# 상세 갤러리는 대표 이미지부터 보여준다 #}
+      {% set imgs = ([main_img] + (p.images | reject('equalto', main_img) | list)) if main_img else [] %}
       {% set p_title   = (p.title_en if p.title_en else p.title) if en else p.title %}
       {% set p_desc    = (p.description_en if p.description_en else p.description) if en else p.description %}
       {% set p_detail  = (p.detail_text_en if p.detail_text_en else p.detail_text) if en else p.detail_text %}

@@ -50,6 +50,26 @@ def test_tiktok_links_render_as_embedded_players_not_resource_chips(client):
     assert '"open_tiktok": "Watch on TikTok"' in client.get("/en").get_data(as_text=True)
 
 
+def test_modal_gallery_starts_with_the_main_image(portfolio_app):
+    import html as html_lib
+    import json
+
+    from app import ProjectImage
+
+    with portfolio_app.app_context():
+        project = Project.query.first()
+        db.session.add_all([
+            ProjectImage(project_id=project.id, filename="first.jpg", is_main=False, sort_order=0),
+            ProjectImage(project_id=project.id, filename="second.jpg", is_main=False, sort_order=1),
+            ProjectImage(project_id=project.id, filename="cover.jpg", is_main=True, sort_order=2),
+        ])
+        db.session.commit()
+
+    page = portfolio_app.test_client().get("/").get_data(as_text=True)
+    raw = page.split('data-images="', 1)[1].split('"', 1)[0]
+    assert json.loads(html_lib.unescape(raw)) == ["cover.jpg", "first.jpg", "second.jpg"]
+
+
 def test_instagram_links_render_as_embedded_players(client):
     js = open("static/js/main.js", encoding="utf-8").read()
 
