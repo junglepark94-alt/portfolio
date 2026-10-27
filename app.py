@@ -2,6 +2,8 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import CSRFProtect
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.middleware.proxy_fix import ProxyFix
+from sqlalchemy.exc import IntegrityError
 from datetime import datetime, timezone, timedelta
 import os
 import time
@@ -73,7 +75,23 @@ def display_period(period, lang='ko'):
 def _today_kst():
     return datetime.now(KST).strftime('%Y-%m-%d')
 
+
+def _utcnow():
+    """기존 컬럼과 같은 naive UTC 시각 (datetime.utcnow()는 deprecated)."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _json_list(raw):
+    """JSON 문자열 컬럼을 목록으로 읽는다. 비었거나 깨졌으면 빈 목록."""
+    try:
+        return json.loads(raw or '[]')
+    except (TypeError, ValueError):
+        return []
+
 app = Flask(__name__)
+# Railway 프록시가 붙이는 X-Forwarded-For 마지막 값(실제 접속 IP)과 https 여부만 신뢰한다.
+# 클라이언트가 직접 넣은 앞쪽 값은 무시되므로 레이트리밋을 IP 위조로 우회할 수 없다.
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
 
 _is_production = bool(os.environ.get('PORT'))  # Railway는 PORT를 주입함
 
@@ -145,6 +163,35 @@ def _looks_like_image(head):
     return False
 
 
+def _unique_upload_name(prefix, ext):
+    """같은 초에 여러 장을 올려도 겹치지 않는 업로드 파일명.
+
+    업로드 파일은 immutable로 캐시되므로 같은 이름을 다시 쓰면 안 된다.
+    """
+    return f"{prefix}_{int(time.time())}_{secrets.token_hex(4)}.{ext}"
+
+
+def _remove_upload_if_unused(filename):
+    """어떤 행도 더 이상 가리키지 않을 때만 업로드 파일을 지운다.
+
+    yt_/ext_ 썸네일은 같은 영상·URL을 쓰는 프로젝트끼리 파일 하나를 공유하므로,
+    행을 지운 뒤(커밋 후) 호출해야 남은 참조만 센다.
+    """
+    if not filename:
+        return False
+    in_use = (ProjectImage.query.filter_by(filename=filename).count()
+              + GalleryItem.query.filter_by(image_filename=filename).count()
+              + Profile.query.filter_by(profile_image_filename=filename).count())
+    if in_use:
+        return False
+    fpath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    try:
+        os.remove(fpath)
+    except OSError:
+        return False
+    return True
+
+
 def save_uploaded_image(file, prefix='project'):
     if not file or not file.filename:
         return None
@@ -155,7 +202,7 @@ def save_uploaded_image(file, prefix='project'):
     file.stream.seek(0)
     if not _looks_like_image(head):
         return None
-    filename = f"{prefix}_{int(time.time())}.{ext}"
+    filename = _unique_upload_name(prefix, ext)
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
     file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
     return filename
@@ -185,9 +232,7 @@ _RATE_HITS = {}  # client_ip -> [timestamps]
 
 
 def _client_ip():
-    xff = request.headers.get('X-Forwarded-For', '')
-    if xff:
-        return xff.split(',')[0].strip()
+    # ProxyFix가 프록시가 붙인 값으로 remote_addr를 채운다. X-Forwarded-For를 직접 읽지 않는다.
     return request.remote_addr or 'unknown'
 
 
@@ -219,7 +264,7 @@ class Project(db.Model):
     demo_url = db.Column(db.String(300))
     period = db.Column(db.String(80))
     order = db.Column(db.Integer, default=0)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=_utcnow)
     image_filename = db.Column(db.String(300), default='')  # 레거시
     detail_text = db.Column(db.Text, default='')
     links_json = db.Column(db.Text, default='[]')
@@ -247,19 +292,11 @@ class Project(db.Model):
 
     @property
     def links(self):
-        import json as _json
-        try:
-            return _json.loads(self.links_json or '[]')
-        except Exception:
-            return []
+        return _json_list(self.links_json)
 
     @property
     def links_en(self):
-        import json as _json
-        try:
-            return _json.loads(self.links_en_json or '[]')
-        except Exception:
-            return []
+        return _json_list(self.links_en_json)
 
     @property
     def tech_list(self):
@@ -284,14 +321,11 @@ class GalleryItem(db.Model):
     image_filename = db.Column(db.String(300), nullable=False)
     links_json = db.Column(db.Text, default='[]')
     sort_order = db.Column(db.Integer, default=0)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=_utcnow)
 
     @property
     def links(self):
-        try:
-            return json.loads(self.links_json or '[]')
-        except Exception:
-            return []
+        return _json_list(self.links_json)
 
 
 class DailyVisit(db.Model):
@@ -317,7 +351,7 @@ class VisitEvent(db.Model):
     project_id = db.Column(db.Integer, default=0, nullable=False)
     detail = db.Column(db.String(32), default='', nullable=False)
     date = db.Column(db.String(10), index=True, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=_utcnow)
     # 유입 경로. visit 이벤트에만 채운다: ?src= 파라미터 > Referer 호스트 > '' (직접 유입)
     source = db.Column(db.String(40), default='', nullable=False)
     __table_args__ = (
@@ -392,12 +426,32 @@ def prune_visit_events(retention_days=VISIT_EVENT_RETENTION_DAYS):
             marker = ContentSync(key='visit_event_pruned_on')
             db.session.add(marker)
         marker.value = today
-        marker.applied_at = datetime.utcnow()
+        marker.applied_at = _utcnow()
         db.session.commit()
         return removed
     except Exception:
         db.session.rollback()
         return 0
+
+
+def increment_daily_visit(today):
+    """오늘 방문수를 1 올린다.
+
+    읽고-더해-쓰기 대신 DB에서 count = count + 1 로 올려 동시 요청끼리 값을 잃지 않는다.
+    첫 방문이 동시에 들어와 INSERT가 유니크 제약에 걸리면 이미 생긴 행을 UPDATE로 다시 올린다.
+    """
+    for _ in range(2):
+        try:
+            updated = DailyVisit.query.filter_by(date=today).update(
+                {DailyVisit.count: db.func.coalesce(DailyVisit.count, 0) + 1},
+                synchronize_session=False)
+            if not updated:
+                db.session.add(DailyVisit(date=today, count=1))
+            db.session.commit()
+            return True
+        except IntegrityError:
+            db.session.rollback()
+    return False
 
 
 def track_visit():
@@ -410,12 +464,7 @@ def track_visit():
         if session.get(key):
             return
         session[key] = True
-        rec = DailyVisit.query.filter_by(date=today).first()
-        if rec is None:
-            rec = DailyVisit(date=today, count=0)
-            db.session.add(rec)
-        rec.count = (rec.count or 0) + 1
-        db.session.commit()
+        increment_daily_visit(today)
     except Exception:
         db.session.rollback()
 
@@ -483,87 +532,47 @@ class Profile(db.Model):
 
     @property
     def language_scores(self):
-        import json as _j
-        try:
-            return _j.loads(self.language_scores_json or '[]')
-        except Exception:
-            return []
+        return _json_list(self.language_scores_json)
 
     @property
     def skill_list(self):
-        return [s.strip() for s in self.skills.split(',') if s.strip()]
+        return [s.strip() for s in (self.skills or '').split(',') if s.strip()]
 
     @property
     def skills_with_level(self):
-        import json as _j
-        try:
-            return _j.loads(self.skills_json or '[]')
-        except Exception:
-            return []
+        return _json_list(self.skills_json)
 
     @property
     def tools(self):
-        import json as _j
-        try:
-            return _j.loads(self.tools_json or '[]')
-        except Exception:
-            return []
+        return _json_list(self.tools_json)
 
     @property
     def tools_en(self):
-        import json as _j
-        try:
-            return _j.loads(self.tools_en_json or '[]')
-        except Exception:
-            return []
+        return _json_list(self.tools_en_json)
 
     @property
     def experience(self):
-        import json
-        try:
-            return json.loads(self.experience_json or '[]')
-        except Exception:
-            return []
+        return _json_list(self.experience_json)
 
     @property
     def experience_en(self):
-        import json as _j
-        try:
-            return _j.loads(self.experience_en_json or '[]')
-        except Exception:
-            return []
+        return _json_list(self.experience_en_json)
 
     @property
     def education(self):
-        import json as _j
-        try:
-            return _j.loads(self.education_json or '[]')
-        except Exception:
-            return []
+        return _json_list(self.education_json)
 
     @property
     def education_en(self):
-        import json as _j
-        try:
-            return _j.loads(self.education_en_json or '[]')
-        except Exception:
-            return []
+        return _json_list(self.education_en_json)
 
     @property
     def awards(self):
-        import json as _j
-        try:
-            return _j.loads(self.awards_json or '[]')
-        except Exception:
-            return []
+        return _json_list(self.awards_json)
 
     @property
     def awards_en(self):
-        import json as _j
-        try:
-            return _j.loads(self.awards_en_json or '[]')
-        except Exception:
-            return []
+        return _json_list(self.awards_en_json)
 
 
 
@@ -572,7 +581,7 @@ class ContentSync(db.Model):
     __tablename__ = 'content_sync'
     key = db.Column(db.String(60), primary_key=True)
     value = db.Column(db.String(120), default='')
-    applied_at = db.Column(db.DateTime, default=datetime.utcnow)
+    applied_at = db.Column(db.DateTime, default=_utcnow)
 
 
 def _normalize_copy(value):
@@ -595,6 +604,8 @@ def _normalize_copy(value):
         ('SHINee Inc. - tvN', 'SHINee Inc. — tvN'),
         ('빙그레X더현대서울', '빙그레×더현대서울'),
         ('Social Eye Awards', 'Social i Awards'),
+        # 복수형을 먼저 바꿔야 단수형 규칙이 'Awards'에 s를 하나 더 붙이지 않는다
+        ('Social I Awards', 'Social i Awards'),
         ('Social I Award', 'Social i Awards'),
     ]:
         normalized = normalized.replace(old, new)
@@ -649,30 +660,43 @@ def _normalize_json_entries(raw):
 
 
 def normalize_public_content():
-    """최초 1회 동기화: 프로필/기간 표기 정리 + 프로젝트 기준 문안 적용."""
+    """최초 1회 동기화: 히어로 기준 문안 + 프로필/기간 표기 정리 + 프로젝트 기준 문안 적용."""
+    _apply_profile_hero_copy()
     normalize_profile_and_periods()
     _apply_project_copy_overrides()
     db.session.commit()
 
 
-def normalize_profile_and_periods():
-    """오탈자·기간 표기·영문 용어만 정리한다 (관리자가 쓴 문안의 내용은 바꾸지 않는다)."""
+def _load_canonical_application():
+    """data/hyundai_application_2026.json. 파일이 없거나 깨졌으면 빈 dict."""
     content_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data',
                                 'hyundai_application_2026.json')
     try:
         with open(content_path, encoding='utf-8') as content_file:
-            canonical = json.load(content_file)
+            return json.load(content_file)
     except (OSError, ValueError):
-        canonical = {}
+        return {}
 
-    profile = db.session.get(Profile, 1)
+
+def _apply_profile_hero_copy():
+    """히어로 이름·직무·소개 문구를 기준 문안으로 덮어쓴다. 최초 동기화(seed)에서만 호출된다."""
+    canonical = _load_canonical_application()
     site_copy = canonical.get('site_copy', {})
+    profile = db.session.get(Profile, 1)
+    if not profile:
+        return
+    profile.name_en = canonical.get('identity', {}).get('name_en', 'Jonggeol Park')
+    profile.role = site_copy.get('hero_role_ko', profile.role)
+    profile.role_en = site_copy.get('hero_role_en', profile.role_en)
+    profile.tagline = site_copy.get('hero_tagline_ko', profile.tagline)
+    profile.tagline_en = site_copy.get('hero_tagline_en', profile.tagline_en)
+
+
+def normalize_profile_and_periods():
+    """오탈자·기간 표기·영문 용어만 정리한다 (관리자가 쓴 문안의 내용은 바꾸지 않는다)."""
+    site_copy = _load_canonical_application().get('site_copy', {})
+    profile = db.session.get(Profile, 1)
     if profile:
-        profile.name_en = canonical.get('identity', {}).get('name_en', 'Jonggeol Park')
-        profile.role = site_copy.get('hero_role_ko', profile.role)
-        profile.role_en = site_copy.get('hero_role_en', profile.role_en)
-        profile.tagline = site_copy.get('hero_tagline_ko', profile.tagline)
-        profile.tagline_en = site_copy.get('hero_tagline_en', profile.tagline_en)
         for attr in (
             'about_text', 'about_text_en', 'skills', 'skills_en', 'skills_json',
             'tools_json', 'tools_en_json',
@@ -856,7 +880,7 @@ def _set_marker(key, version):
         marker = ContentSync(key=key)
         db.session.add(marker)
     marker.value = str(version)
-    marker.applied_at = datetime.utcnow()
+    marker.applied_at = _utcnow()
     try:
         db.session.commit()
     except Exception:
@@ -885,7 +909,7 @@ def sync_canonical_content_once():
         marker = ContentSync(key='seed_version')
         db.session.add(marker)
     marker.value = str(CONTENT_SEED_VERSION)
-    marker.applied_at = datetime.utcnow()
+    marker.applied_at = _utcnow()
     try:
         db.session.commit()
     except Exception:
@@ -1194,8 +1218,13 @@ def index_en():
 @app.route('/admin/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        admin = Admin.query.filter_by(username=request.form['username']).first()
-        if admin and admin.check_password(request.form['password']):
+        # 무차별 대입 방지: IP당 5분에 10회까지만 시도할 수 있다
+        if _rate_limited(f'login:{_client_ip()}', max_hits=10, window=300):
+            flash('로그인 시도가 너무 많습니다. 잠시 후 다시 시도하세요.')
+            return render_template('login.html'), 429
+        admin = Admin.query.filter_by(username=request.form.get('username', '')).first()
+        if admin and admin.check_password(request.form.get('password', '')):
+            session.clear()  # 로그인 전 세션 값을 이어받지 않는다 (세션 고정 방지)
             session['logged_in'] = True
             return redirect(url_for('admin_dashboard'))
         flash('아이디 또는 비밀번호가 올바르지 않습니다.')
@@ -1206,6 +1235,14 @@ def login():
 def logout():
     session.pop('logged_in', None)
     return redirect(url_for('index'))
+
+
+def _form_int(name, default=0):
+    """숫자 입력칸 값. 비었거나 숫자가 아니면 default."""
+    try:
+        return int(request.form.get(name) or default)
+    except (TypeError, ValueError):
+        return default
 
 
 def login_required(f):
@@ -1300,7 +1337,7 @@ def profile_edit():
         prof_img_cropped = request.form.get('profile_image_cropped_data', '')
         prof_img_file = request.files.get('profile_image_file')
         if prof_img_cropped and ',' in prof_img_cropped:
-            fn = _save_data_uri(prof_img_cropped, f"profile_{int(time.time())}.jpg")
+            fn = _save_data_uri(prof_img_cropped, _unique_upload_name('profile', 'jpg'))
             if fn:
                 profile.profile_image_filename = fn
         elif prof_img_file and prof_img_file.filename:
@@ -1311,7 +1348,7 @@ def profile_edit():
         og_cropped = request.form.get('og_cropped_data', '')
         og_file = request.files.get('og_image_file')
         if og_cropped and ',' in og_cropped:
-            fn = _save_data_uri(og_cropped, f"og_{int(time.time())}.jpg")
+            fn = _save_data_uri(og_cropped, _unique_upload_name('og', 'jpg'))
             if fn:
                 profile.og_image_url = url_for('static', filename='uploads/' + fn, _external=True)
         elif og_file and og_file.filename:
@@ -1373,7 +1410,7 @@ def profile_edit():
         if resume_file and resume_file.filename:
             ext = resume_file.filename.rsplit('.', 1)[-1].lower() if '.' in resume_file.filename else ''
             if ext == 'pdf':
-                filename = f"resume_{int(time.time())}.pdf"
+                filename = _unique_upload_name('resume', 'pdf')
                 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
                 resume_file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
                 profile.resume_filename = filename
@@ -1464,7 +1501,7 @@ def project_new():
             github_url='',
             demo_url='',
             period=request.form.get('period', ''),
-            order=int(request.form.get('order', 0)),
+            order=_form_int('order'),
             detail_text=request.form.get('detail_text', ''),
             image_filename=img or '',
             links_json=_json.dumps(links, ensure_ascii=False),
@@ -1500,7 +1537,7 @@ def project_edit(pid):
         p.description = request.form['description']
         p.tech_stack = request.form['tech_stack']
         p.period = request.form.get('period', '')
-        p.order = int(request.form.get('order', 0))
+        p.order = _form_int('order')
         p.detail_text = request.form.get('detail_text', '')
         p.links_json = _json.dumps(links, ensure_ascii=False)
         en_labels = request.form.getlist('link_label_en')
@@ -1555,16 +1592,12 @@ def project_toggle_hidden(pid):
 @login_required
 def project_delete(pid):
     p = Project.query.get_or_404(pid)
-    # 연결된 이미지 파일도 디스크에서 제거 (cascade는 DB 행만 삭제함)
-    for img in p.images:
-        fpath = os.path.join(app.config['UPLOAD_FOLDER'], img.filename)
-        if os.path.exists(fpath):
-            try:
-                os.remove(fpath)
-            except OSError:
-                pass
+    filenames = {img.filename for img in p.images}
     db.session.delete(p)
     db.session.commit()
+    # cascade는 DB 행만 지우므로 파일은 따로 지운다. 다른 프로젝트가 같이 쓰는 썸네일은 남긴다.
+    for filename in filenames:
+        _remove_upload_if_unused(filename)
     flash('프로젝트가 삭제되었습니다.')
     return redirect(url_for('admin_dashboard'))
 
@@ -1588,11 +1621,10 @@ def profile_resume_delete():
 def profile_image_delete():
     profile = db.session.get(Profile, 1)
     if profile and profile.profile_image_filename:
-        fpath = os.path.join(app.config['UPLOAD_FOLDER'], profile.profile_image_filename)
-        if os.path.exists(fpath):
-            os.remove(fpath)
+        filename = profile.profile_image_filename
         profile.profile_image_filename = ''
         db.session.commit()
+        _remove_upload_if_unused(filename)
         flash('프로필 이미지가 삭제되었습니다.')
     return redirect(url_for('profile_edit'))
 
@@ -1610,7 +1642,7 @@ def serve_resume():
 
 def _save_gallery_image(request):
     cropped = request.form.get('cropped_data')
-    fn = _save_data_uri(cropped, f"gallery_{int(time.time())}.jpg")
+    fn = _save_data_uri(cropped, _unique_upload_name('gallery', 'jpg'))
     if fn:
         return fn
     return save_uploaded_image(request.files.get('image'), 'gallery')
@@ -1630,7 +1662,7 @@ def gallery_new():
             description='',
             image_filename=filename,
             links_json='[]',
-            sort_order=int(request.form.get('sort_order', 0)),
+            sort_order=_form_int('sort_order'),
         )
         db.session.add(item)
         db.session.commit()
@@ -1646,7 +1678,7 @@ def gallery_edit(gid):
     if request.method == 'POST':
         item.title = request.form['title']
         item.title_en = request.form.get('title_en', '')
-        item.sort_order = int(request.form.get('sort_order', 0))
+        item.sort_order = _form_int('sort_order')
         new_img = _save_gallery_image(request)
         if new_img:
             item.image_filename = new_img
@@ -1659,11 +1691,10 @@ def gallery_edit(gid):
 @login_required
 def gallery_delete(gid):
     item = GalleryItem.query.get_or_404(gid)
-    fpath = os.path.join(app.config['UPLOAD_FOLDER'], item.image_filename)
-    if os.path.exists(fpath):
-        os.remove(fpath)
+    filename = item.image_filename
     db.session.delete(item)
     db.session.commit()
+    _remove_upload_if_unused(filename)
     flash('갤러리 항목이 삭제되었습니다.')
     return redirect(url_for('admin_dashboard'))
 
@@ -1675,7 +1706,7 @@ def gallery_delete(gid):
 def project_image_upload(pid):
     p = Project.query.get_or_404(pid)
     cropped = request.form.get('cropped_data')
-    filename = _save_data_uri(cropped, f"proj{pid}_{int(time.time())}.jpg")
+    filename = _save_data_uri(cropped, _unique_upload_name(f'proj{pid}', 'jpg'))
     if not filename:
         filename = save_uploaded_image(request.files.get('image'), f"proj{pid}")
     if not filename:
@@ -1707,12 +1738,10 @@ def project_image_set_main(img_id):
 def project_image_delete(img_id):
     import json as _json
     img = ProjectImage.query.get_or_404(img_id)
-    was_main, pid = img.is_main, img.project_id
-    fpath = os.path.join(app.config['UPLOAD_FOLDER'], img.filename)
-    if os.path.exists(fpath):
-        os.remove(fpath)
+    was_main, pid, filename = img.is_main, img.project_id, img.filename
     db.session.delete(img)
     db.session.commit()
+    _remove_upload_if_unused(filename)
     if was_main:
         nxt = ProjectImage.query.filter_by(project_id=pid).first()
         if nxt:
@@ -1727,7 +1756,7 @@ def project_image_delete(img_id):
 @login_required
 def projects_reorder():
     import json as _json
-    ids = (_json.loads(request.data) or {}).get('ids', [])
+    ids = (request.get_json(silent=True) or {}).get('ids', [])
     for i, pid in enumerate(ids):
         p = db.session.get(Project, int(pid))
         if p:
@@ -1740,7 +1769,7 @@ def projects_reorder():
 @login_required
 def gallery_reorder():
     import json as _json
-    ids = (_json.loads(request.data) or {}).get('ids', [])
+    ids = (request.get_json(silent=True) or {}).get('ids', [])
     for i, gid in enumerate(ids):
         g = db.session.get(GalleryItem, int(gid))
         if g:

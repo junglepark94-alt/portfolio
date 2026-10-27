@@ -301,10 +301,13 @@
       fd.append('image', file);
     }
     fetch(`/admin/project/${PID}/images/upload`, { method: 'POST', headers: { 'X-CSRFToken': CSRF }, body: fd })
-      .then(r => r.json())
+      // 413(용량 초과)·500은 HTML로 오므로 JSON 파싱 실패를 오류 메시지로 바꾼다
+      .then(r => r.json().catch(() => ({ error: `업로드 실패 (HTTP ${r.status})` })))
+      .catch(() => ({ error: '업로드 중 네트워크 오류가 발생했습니다.' }))
       .then(data => {
-        if (data.error) { alert(data.error); return; }
-        addTileToGrid(data);
+        // 한 장이 실패해도 큐가 멈추지 않고 다음 파일로 넘어간다
+        if (data.error) alert(data.error);
+        else addTileToGrid(data);
         queueIdx++;
         processNext();
       });
