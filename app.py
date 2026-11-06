@@ -338,7 +338,7 @@ class DailyVisit(db.Model):
 
 FUNNEL_STAGES = ('visit', 'projects_view', 'project_detail', 'convert')
 TRACKABLE_STAGES = ('projects_view', 'project_detail', 'convert')
-CONVERT_KINDS = ('resume', 'email', 'linkedin', 'github', 'blog', 'remember')
+CONVERT_KINDS = ('resume', 'email', 'phone', 'linkedin', 'github', 'blog', 'remember')
 VISIT_EVENT_RETENTION_DAYS = 180
 
 
@@ -493,6 +493,7 @@ class Profile(db.Model):
     skills = db.Column(db.String(500), default='콘텐츠 기획,마케팅 전략,데이터 분석,Python / Flask,AI 도구 활용,PPT / Word')
     # Contact
     email = db.Column(db.String(200), default='')
+    phone = db.Column(db.String(40), default='')
     linkedin_url = db.Column(db.String(300), default='')
     github_url = db.Column(db.String(300), default='')
     remember_url = db.Column(db.String(300), default='')
@@ -1026,6 +1027,7 @@ def init_db():
             "ALTER TABLE profile ADD COLUMN profile_image_filename VARCHAR(300) DEFAULT ''",
             "ALTER TABLE profile ADD COLUMN language_scores_json TEXT DEFAULT '[]'",
             "ALTER TABLE profile ADD COLUMN remember_url VARCHAR(300) DEFAULT ''",
+            "ALTER TABLE profile ADD COLUMN phone VARCHAR(40) DEFAULT ''",
             # English columns
             "ALTER TABLE profile ADD COLUMN name_en VARCHAR(80) DEFAULT ''",
             "ALTER TABLE profile ADD COLUMN role_en VARCHAR(120) DEFAULT ''",
@@ -1323,6 +1325,7 @@ def profile_edit():
         profile.tagline = request.form.get('tagline', '')
         profile.about_text = request.form.get('about_text', '')
         profile.email = request.form.get('email', '')
+        profile.phone = request.form.get('phone', '').strip()[:40]
         def fix_url(u):
             u = u.strip()
             if u and not u.startswith(('http://', 'https://')):

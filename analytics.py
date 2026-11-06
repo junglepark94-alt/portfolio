@@ -13,6 +13,7 @@ FUNNEL_LABELS = [
 CONVERT_LABELS = {
     'resume': '이력서 다운로드',
     'email': '이메일',
+    'phone': '전화',
     'linkedin': '링크드인',
     'github': '깃허브',
     'blog': '블로그',

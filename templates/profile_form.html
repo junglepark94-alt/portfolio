@@ -346,6 +346,10 @@
           <input type="email" name="email" value="{{ profile.email }}" placeholder="your@email.com" />
         </div>
         <div class="form-group">
+          <label>휴대폰 번호</label>
+          <input type="tel" name="phone" value="{{ profile.phone or '' }}" placeholder="010-1234-5678" maxlength="40" />
+        </div>
+        <div class="form-group">
           <label>LinkedIn URL</label>
           <input type="text" name="linkedin_url" value="{{ profile.linkedin_url }}" placeholder="https://linkedin.com/in/..." />
         </div>
