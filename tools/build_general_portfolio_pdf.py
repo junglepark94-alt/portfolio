@@ -234,11 +234,11 @@ def parse(page, site, lang):
 
     about = _section(page, r'id="about"', r'<section')
     data['about'] = [_text(p) for p in re.findall(r'<p>(.*?)</p>', _section(about, r'class="about-intro', r'</div>'), re.S)]
-    blocks = re.split(r'<h4 class="about-block-title"[^>]*>', about)
+    blocks = re.split(r'<h[34] class="about-block-title"[^>]*>', about)
     data['education'], data['language'], data['awards'] = [], [], []
     for b in blocks[1:]:
-        title = _text(b.split('</h4>', 1)[0])
-        body = b.split('</h4>', 1)[1] if '</h4>' in b else ''
+        title = _text(re.split(r'</h[34]>', b, 1)[0])
+        body = (re.split(r'</h[34]>', b, 1) + [''])[1]
         items = _list_items(body)
         if title in ('학력', 'Education'):
             data['education'] = items

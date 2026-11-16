@@ -1196,6 +1196,93 @@ def _visible_projects():
             .order_by(Project.order, Project.created_at.desc()).all())
 
 
+def _flat(text):
+    """줄바꿈·연속 공백을 한 칸으로 접는다 (구조화 데이터용)."""
+    return re.sub(r'\s+', ' ', text or '').strip()
+
+
+def build_structured_data(profile, projects, lang, page_url):
+    """페이지에 보이는 프로필·프로젝트 내용을 schema.org JSON-LD로 옮긴다.
+
+    화면에 이미 공개된 문안만 담는다 — 검색엔진·AI 리더가 모달(JS) 안의
+    프로젝트 설명과 성과까지 정확히 읽도록 하기 위한 것이다.
+    """
+    if not profile:
+        return None
+    en = lang == 'en'
+
+    def pick(ko, en_value):
+        return (en_value or ko) if en else ko
+
+    experience = pick(profile.experience, profile.experience_en)
+    education = pick(profile.education, profile.education_en)
+    awards = pick(profile.awards, profile.awards_en)
+    tools = pick(profile.tools, profile.tools_en)
+    skills = ([s.strip() for s in profile.skills_en.split(',') if s.strip()]
+              if en and profile.skills_en else profile.skill_list)
+
+    person = {
+        '@type': 'Person',
+        'name': pick(profile.name, profile.name_en),
+        'jobTitle': pick(profile.role, profile.role_en),
+        'description': _flat(pick(profile.tagline, profile.tagline_en)),
+        'url': page_url,
+    }
+    if en and profile.name_en and profile.name_en != profile.name:
+        person['alternateName'] = profile.name
+    if profile.email:
+        person['email'] = f'mailto:{profile.email}'
+    same_as = [u for u in (profile.linkedin_url, profile.remember_url,
+                           profile.github_url, profile.blog_url) if u]
+    if same_as:
+        person['sameAs'] = same_as
+    knows = skills + [t.get('name') for t in tools if isinstance(t, dict) and t.get('name')]
+    if knows:
+        person['knowsAbout'] = knows
+    schools = [e.get('school') for e in education if isinstance(e, dict) and e.get('school')]
+    if schools:
+        person['alumniOf'] = [{'@type': 'EducationalOrganization', 'name': s} for s in schools]
+    award_names = [' · '.join(filter(None, [a.get('year'), a.get('title'), a.get('org')]))
+                   for a in awards if isinstance(a, dict) and a.get('title')]
+    if award_names:
+        person['award'] = award_names
+    occupations = []
+    for ex in experience:
+        if not isinstance(ex, dict) or not ex.get('role'):
+            continue
+        desc = ' · '.join(filter(None, [ex.get('company'), ex.get('period')]))
+        bullets = ' / '.join(_flat(b) for b in ex.get('bullets') or [] if b)
+        occupations.append({'@type': 'Occupation', 'name': ex['role'],
+                            'description': f'{desc} — {bullets}' if bullets else desc})
+    if occupations:
+        person['hasOccupation'] = occupations
+
+    works = []
+    for p in projects:
+        title = pick(p.title, p.title_en)
+        parts = [_flat(pick(p.description, p.description_en)), _flat(pick(p.kpi, p.kpi_en))]
+        work = {'@type': 'CreativeWork', 'name': title,
+                'description': ' '.join(x for x in parts if x)}
+        role = pick(p.my_role, p.my_role_en)
+        if role:
+            work['creator'] = {'@type': 'Role', 'roleName': role,
+                               'creator': {'@type': 'Person', 'name': person['name']}}
+        category = pick(p.category, p.category_en)
+        if category:
+            work['genre'] = category
+        if p.period:
+            work['temporalCoverage'] = display_period(p.period, lang)
+        if p.tech_list:
+            work['keywords'] = ', '.join(p.tech_list)
+        works.append(work)
+
+    data = {'@context': 'https://schema.org', '@type': 'ProfilePage',
+            'inLanguage': lang, 'url': page_url, 'mainEntity': person}
+    if works:
+        data['hasPart'] = works
+    return data
+
+
 def _render_index(lang):
     track_visit()
     projects = _visible_projects()
@@ -1204,6 +1291,7 @@ def _render_index(lang):
     return render_template(
         'index.html', projects=projects, gallery_items=gallery_items,
         profile=profile, lang=lang, ui=UI_TEXT[lang], display_period=display_period,
+        structured_data=build_structured_data(profile, projects, lang, request.base_url),
     )
 
 @app.route('/')

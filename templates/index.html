@@ -88,7 +88,7 @@
     <div class="about-summary-grid reveal">
       {% if edu_list %}
       <div class="about-block">
-        <h4 class="about-block-title">{{ 'Education' if en else '학력' }}</h4>
+        <h3 class="about-block-title">{{ 'Education' if en else '학력' }}</h3>
         <ul class="about-list">
           {% for ed in edu_list %}
           <li class="about-list-item">
@@ -99,7 +99,7 @@
           {% endfor %}
         </ul>
         {% if profile.language_scores %}
-        <h4 class="about-block-title" style="margin-top:1.75rem;">{{ 'Language' if en else '어학' }}</h4>
+        <h3 class="about-block-title" style="margin-top:1.75rem;">{{ 'Language' if en else '어학' }}</h3>
         <ul class="about-list">
           {% for ls in profile.language_scores %}
           <li class="about-list-item">
@@ -113,7 +113,7 @@
       {% endif %}
       {% if award_list %}
       <div class="about-block">
-        <h4 class="about-block-title">{{ 'Awards' if en else '수상내역' }}</h4>
+        <h3 class="about-block-title">{{ 'Awards' if en else '수상내역' }}</h3>
         <ul class="about-list">
           {% for aw in award_list %}
           <li class="about-list-item">
@@ -132,7 +132,7 @@
     {% set skill_display = (profile.skills_en.split(',') | map('trim') | select | list) if en and profile.skills_en else profile.skill_list %}
     {% if skill_display %}
     <div class="about-skills-wrap reveal">
-      <h4 class="about-block-title">{{ 'Core Competencies' if en else '핵심 역량' }}</h4>
+      <h3 class="about-block-title">{{ 'Core Competencies' if en else '핵심 역량' }}</h3>
       <ul class="skill-list">
         {% for s in skill_display %}
         <li><span class="skill-tag">{{ s }}</span></li>
@@ -145,7 +145,7 @@
     {% set tools_display = (profile.tools_en if en and profile.tools_en else profile.tools) %}
     {% if tools_display %}
     <div class="about-skills-wrap reveal">
-      <h4 class="about-block-title">{{ 'Skills' if en else '스킬' }}</h4>
+      <h3 class="about-block-title">{{ 'Skills' if en else '스킬' }}</h3>
       <ul class="skill-level-list">
         {% set level_map = {'상': 'High', '중': 'Mid', '하': 'Low'} %}
         {% for tk in tools_display %}
@@ -266,7 +266,7 @@
         data-links="{{ item.links | tojson | forceescape }}"
         data-image="{{ url_for('static', filename='uploads/' + item.image_filename) }}"
       >
-        <img src="{{ url_for('static', filename='uploads/' + item.image_filename) }}" alt="{{ item.title }}" loading="lazy" />
+        <img src="{{ url_for('static', filename='uploads/' + item.image_filename) }}" alt="{{ g_title }}" loading="lazy" />
       </div>
       {% endfor %}
     </div>
