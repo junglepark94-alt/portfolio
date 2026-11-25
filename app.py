@@ -136,6 +136,30 @@ print(f"[DB] engine={'SQLite (ephemeral!)' if _using_sqlite else 'PostgreSQL'}")
 app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
 app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5MB
 
+
+def uploads_on_persistent_volume(upload_folder=None):
+    """업로드 폴더가 Railway 볼륨 안에 있는지. 볼륨이 붙으면 Railway가 RAILWAY_VOLUME_MOUNT_PATH를 넣는다.
+
+    볼륨 밖이면 컨테이너 파일시스템이라 재배포 때 업로드 파일이 모두 사라진다.
+    """
+    mount = os.environ.get('RAILWAY_VOLUME_MOUNT_PATH', '').strip()
+    if not mount:
+        return False
+    folder = os.path.abspath(upload_folder or app.config['UPLOAD_FOLDER'])
+    mount = os.path.abspath(mount)
+    try:
+        return os.path.commonpath([folder, mount]) == mount
+    except ValueError:  # 다른 드라이브(Windows)
+        return False
+
+
+if _is_production and not uploads_on_persistent_volume():
+    print("=" * 60)
+    print("WARNING: static/uploads is not on a Railway volume.")
+    print("Uploaded images and the resume PDF WILL be lost on every redeploy!")
+    print(f"Attach a volume mounted at {app.config['UPLOAD_FOLDER']}")
+    print("=" * 60)
+
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 
 csrf = CSRFProtect(app)
@@ -179,9 +203,13 @@ def _remove_upload_if_unused(filename):
     """
     if not filename:
         return False
+    if os.path.basename(filename) != filename:  # 업로드 폴더 밖은 절대 건드리지 않는다
+        return False
     in_use = (ProjectImage.query.filter_by(filename=filename).count()
               + GalleryItem.query.filter_by(image_filename=filename).count()
-              + Profile.query.filter_by(profile_image_filename=filename).count())
+              + Profile.query.filter_by(profile_image_filename=filename).count()
+              + Profile.query.filter_by(resume_filename=filename).count()
+              + Profile.query.filter(Profile.og_image_url.like(f'%/uploads/{filename}')).count())
     if in_use:
         return False
     fpath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
@@ -190,6 +218,33 @@ def _remove_upload_if_unused(filename):
     except OSError:
         return False
     return True
+
+
+def _upload_name_from_url(url):
+    """'/static/uploads/<파일명>'을 가리키는 URL이면 파일명을, 외부 URL이면 ''를 돌려준다."""
+    path = urlparse(url or '').path
+    marker = '/static/uploads/'
+    if marker not in path:
+        return ''
+    name = path.rsplit(marker, 1)[1]
+    return name if name and os.path.basename(name) == name else ''
+
+
+def save_uploaded_pdf(file, prefix='resume'):
+    """PDF 업로드 저장. 확장자와 매직 바이트(%PDF-)가 모두 맞을 때만 저장하고 파일명을 돌려준다."""
+    if not file or not file.filename:
+        return None
+    ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
+    if ext != 'pdf':
+        return None
+    head = file.stream.read(5)
+    file.stream.seek(0)
+    if head != b'%PDF-':
+        return None
+    filename = _unique_upload_name(prefix, 'pdf')
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+    return filename
 
 
 def save_uploaded_image(file, prefix='project'):
@@ -1004,7 +1059,7 @@ def _swap_in_youtube_thumbnails(project, mapping):
 
 # ── DB Init ─────────────────────────────────────────────
 
-def init_db():
+def init_db(background_network_tasks=True):
     db.create_all()
     # 신규 컬럼 마이그레이션 (SQLite는 IF NOT EXISTS 미지원 → try/except)
     with db.engine.connect() as conn:
@@ -1164,6 +1219,14 @@ def init_db():
     except Exception as exc:
         db.session.rollback()
         print(f"[profile-fix] skipped: {exc!r}")
+    if background_network_tasks:
+        start_boot_network_tasks()
+    else:
+        run_boot_network_tasks()
+
+
+def run_boot_network_tasks():
+    """외부 네트워크가 필요한 시작 작업 (썸네일 내려받기, TikTok 단축링크 풀기). 앱 컨텍스트 안에서 호출."""
     try:
         apply_youtube_thumbnail_swaps()
     except Exception as exc:
@@ -1174,6 +1237,23 @@ def init_db():
     except Exception as exc:
         db.session.rollback()
         print(f"[tiktok-expand] skipped: {exc!r}")
+
+
+def start_boot_network_tasks():
+    """run_boot_network_tasks()를 백그라운드 스레드에서 실행한다.
+
+    요청 하나에 최대 6~10초씩 걸리므로 부팅 중에 돌리면 헬스체크(30초)를 넘겨 배포가 실패할 수 있다.
+    """
+    def _worker():
+        with app.app_context():
+            try:
+                run_boot_network_tasks()
+            finally:
+                db.session.remove()
+
+    thread = threading.Thread(target=_worker, name='boot-network-tasks', daemon=True)
+    thread.start()
+    return thread
 
 
 # ── Context Processor ────────────────────────────────────
@@ -1356,6 +1436,8 @@ def admin_dashboard():
     db_info = {
         'engine': 'SQLite ⚠️ (재배포 시 데이터 소멸)' if _using_sqlite else 'PostgreSQL ✅',
         'warning': _using_sqlite and _is_production,
+        'uploads_warning': _is_production and not uploads_on_persistent_volume(),
+        'upload_folder': app.config['UPLOAD_FOLDER'],
     }
 
     # 방문 통계: 최근 30일 (KST 기준)
@@ -1405,9 +1487,11 @@ def admin_dashboard():
 @app.route('/admin/profile', methods=['GET', 'POST'])
 @login_required
 def profile_edit():
-    import json
     profile = db.session.get(Profile, 1)
     if request.method == 'POST':
+        # 저장 후 더 이상 쓰이지 않는 이전 업로드 파일을 지우기 위해 기억해 둔다
+        old_files = {profile.profile_image_filename, profile.resume_filename,
+                     _upload_name_from_url(profile.og_image_url)}
         profile.name = request.form.get('name', '')
         profile.role = request.form.get('role', '')
         profile.tagline = request.form.get('tagline', '')
@@ -1498,13 +1582,13 @@ def profile_edit():
 
         # 이력서 PDF 업로드
         resume_file = request.files.get('resume_file')
+        resume_rejected = False
         if resume_file and resume_file.filename:
-            ext = resume_file.filename.rsplit('.', 1)[-1].lower() if '.' in resume_file.filename else ''
-            if ext == 'pdf':
-                filename = _unique_upload_name('resume', 'pdf')
-                os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-                resume_file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+            filename = save_uploaded_pdf(resume_file)
+            if filename:
                 profile.resume_filename = filename
+            else:
+                resume_rejected = True
 
         # 어학 성적
         lang_exams  = request.form.getlist('lang_exam')
@@ -1564,6 +1648,10 @@ def profile_edit():
         profile.experience_json = json.dumps(experience, ensure_ascii=False)
 
         db.session.commit()
+        for filename in old_files:
+            _remove_upload_if_unused(filename)
+        if resume_rejected:
+            flash('이력서는 PDF 파일만 올릴 수 있습니다. 이력서를 뺀 나머지 내용만 저장했습니다.')
         flash('프로필이 저장되었습니다.')
         return redirect(url_for('admin_dashboard'))
     return render_template('profile_form.html', profile=profile)
@@ -1770,10 +1858,13 @@ def gallery_edit(gid):
         item.title = request.form['title']
         item.title_en = request.form.get('title_en', '')
         item.sort_order = _form_int('sort_order')
+        old_img = item.image_filename
         new_img = _save_gallery_image(request)
         if new_img:
             item.image_filename = new_img
         db.session.commit()
+        if new_img:
+            _remove_upload_if_unused(old_img)
         flash('갤러리 항목이 수정되었습니다.')
         return redirect(url_for('admin_dashboard'))
     return render_template('gallery_form.html', item=item)
@@ -1903,119 +1994,154 @@ def api_track():
 
 # ── YouTube API Proxy ────────────────────────────────────
 
-@app.route('/api/youtube')
-def youtube_info():
-    import json as _json, urllib.request as _req, urllib.error as _err
+# 조회수·제목은 몇 분 늦어도 괜찮으므로 응답을 잠시 캐시해 API 쿼터(하루 10,000)를 아낀다.
+# 방문자가 같은 프로젝트 모달을 열 때마다 YouTube를 다시 부르지 않는다.
+_YT_CACHE_TTL = 30 * 60
+_YT_CACHE_MAX = 500
+_YT_CACHE_LOCK = threading.Lock()
+_YT_CACHE = {}  # key -> (expires_at, status, body)
+
+
+def _json_response(body, status=200):
+    return app.response_class(response=json.dumps(body), status=status,
+                              mimetype='application/json')
+
+
+def _yt_cache_get(key):
+    now = time.time()
+    with _YT_CACHE_LOCK:
+        hit = _YT_CACHE.get(key)
+        if hit and hit[0] > now:
+            return hit[1], hit[2]
+        _YT_CACHE.pop(key, None)
+    return None
+
+
+def _yt_cache_put(key, status, body):
+    """정상 응답과 '없음(404)'만 캐시한다. 일시적인 오류는 다음 요청에서 다시 시도한다."""
+    if status not in (200, 404):
+        return
+    now = time.time()
+    with _YT_CACHE_LOCK:
+        if len(_YT_CACHE) >= _YT_CACHE_MAX:
+            for k in [k for k, v in _YT_CACHE.items() if v[0] <= now]:
+                _YT_CACHE.pop(k, None)
+            if len(_YT_CACHE) >= _YT_CACHE_MAX:
+                _YT_CACHE.pop(min(_YT_CACHE, key=lambda k: _YT_CACHE[k][0]), None)
+        _YT_CACHE[key] = (now + _YT_CACHE_TTL, status, body)
+
+
+def _yt_get_json(url, timeout):
+    import urllib.request as _req
+    with _req.urlopen(url, timeout=timeout) as resp:
+        return json.loads(resp.read())
+
+
+def _yt_thumbnail(snippet):
+    thumbs = snippet.get('thumbnails', {})
+    return (thumbs.get('high') or thumbs.get('medium') or {}).get('url', '')
+
+
+def _yt_proxy(cache_key, fetch):
+    """캐시 → 레이트리밋 → API 키 확인 → fetch(api_key) 순으로 처리한다. fetch는 (status, body)를 돌려준다."""
+    import urllib.error as _err
+    cached = _yt_cache_get(cache_key)
+    if cached:
+        return _json_response(cached[1], cached[0])
     if _rate_limited(f"yt:{_client_ip()}"):
-        return _json.dumps({'error': 'rate limited'}), 429, {'Content-Type': 'application/json'}
-    video_id = request.args.get('v', '').strip()
-    if not video_id:
-        return _json.dumps({'error': 'no video id'}), 400, {'Content-Type': 'application/json'}
-    if not re.fullmatch(r'[A-Za-z0-9_-]{11}', video_id):
-        return _json.dumps({'error': 'invalid video id'}), 400, {'Content-Type': 'application/json'}
+        return _json_response({'error': 'rate limited'}, 429)
     api_key = os.environ.get('YOUTUBE_API_KEY', '')
     if not api_key:
-        return _json.dumps({'error': 'YOUTUBE_API_KEY not set'}), 503, {'Content-Type': 'application/json'}
-    url = (
-        'https://www.googleapis.com/youtube/v3/videos'
-        f'?part=snippet,statistics&id={video_id}&key={api_key}'
-    )
+        return _json_response({'error': 'YOUTUBE_API_KEY not set'}, 503)
     try:
-        with _req.urlopen(url, timeout=6) as resp:
-            data = _json.loads(resp.read())
+        status, body = fetch(api_key)
+    except _err.HTTPError as e:
+        status, body = 502, {'error': f'youtube api {e.code}'}
+    except Exception as e:
+        print(f"[youtube] {cache_key}: {e!r}")
+        status, body = 500, {'error': 'youtube fetch failed'}
+    _yt_cache_put(cache_key, status, body)
+    return _json_response(body, status)
+
+
+def _parse_iso_duration(d):
+    m = re.match(r'PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?', d or '')
+    if not m:
+        return 0
+    h, mn, s = (int(x or 0) for x in m.groups())
+    return h * 3600 + mn * 60 + s
+
+
+@app.route('/api/youtube')
+def youtube_info():
+    video_id = request.args.get('v', '').strip()
+    if not video_id:
+        return _json_response({'error': 'no video id'}, 400)
+    if not re.fullmatch(r'[A-Za-z0-9_-]{11}', video_id):
+        return _json_response({'error': 'invalid video id'}, 400)
+
+    def fetch(api_key):
+        data = _yt_get_json(
+            'https://www.googleapis.com/youtube/v3/videos'
+            f'?part=snippet,statistics&id={video_id}&key={api_key}', timeout=6)
         items = data.get('items', [])
         if not items:
-            return _json.dumps({'error': 'not found'}), 404, {'Content-Type': 'application/json'}
+            return 404, {'error': 'not found'}
         snippet = items[0].get('snippet', {})
-        stats   = items[0].get('statistics', {})
-        thumb   = (snippet.get('thumbnails', {}).get('high') or
-                   snippet.get('thumbnails', {}).get('medium') or {}).get('url', '')
-        return app.response_class(
-            response=_json.dumps({
-                'title':        snippet.get('title', ''),
-                'thumbnail':    thumb,
-                'viewCount':    stats.get('viewCount', '0'),
-                'likeCount':    stats.get('likeCount', '0'),
-                'commentCount': stats.get('commentCount', '0'),
-            }),
-            mimetype='application/json'
-        )
-    except _err.HTTPError as e:
-        return _json.dumps({'error': f'youtube api {e.code}'}), 502, {'Content-Type': 'application/json'}
-    except Exception as e:
-        return _json.dumps({'error': str(e)}), 500, {'Content-Type': 'application/json'}
+        stats = items[0].get('statistics', {})
+        return 200, {
+            'title':        snippet.get('title', ''),
+            'thumbnail':    _yt_thumbnail(snippet),
+            'viewCount':    stats.get('viewCount', '0'),
+            'likeCount':    stats.get('likeCount', '0'),
+            'commentCount': stats.get('commentCount', '0'),
+        }
 
+    return _yt_proxy(f'v:{video_id}', fetch)
 
-# ── YouTube Playlist API Proxy ───────────────────────────
 
 @app.route('/api/youtube/playlist')
 def youtube_playlist_info():
-    import json as _json, urllib.request as _req, urllib.error as _err, re as _re
-    if _rate_limited(f"yt:{_client_ip()}"):
-        return _json.dumps({'error': 'rate limited'}), 429, {'Content-Type': 'application/json'}
     playlist_id = request.args.get('list', '').strip()
     if not playlist_id:
-        return _json.dumps({'error': 'no playlist id'}), 400, {'Content-Type': 'application/json'}
+        return _json_response({'error': 'no playlist id'}, 400)
     if not re.fullmatch(r'[A-Za-z0-9_-]{10,64}', playlist_id):
-        return _json.dumps({'error': 'invalid playlist id'}), 400, {'Content-Type': 'application/json'}
-    api_key = os.environ.get('YOUTUBE_API_KEY', '')
-    if not api_key:
-        return _json.dumps({'error': 'YOUTUBE_API_KEY not set'}), 503, {'Content-Type': 'application/json'}
+        return _json_response({'error': 'invalid playlist id'}, 400)
 
-    def fetch(url):
-        with _req.urlopen(url, timeout=8) as r:
-            return _json.loads(r.read())
-
-    def parse_duration(d):
-        m = _re.match(r'PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?', d or '')
-        if not m: return 0
-        h, mn, s = (int(x or 0) for x in m.groups())
-        return h * 3600 + mn * 60 + s
-
-    try:
-        items_data = fetch(
+    def fetch(api_key):
+        items_data = _yt_get_json(
             'https://www.googleapis.com/youtube/v3/playlistItems'
-            f'?part=contentDetails&maxResults=50&playlistId={playlist_id}&key={api_key}'
-        )
+            f'?part=contentDetails&maxResults=50&playlistId={playlist_id}&key={api_key}', timeout=8)
         video_ids = [it['contentDetails']['videoId'] for it in items_data.get('items', [])]
         if not video_ids:
-            return _json.dumps({'error': 'empty playlist'}), 404, {'Content-Type': 'application/json'}
-
-        vdata = fetch(
+            return 404, {'error': 'empty playlist'}
+        vdata = _yt_get_json(
             'https://www.googleapis.com/youtube/v3/videos'
-            f'?part=snippet,statistics,contentDetails&id={",".join(video_ids)}&key={api_key}'
-        )
+            f'?part=snippet,statistics,contentDetails&id={",".join(video_ids)}&key={api_key}', timeout=8)
         videos = []
         for v in vdata.get('items', []):
-            dur = parse_duration(v.get('contentDetails', {}).get('duration', ''))
+            dur = _parse_iso_duration(v.get('contentDetails', {}).get('duration', ''))
             views = int(v.get('statistics', {}).get('viewCount', 0) or 0)
             videos.append((dur, views, v))
-
-        long_form = [(dur, views, v) for dur, views, v in videos if dur > 180]
-        pool = long_form if long_form else videos
+        if not videos:
+            return 404, {'error': 'empty playlist'}
+        long_form = [x for x in videos if x[0] > 180]
+        pool = long_form or videos
         pool.sort(key=lambda x: x[1], reverse=True)
         best = pool[0][2]
-
         snippet = best.get('snippet', {})
-        stats   = best.get('statistics', {})
-        thumb   = (snippet.get('thumbnails', {}).get('high') or
-                   snippet.get('thumbnails', {}).get('medium') or {}).get('url', '')
-        return app.response_class(
-            response=_json.dumps({
-                'videoUrl':    f"https://www.youtube.com/watch?v={best['id']}",
-                'videoId':     best['id'],
-                'title':       snippet.get('title', ''),
-                'thumbnail':   thumb,
-                'viewCount':   stats.get('viewCount', '0'),
-                'likeCount':   stats.get('likeCount', '0'),
-                'commentCount':stats.get('commentCount', '0'),
-            }),
-            mimetype='application/json'
-        )
-    except _err.HTTPError as e:
-        return _json.dumps({'error': f'youtube api {e.code}'}), 502, {'Content-Type': 'application/json'}
-    except Exception as e:
-        return _json.dumps({'error': str(e)}), 500, {'Content-Type': 'application/json'}
+        stats = best.get('statistics', {})
+        return 200, {
+            'videoUrl':     f"https://www.youtube.com/watch?v={best['id']}",
+            'videoId':      best['id'],
+            'title':        snippet.get('title', ''),
+            'thumbnail':    _yt_thumbnail(snippet),
+            'viewCount':    stats.get('viewCount', '0'),
+            'likeCount':    stats.get('likeCount', '0'),
+            'commentCount': stats.get('commentCount', '0'),
+        }
+
+    return _yt_proxy(f'list:{playlist_id}', fetch)
 
 
 # ── Entry ────────────────────────────────────────────────

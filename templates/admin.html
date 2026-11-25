@@ -20,6 +20,13 @@
   </div>
   {% endif %}
 
+  {% if db_info.uploads_warning %}
+  <div class="db-warning-banner">
+    ⚠️ <strong>업로드 저장소 경고</strong> — 업로드 폴더가 Railway 볼륨에 연결되어 있지 않습니다. 재배포할 때마다 이미지와 이력서 PDF가 사라집니다.<br>
+    Railway 대시보드 → 앱 서비스 → <strong>+ New → Volume</strong>을 추가하고 마운트 경로를 <code>{{ db_info.upload_folder }}</code>로 지정하세요.
+  </div>
+  {% endif %}
+
   <!-- 방문 통계 -->
   <div class="admin-section-card">
     <div class="asc-header">
