@@ -19,7 +19,11 @@
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Noto+Sans+KR:wght@300;400;500;600&family=Noto+Serif+KR:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  {# 웹폰트 CSS(한글 서브셋 때문에 약 160KB)가 첫 화면 그리기를 막지 않도록 비동기로 불러온다.
+     폰트가 오기 전에는 시스템 글꼴로 먼저 보이고(display=swap), 오면 바뀐다. 300 굵기는 CSS에서 쓰지 않아 뺐다. #}
+  {% set font_css = 'https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Noto+Sans+KR:wght@400;500;600&family=Noto+Serif+KR:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap' %}
+  <link rel="preload" as="style" href="{{ font_css }}" onload="this.onload=null;this.rel='stylesheet'" />
+  <noscript><link rel="stylesheet" href="{{ font_css }}" /></noscript>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
   {% if structured_data %}
   <script type="application/ld+json">{{ structured_data | tojson }}</script>

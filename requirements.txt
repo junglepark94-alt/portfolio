@@ -5,3 +5,4 @@ flask-wtf==1.2.1
 gunicorn==22.0.0
 werkzeug==3.0.3
 psycopg2-binary==2.9.9
+pillow==12.3.0

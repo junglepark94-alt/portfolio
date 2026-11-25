@@ -34,7 +34,7 @@
 
       {% if profile.profile_image_filename %}
       <div id="profileImgCurrentWrap" style="margin-bottom:0.75rem;">
-        <img src="{{ url_for('static', filename='uploads/' + profile.profile_image_filename) }}" alt="프로필 이미지" style="max-width:175px; aspect-ratio:3.5/4.5; object-fit:cover; border-radius:8px; border:1px solid var(--border);" />
+        <img src="{{ image_url(profile.profile_image_filename, 480) }}" alt="프로필 이미지" style="max-width:175px; aspect-ratio:3.5/4.5; object-fit:cover; border-radius:8px; border:1px solid var(--border);" />
         <div class="form-hint" style="margin-top:0.25rem;">현재 설정된 프로필 이미지</div>
       </div>
       {% endif %}

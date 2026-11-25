@@ -2,7 +2,7 @@
 document.addEventListener('error', function (e) {
   const img = e.target;
   if (!(img instanceof HTMLImageElement) || img.dataset.retried || !img.src) return;
-  if (img.src.indexOf('/static/uploads/') === -1) return;
+  if (img.src.indexOf('/static/uploads/') === -1 && img.src.indexOf('/media/') === -1) return;
   img.dataset.retried = '1';
   setTimeout(function () { img.src = img.src.split('?')[0] + '?retry=' + Date.now(); }, 1200);
 }, true);
@@ -236,7 +236,8 @@ if (modal) {
 
     // 갤러리
     let images = [];
-    try { images = JSON.parse(d.images || '[]').map(fn => `/static/uploads/${fn}`); } catch (e) {}
+    // 원본 대신 화면 크기에 맞춘 축소본(WebP)을 쓴다. 큰 이미지는 1600px, 아래 썸네일 줄은 480px.
+    try { images = JSON.parse(d.images || '[]').map(fn => ({ full: `/media/1600/${fn}`, thumb: `/media/480/${fn}` })); } catch (e) {}
     if (show('modalGalleryWrap', images.length > 0)) initGallery(images, d.title || '');
 
     // 태그 + 링크 (유튜브는 영상 목록으로 분리)
@@ -306,7 +307,8 @@ if (modal) {
     if (imgs.length > 1) {
       imgs.forEach((src, i) => {
         const th = document.createElement('img');
-        th.src = src; th.alt = ''; th.className = i === 0 ? 'active' : '';
+        th.src = src.thumb; th.alt = ''; th.className = i === 0 ? 'active' : '';
+        th.loading = 'lazy'; th.decoding = 'async';
         th.addEventListener('click', () => { galleryIdx = i; setGallerySlide(i, alt); });
         thumbsEl.appendChild(th);
       });
@@ -316,7 +318,9 @@ if (modal) {
   }
 
   function setGallerySlide(i, alt) {
-    galleryMainImg.src = galleryImgs[i];
+    galleryMainImg.src = galleryImgs[i].full;
+    // 다음 장을 미리 받아 두어 넘길 때 기다리지 않게 한다
+    if (galleryImgs.length > 1) new Image().src = galleryImgs[(i + 1) % galleryImgs.length].full;
     galleryMainImg.alt = alt || '';
     thumbsEl.querySelectorAll('img').forEach((th, ti) => th.classList.toggle('active', ti === i));
   }
@@ -447,6 +451,11 @@ if (modal) {
     document.head.appendChild(el);
   }
   function warmEmbeds(card) {
+    // 상세 화면을 열면 바로 보일 첫 번째 큰 이미지를 미리 받아 둔다
+    try {
+      const first = JSON.parse(card.dataset.images || '[]')[0];
+      if (first) warmLink('prefetch', `/media/1600/${first}`);
+    } catch (e) {}
     let links = [];
     try { links = JSON.parse(card.dataset.links || '[]'); } catch (e) {}
     links.forEach(lk => {

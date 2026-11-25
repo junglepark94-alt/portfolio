@@ -49,7 +49,7 @@
       {% if profile.profile_image_filename %}
       <figure class="hero-photo">
         <div class="hero-photo-frame">
-          <img src="{{ url_for('static', filename='uploads/' + profile.profile_image_filename) }}" alt="{{ profile.name }}" />
+          <img src="{{ image_url(profile.profile_image_filename, 480) }}" srcset="{{ image_srcset(profile.profile_image_filename) }}" sizes="240px" alt="{{ profile.name }}" fetchpriority="high" />
         </div>
         <figcaption class="hero-photo-cap">{{ (profile.name_en if en and profile.name_en else profile.name) }} — Portfolio</figcaption>
       </figure>
@@ -231,7 +231,7 @@
       >
         {% if main_img %}
         <div class="pc-thumb">
-          <img src="{{ url_for('static', filename='uploads/' + main_img.filename) }}" alt="{{ p_title }}" loading="lazy" decoding="async" />
+          <img src="{{ image_url(main_img.filename, 480) }}" srcset="{{ image_srcset(main_img.filename) }}" sizes="(max-width: 640px) 92vw, 380px" alt="{{ p_title }}" loading="lazy" decoding="async" />
         </div>
         {% endif %}
         <div class="pc-body" data-detail-label="{{ ui.view_details }} →">
@@ -264,9 +264,9 @@
         data-title="{{ g_title | e }}"
         data-desc="{{ item.description | e }}"
         data-links="{{ item.links | tojson | forceescape }}"
-        data-image="{{ url_for('static', filename='uploads/' + item.image_filename) }}"
+        data-image="{{ image_url(item.image_filename, 1600) }}"
       >
-        <img src="{{ url_for('static', filename='uploads/' + item.image_filename) }}" alt="{{ g_title }}" loading="lazy" />
+        <img src="{{ image_url(item.image_filename, 480) }}" srcset="{{ image_srcset(item.image_filename) }}" sizes="340px" alt="{{ g_title }}" loading="lazy" decoding="async" />
       </div>
       {% endfor %}
     </div>

@@ -19,6 +19,7 @@ from tracking import prune_visit_events, record_event, track_visit
 from uploads import (_remove_upload_if_unused, _save_data_uri, _unique_upload_name,
                      _upload_name_from_url, save_uploaded_image, save_uploaded_pdf,
                      uploads_on_persistent_volume)
+import images
 import youtube
 
 UI_TEXT = {
@@ -128,6 +129,7 @@ app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5MB
 
 db.init_app(app)
 app.register_blueprint(youtube.bp)
+app.register_blueprint(images.bp)
 
 if _is_production and not uploads_on_persistent_volume(app.config['UPLOAD_FOLDER']):
     print("=" * 60)
@@ -145,7 +147,31 @@ def _cache_uploaded_images(response):
     # 관리자 화면을 오갈 때마다 수십 장을 다시 받지 않도록 한다.
     if request.path.startswith('/static/uploads/') and response.status_code == 200:
         response.headers['Cache-Control'] = 'public, max-age=604800, immutable'
+    elif (request.path.startswith('/static/') and request.args.get('v')
+          and response.status_code == 200):
+        # ?v=<수정시각>이 붙은 CSS·JS는 파일이 바뀌면 주소가 바뀌므로 1년 캐시해도 안전하다
+        response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
     return response
+
+
+_STATIC_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
+
+
+@app.url_defaults
+def _version_static_urls(endpoint, values):
+    """url_for('static', ...)에 파일 수정 시각을 붙인다 (업로드 파일 제외).
+
+    예전에는 CSS·JS가 no-cache라 방문할 때마다 서버에 변경 여부를 물었다(왕복 약 150ms).
+    """
+    if endpoint != 'static' or 'v' in values:
+        return
+    filename = values.get('filename') or ''
+    if filename.startswith('uploads/'):
+        return
+    try:
+        values['v'] = int(os.stat(os.path.join(_STATIC_ROOT, filename)).st_mtime)
+    except OSError:
+        pass
 
 
 # ── Context Processor ────────────────────────────────────
@@ -156,7 +182,7 @@ def inject_globals():
         p = db.session.get(Profile, 1)
     except Exception:
         p = None
-    return {'profile': p}
+    return {'profile': p, 'image_url': images.image_url, 'image_srcset': images.image_srcset}
 
 
 # ── Public Routes ────────────────────────────────────────

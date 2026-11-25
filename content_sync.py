@@ -7,6 +7,7 @@ import urllib.request
 
 from flask import current_app
 
+from images import warm_variants
 from models import ContentSync, Profile, Project, ProjectImage, _utcnow, db
 from uploads import _fetch_external_image, _fetch_youtube_thumbnail
 
@@ -364,7 +365,7 @@ def _swap_in_youtube_thumbnails(project, mapping):
 
 
 def run_boot_network_tasks():
-    """외부 네트워크가 필요한 시작 작업 (썸네일 내려받기, TikTok 단축링크 풀기). 앱 컨텍스트 안에서 호출."""
+    """부팅 후 백그라운드 작업 (썸네일 내려받기, TikTok 단축링크 풀기, 이미지 축소본 미리 만들기). 앱 컨텍스트 안에서 호출."""
     try:
         apply_youtube_thumbnail_swaps()
     except Exception as exc:
@@ -375,6 +376,12 @@ def run_boot_network_tasks():
     except Exception as exc:
         db.session.rollback()
         print(f"[tiktok-expand] skipped: {exc!r}")
+    try:
+        # 썸네일 교체가 끝난 뒤에 해야 새로 받은 썸네일의 축소본까지 만든다
+        warm_variants()
+    except Exception as exc:
+        db.session.rollback()
+        print(f"[images] warm-up skipped: {exc!r}")
 
 
 def start_boot_network_tasks():

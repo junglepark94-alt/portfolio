@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 
 from flask import current_app
 
+from images import remove_variants
 from models import GalleryItem, Profile, ProjectImage
 
 def uploads_on_persistent_volume(upload_folder=None):
@@ -74,6 +75,7 @@ def _remove_upload_if_unused(filename):
         os.remove(fpath)
     except OSError:
         return False
+    remove_variants(filename)
     return True
 
 

@@ -14,7 +14,7 @@
       <div class="img-manager-grid" id="imgGrid">
         {% for img in project.images %}
         <div class="img-tile" data-id="{{ img.id }}">
-          <img src="{{ url_for('static', filename='uploads/' + img.filename) }}" alt="" />
+          <img src="{{ image_url(img.filename, 480) }}" alt="" loading="lazy" />
           {% if img.is_main %}<span class="img-main-badge">대표</span>{% endif %}
           <div class="img-tile-actions">
             {% if not img.is_main %}
