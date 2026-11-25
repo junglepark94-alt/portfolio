@@ -251,6 +251,7 @@ if (modal) {
     ).join('');
     show('secResources', plainLinks.length > 0 || tags.length > 0);
 
+    embedLoader.reset();
     ytListEl.innerHTML = '';
     links.forEach(lk => {
       if (!lk || !lk.url) return;
@@ -273,6 +274,7 @@ if (modal) {
     document.body.style.overflow = 'hidden';
     modalBox.scrollTop = 0;
     if (modalMedia) modalMedia.scrollTop = 0;
+    embedLoader.watch([...ytListEl.querySelectorAll('iframe[data-src]')]);
     modalClose.focus();
   }
 
@@ -281,6 +283,7 @@ if (modal) {
     modal.classList.remove('active');
     modal.setAttribute('aria-hidden', 'true');
     document.body.style.overflow = '';
+    embedLoader.reset();
     ytListEl.innerHTML = '';
     if (activeProjectCard) activeProjectCard.focus();
   }
@@ -364,12 +367,79 @@ if (modal) {
       external: () => modalText.externalInstagram,
     },
   };
+  // ── TikTok·Instagram 임베드 순차 로딩 ──
+  // 플레이어 하나가 JS를 약 1.2MB 받는다. 모달을 열자마자 여러 개를 한꺼번에 띄우면 대역폭과 CPU를
+  // 나눠 쓰느라 모두 늦게 뜬다(5개 동시: 2.6~4초). 화면 가까이 온 것부터 하나씩 띄우면 첫 번째가
+  // 빨리 보이고, 뒤의 것들은 앞에서 받아 둔 JS를 캐시로 다시 쓴다.
+  const embedLoader = (() => {
+    const MAX_ACTIVE = 1;
+    const LOAD_TIMEOUT = 8000;  // 응답이 늦은 임베드가 뒤의 것을 막지 않도록
+    let queue = [];
+    let active = 0;
+    let observer = null;
+    let generation = 0;
+
+    // 화면 폭에 따라 스크롤 영역이 달라진다(넓으면 .modal-media, 좁으면 모달 전체).
+    // overflow가 auto여도 크기가 0인 요소(레이아웃상 쓰이지 않는 것)는 건너뛴다.
+    function scrollRoot(el) {
+      for (let p = el.parentElement; p; p = p.parentElement) {
+        const overflow = getComputedStyle(p).overflowY;
+        if ((overflow === 'auto' || overflow === 'scroll') && p.clientHeight > 0) return p;
+      }
+      return null;
+    }
+    function pump() {
+      while (active < MAX_ACTIVE && queue.length) {
+        const iframe = queue.shift();
+        if (!iframe.isConnected || !iframe.dataset.src) continue;
+        active++;
+        const gen = generation;
+        let finished = false;
+        const finish = () => {
+          if (finished) return;
+          finished = true;
+          iframe.closest('.video-embed')?.classList.add('loaded');
+          if (gen !== generation) return;  // 그 사이 모달이 닫혔거나 다른 프로젝트로 바뀜
+          active--;
+          pump();
+        };
+        iframe.addEventListener('load', finish, { once: true });
+        setTimeout(finish, LOAD_TIMEOUT);
+        iframe.src = iframe.dataset.src;
+        delete iframe.dataset.src;
+      }
+    }
+    return {
+      reset() {
+        generation++;
+        queue = [];
+        active = 0;
+        if (observer) observer.disconnect();
+        observer = null;
+      },
+      watch(iframes) {
+        if (!iframes.length) return;
+        // 모달 안쪽 스크롤 영역 기준으로, 보이기 조금 전(600px)부터 불러온다
+        observer = new IntersectionObserver(entries => {
+          entries.forEach(entry => {
+            if (!entry.isIntersecting) return;
+            observer.unobserve(entry.target);
+            queue.push(entry.target);
+          });
+          queue.sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) ? -1 : 1);
+          pump();
+        }, { root: scrollRoot(iframes[0]), rootMargin: '600px 0px' });
+        iframes.forEach(f => observer.observe(f));
+      },
+    };
+  })();
+
   function createEmbedItem(kind, label, url, id) {
     const item = document.createElement('div');
     item.className = `video-item playing ${kind}`;
     item.innerHTML =
-      `<div class="video-embed">
-         <iframe src="${EMBEDS[kind].src(id)}" title="${esc(label || kind)}" scrolling="no" allow="autoplay; encrypted-media; fullscreen; picture-in-picture"></iframe>
+      `<div class="video-embed lazy-embed">
+         <iframe data-src="${EMBEDS[kind].src(id)}" title="${esc(label || kind)}" scrolling="no" allow="autoplay; encrypted-media; fullscreen; picture-in-picture"></iframe>
        </div>
        <div class="video-info">
          ${label ? `<div class="video-label">${esc(label)}</div>` : ''}
@@ -442,6 +512,11 @@ if (modal) {
 
   // 카드에 마우스·포커스가 오면 TikTok·Instagram 임베드를 미리 연결·요청해 상세 화면의 로딩을 줄인다.
   const warmed = new Set();
+  // 플레이어 페이지와, 그 페이지가 JS·표지 이미지를 받는 서버 (2026-11 측정 기준)
+  const EMBED_ORIGINS = {
+    tiktok: ['https://www.tiktok.com', 'https://sf16-website-login.neutral.ttwstatic.com', 'https://p16-common-sign.tiktokcdn.com'],
+    instagram: ['https://www.instagram.com', 'https://static.cdninstagram.com', 'https://scontent.cdninstagram.com'],
+  };
   function warmLink(rel, href) {
     if (warmed.has(href)) return;
     warmed.add(href);
@@ -464,7 +539,7 @@ if (modal) {
       const igid = !tid && extractInstagramCode(lk.url);
       const kind = tid ? 'tiktok' : igid ? 'instagram' : null;
       if (!kind) return;
-      warmLink('preconnect', kind === 'tiktok' ? 'https://www.tiktok.com' : 'https://www.instagram.com');
+      EMBED_ORIGINS[kind].forEach(origin => warmLink('preconnect', origin));
       warmLink('prefetch', EMBEDS[kind].src(tid || igid));
     });
   }
