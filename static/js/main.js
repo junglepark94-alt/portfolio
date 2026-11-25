@@ -374,7 +374,10 @@ if (modal) {
   const embedLoader = (() => {
     const MAX_ACTIVE = 1;
     const LOAD_TIMEOUT = 8000;  // 응답이 늦은 임베드가 뒤의 것을 막지 않도록
-    let queue = [];
+    let pending = [];           // 아직 불러오지 않은 iframe (문서 순서)
+    let visible = new Set();    // 지금 보이는(또는 곧 보일) iframe
+    let furthestSeen = -1;      // 한 번이라도 보인 iframe 중 가장 아래쪽의 순번
+    let order = new Map();
     let active = 0;
     let observer = null;
     let generation = 0;
@@ -388,9 +391,17 @@ if (modal) {
       }
       return null;
     }
+    // 보이는 것을 먼저, 그다음 이미 스크롤로 지나친 것을 위에서부터 불러온다.
+    // (맨 아래로 한 번에 건너뛰면 중간 것은 '보이는' 순간이 없으므로 지나친 것도 챙긴다)
+    function nextToLoad() {
+      return pending.find(f => visible.has(f)) || pending.find(f => order.get(f) <= furthestSeen);
+    }
     function pump() {
-      while (active < MAX_ACTIVE && queue.length) {
-        const iframe = queue.shift();
+      while (active < MAX_ACTIVE) {
+        const iframe = nextToLoad();
+        if (!iframe) return;
+        pending = pending.filter(f => f !== iframe);
+        if (observer) observer.unobserve(iframe);
         if (!iframe.isConnected || !iframe.dataset.src) continue;
         active++;
         const gen = generation;
@@ -412,21 +423,28 @@ if (modal) {
     return {
       reset() {
         generation++;
-        queue = [];
+        pending = [];
+        visible = new Set();
+        furthestSeen = -1;
+        order = new Map();
         active = 0;
         if (observer) observer.disconnect();
         observer = null;
       },
       watch(iframes) {
         if (!iframes.length) return;
+        pending = iframes.slice();
+        iframes.forEach((f, i) => order.set(f, i));
         // 모달 안쪽 스크롤 영역 기준으로, 보이기 조금 전(600px)부터 불러온다
         observer = new IntersectionObserver(entries => {
           entries.forEach(entry => {
-            if (!entry.isIntersecting) return;
-            observer.unobserve(entry.target);
-            queue.push(entry.target);
+            if (entry.isIntersecting) {
+              visible.add(entry.target);
+              furthestSeen = Math.max(furthestSeen, order.get(entry.target));
+            } else {
+              visible.delete(entry.target);
+            }
           });
-          queue.sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) ? -1 : 1);
           pump();
         }, { root: scrollRoot(iframes[0]), rootMargin: '600px 0px' });
         iframes.forEach(f => observer.observe(f));
