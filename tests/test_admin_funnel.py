@@ -2,7 +2,8 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 
 from analytics import build_funnel_stats
-from app import VisitEvent, _today_kst, db
+from app import VisitEvent, db
+from models import _today_kst
 
 
 def _ev(session_key, stage, project_id=0, detail=''):

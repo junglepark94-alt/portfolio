@@ -5,6 +5,10 @@ import urllib.request
 import pytest
 
 import app as app_module
+import content_sync as content_sync_mod
+import schema as schema_mod
+import ratelimit as ratelimit_mod
+import youtube as youtube_mod
 from app import GalleryItem, Profile, db
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
@@ -14,11 +18,11 @@ PDF = b"%PDF-1.7\n" + b"\x00" * 64
 @pytest.fixture(autouse=True)
 def isolated_state(tmp_path, monkeypatch):
     monkeypatch.setitem(app_module.app.config, "UPLOAD_FOLDER", str(tmp_path))
-    app_module._RATE_HITS.clear()
-    app_module._YT_CACHE.clear()
+    ratelimit_mod._RATE_HITS.clear()
+    youtube_mod._YT_CACHE.clear()
     yield tmp_path
-    app_module._RATE_HITS.clear()
-    app_module._YT_CACHE.clear()
+    ratelimit_mod._RATE_HITS.clear()
+    youtube_mod._YT_CACHE.clear()
 
 
 def _login(client):
@@ -118,8 +122,8 @@ def test_playlist_with_no_playable_videos_returns_404(client, monkeypatch):
 
 def test_init_db_runs_network_tasks_in_background(portfolio_app, monkeypatch):
     started = []
-    monkeypatch.setattr(app_module, "start_boot_network_tasks", lambda: started.append(True))
-    monkeypatch.setattr(app_module, "run_boot_network_tasks",
+    monkeypatch.setattr(schema_mod, "start_boot_network_tasks", lambda: started.append(True))
+    monkeypatch.setattr(schema_mod, "run_boot_network_tasks",
                         lambda: pytest.fail("network tasks must not block boot"))
     with portfolio_app.app_context():
         app_module.init_db()
@@ -128,8 +132,8 @@ def test_init_db_runs_network_tasks_in_background(portfolio_app, monkeypatch):
 
 def test_background_network_thread_runs_tasks(portfolio_app, monkeypatch):
     ran = []
-    monkeypatch.setattr(app_module, "run_boot_network_tasks", lambda: ran.append(True))
-    app_module.start_boot_network_tasks().join(timeout=5)
+    monkeypatch.setattr(content_sync_mod, "run_boot_network_tasks", lambda: ran.append(True))
+    content_sync_mod.start_boot_network_tasks().join(timeout=5)
     assert ran == [True]
 
 

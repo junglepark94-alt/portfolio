@@ -1,23 +1,25 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory, abort
-from flask_sqlalchemy import SQLAlchemy
-from flask_wtf import CSRFProtect
-from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.middleware.proxy_fix import ProxyFix
-from sqlalchemy.exc import IntegrityError
-from datetime import datetime, timezone, timedelta
-import os
-import time
-import re
+from datetime import datetime, timedelta
+from functools import wraps
 import json
-import base64
-import threading
-import urllib.error
-import urllib.request
-from analytics import build_funnel_stats, build_source_stats
-import secrets
-from urllib.parse import urlparse
+import os
+import re
 
-KST = timezone(timedelta(hours=9))
+from flask import (Flask, abort, flash, jsonify, redirect, render_template, request,
+                   send_from_directory, session, url_for)
+from flask_wtf import CSRFProtect
+from werkzeug.middleware.proxy_fix import ProxyFix
+
+from analytics import build_funnel_stats, build_source_stats
+from content_sync import _apply_copy_entry, _expand_tiktok_short_url, _find_copy_entry
+from models import (CONVERT_KINDS, KST, TRACKABLE_STAGES, Admin, DailyVisit, GalleryItem,
+                    Profile, Project, ProjectImage, VisitEvent, db)
+from ratelimit import _client_ip, _rate_limited
+from schema import init_db  # noqa: F401  (wsgi.py와 `python app.py`가 여기서 가져간다)
+from tracking import prune_visit_events, record_event, track_visit
+from uploads import (_remove_upload_if_unused, _save_data_uri, _unique_upload_name,
+                     _upload_name_from_url, save_uploaded_image, save_uploaded_pdf,
+                     uploads_on_persistent_volume)
+import youtube
 
 UI_TEXT = {
     'ko': {
@@ -74,21 +76,6 @@ def display_period(period, lang='ko'):
         return value.replace('진행 중', 'Present')
     return value.replace('Present', '진행 중')
 
-def _today_kst():
-    return datetime.now(KST).strftime('%Y-%m-%d')
-
-
-def _utcnow():
-    """기존 컬럼과 같은 naive UTC 시각 (datetime.utcnow()는 deprecated)."""
-    return datetime.now(timezone.utc).replace(tzinfo=None)
-
-
-def _json_list(raw):
-    """JSON 문자열 컬럼을 목록으로 읽는다. 비었거나 깨졌으면 빈 목록."""
-    try:
-        return json.loads(raw or '[]')
-    except (TypeError, ValueError):
-        return []
 
 app = Flask(__name__)
 # Railway 프록시가 붙이는 X-Forwarded-For 마지막 값(실제 접속 IP)과 https 여부만 신뢰한다.
@@ -96,6 +83,7 @@ app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
 
 _is_production = bool(os.environ.get('PORT'))  # Railway는 PORT를 주입함
+app.config['IS_PRODUCTION'] = _is_production
 
 # SECRET_KEY: 프로덕션에서는 반드시 환경변수로 주입해야 함.
 # 기본값으로 세션을 서명하면 공격자가 쿠키를 위조해 관리자 인증을 우회할 수 있음.
@@ -138,31 +126,15 @@ print(f"[DB] engine={'SQLite (ephemeral!)' if _using_sqlite else 'PostgreSQL'}")
 app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
 app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5MB
 
+db.init_app(app)
+app.register_blueprint(youtube.bp)
 
-def uploads_on_persistent_volume(upload_folder=None):
-    """업로드 폴더가 Railway 볼륨 안에 있는지. 볼륨이 붙으면 Railway가 RAILWAY_VOLUME_MOUNT_PATH를 넣는다.
-
-    볼륨 밖이면 컨테이너 파일시스템이라 재배포 때 업로드 파일이 모두 사라진다.
-    """
-    mount = os.environ.get('RAILWAY_VOLUME_MOUNT_PATH', '').strip()
-    if not mount:
-        return False
-    folder = os.path.abspath(upload_folder or app.config['UPLOAD_FOLDER'])
-    mount = os.path.abspath(mount)
-    try:
-        return os.path.commonpath([folder, mount]) == mount
-    except ValueError:  # 다른 드라이브(Windows)
-        return False
-
-
-if _is_production and not uploads_on_persistent_volume():
+if _is_production and not uploads_on_persistent_volume(app.config['UPLOAD_FOLDER']):
     print("=" * 60)
     print("WARNING: static/uploads is not on a Railway volume.")
     print("Uploaded images and the resume PDF WILL be lost on every redeploy!")
     print(f"Attach a volume mounted at {app.config['UPLOAD_FOLDER']}")
     print("=" * 60)
-
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 
 csrf = CSRFProtect(app)
 
@@ -174,1115 +146,6 @@ def _cache_uploaded_images(response):
     if request.path.startswith('/static/uploads/') and response.status_code == 200:
         response.headers['Cache-Control'] = 'public, max-age=604800, immutable'
     return response
-
-
-def _looks_like_image(head):
-    """매직 바이트로 실제 이미지 여부를 검사 (확장자 위조 방지)."""
-    if head[:3] == b'\xff\xd8\xff':                       # JPEG
-        return True
-    if head[:8] == b'\x89PNG\r\n\x1a\n':                  # PNG
-        return True
-    if head[:6] in (b'GIF87a', b'GIF89a'):               # GIF
-        return True
-    if head[:4] == b'RIFF' and head[8:12] == b'WEBP':    # WEBP
-        return True
-    return False
-
-
-def _unique_upload_name(prefix, ext):
-    """같은 초에 여러 장을 올려도 겹치지 않는 업로드 파일명.
-
-    업로드 파일은 immutable로 캐시되므로 같은 이름을 다시 쓰면 안 된다.
-    """
-    return f"{prefix}_{int(time.time())}_{secrets.token_hex(4)}.{ext}"
-
-
-def _remove_upload_if_unused(filename):
-    """어떤 행도 더 이상 가리키지 않을 때만 업로드 파일을 지운다.
-
-    yt_/ext_ 썸네일은 같은 영상·URL을 쓰는 프로젝트끼리 파일 하나를 공유하므로,
-    행을 지운 뒤(커밋 후) 호출해야 남은 참조만 센다.
-    """
-    if not filename:
-        return False
-    if os.path.basename(filename) != filename:  # 업로드 폴더 밖은 절대 건드리지 않는다
-        return False
-    in_use = (ProjectImage.query.filter_by(filename=filename).count()
-              + GalleryItem.query.filter_by(image_filename=filename).count()
-              + Profile.query.filter_by(profile_image_filename=filename).count()
-              + Profile.query.filter_by(resume_filename=filename).count()
-              + Profile.query.filter(Profile.og_image_url.like(f'%/uploads/{filename}')).count())
-    if in_use:
-        return False
-    fpath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    try:
-        os.remove(fpath)
-    except OSError:
-        return False
-    return True
-
-
-def _upload_name_from_url(url):
-    """'/static/uploads/<파일명>'을 가리키는 URL이면 파일명을, 외부 URL이면 ''를 돌려준다."""
-    path = urlparse(url or '').path
-    marker = '/static/uploads/'
-    if marker not in path:
-        return ''
-    name = path.rsplit(marker, 1)[1]
-    return name if name and os.path.basename(name) == name else ''
-
-
-def save_uploaded_pdf(file, prefix='resume'):
-    """PDF 업로드 저장. 확장자와 매직 바이트(%PDF-)가 모두 맞을 때만 저장하고 파일명을 돌려준다."""
-    if not file or not file.filename:
-        return None
-    ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
-    if ext != 'pdf':
-        return None
-    head = file.stream.read(5)
-    file.stream.seek(0)
-    if head != b'%PDF-':
-        return None
-    filename = _unique_upload_name(prefix, 'pdf')
-    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-    return filename
-
-
-def save_uploaded_image(file, prefix='project'):
-    if not file or not file.filename:
-        return None
-    ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
-    if ext not in ALLOWED_EXTENSIONS:
-        return None
-    head = file.stream.read(16)
-    file.stream.seek(0)
-    if not _looks_like_image(head):
-        return None
-    filename = _unique_upload_name(prefix, ext)
-    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-    return filename
-
-
-def _save_data_uri(data_uri, filename):
-    """data URI(base64 크롭 이미지)를 검증 후 저장. 성공 시 filename, 실패 시 None."""
-    if not data_uri or ',' not in data_uri:
-        return None
-    try:
-        raw = base64.b64decode(data_uri.split(',', 1)[1])
-    except Exception:
-        return None
-    if not _looks_like_image(raw[:16]):
-        return None
-    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-    with open(os.path.join(app.config['UPLOAD_FOLDER'], filename), 'wb') as f:
-        f.write(raw)
-    return filename
-
-
-# ── 간단한 인메모리 레이트리밋 (YouTube 프록시 쿼터 어뷰징 방지) ──
-# gunicorn 워커마다 독립적이므로 분산 환경에서는 워커 수만큼 한도가 곱해짐.
-# 외부 의존성 없이 캐주얼한 남용을 막는 수준의 방어임.
-_RATE_LOCK = threading.Lock()
-_RATE_HITS = {}  # client_ip -> [timestamps]
-
-
-def _client_ip():
-    # ProxyFix가 프록시가 붙인 값으로 remote_addr를 채운다. X-Forwarded-For를 직접 읽지 않는다.
-    return request.remote_addr or 'unknown'
-
-
-def _rate_limited(key, max_hits=30, window=60):
-    now = time.time()
-    with _RATE_LOCK:
-        if len(_RATE_HITS) > 2000:  # 키 무한 증가 방지
-            for k in [k for k, v in _RATE_HITS.items() if not v or now - v[-1] > window]:
-                _RATE_HITS.pop(k, None)
-        hits = [t for t in _RATE_HITS.get(key, []) if now - t < window]
-        if len(hits) >= max_hits:
-            _RATE_HITS[key] = hits
-            return True
-        hits.append(now)
-        _RATE_HITS[key] = hits
-        return False
-
-
-db = SQLAlchemy(app)
-
-# ── Models ──────────────────────────────────────────────
-
-class Project(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(120), nullable=False)
-    description = db.Column(db.Text, nullable=False)
-    tech_stack = db.Column(db.String(250))
-    github_url = db.Column(db.String(300))
-    demo_url = db.Column(db.String(300))
-    period = db.Column(db.String(80))
-    order = db.Column(db.Integer, default=0)
-    created_at = db.Column(db.DateTime, default=_utcnow)
-    image_filename = db.Column(db.String(300), default='')  # 레거시
-    detail_text = db.Column(db.Text, default='')
-    links_json = db.Column(db.Text, default='[]')
-    kpi = db.Column(db.Text, default='')
-    my_role = db.Column(db.String(200), default='')
-    category = db.Column(db.String(100), default='')
-    # English
-    links_en_json = db.Column(db.Text, default='[]')
-    title_en = db.Column(db.String(120), default='')
-    description_en = db.Column(db.Text, default='')
-    detail_text_en = db.Column(db.Text, default='')
-    kpi_en = db.Column(db.Text, default='')
-    my_role_en = db.Column(db.String(200), default='')
-    category_en = db.Column(db.String(100), default='')
-    is_hidden = db.Column(db.Boolean, default=False)  # True면 공개 페이지에서 제외 (관리자에서만 보임)
-    images = db.relationship('ProjectImage', backref='project',
-                             cascade='all, delete-orphan',
-                             order_by='ProjectImage.sort_order, ProjectImage.id',
-                             lazy='select')
-
-    @property
-    def main_image(self):
-        m = next((i for i in self.images if i.is_main), None)
-        return m or (self.images[0] if self.images else None)
-
-    @property
-    def links(self):
-        return _json_list(self.links_json)
-
-    @property
-    def links_en(self):
-        return _json_list(self.links_en_json)
-
-    @property
-    def tech_list(self):
-        return [t.strip() for t in (self.tech_stack or '').split(',') if t.strip()]
-
-
-class ProjectImage(db.Model):
-    __tablename__ = 'project_image'
-    id = db.Column(db.Integer, primary_key=True)
-    project_id = db.Column(db.Integer, db.ForeignKey('project.id', ondelete='CASCADE'), nullable=False)
-    filename = db.Column(db.String(300), nullable=False)
-    is_main = db.Column(db.Boolean, default=False)
-    sort_order = db.Column(db.Integer, default=0)
-
-
-class GalleryItem(db.Model):
-    __tablename__ = 'gallery_item'
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(200), nullable=False)
-    title_en = db.Column(db.String(200), default='')
-    description = db.Column(db.Text, default='')
-    image_filename = db.Column(db.String(300), nullable=False)
-    links_json = db.Column(db.Text, default='[]')
-    sort_order = db.Column(db.Integer, default=0)
-    created_at = db.Column(db.DateTime, default=_utcnow)
-
-    @property
-    def links(self):
-        return _json_list(self.links_json)
-
-
-class DailyVisit(db.Model):
-    """일별 방문수 집계 (KST 기준, 세션당 하루 1회)"""
-    __tablename__ = 'daily_visit'
-    id = db.Column(db.Integer, primary_key=True)
-    date = db.Column(db.String(10), unique=True, index=True, nullable=False)  # YYYY-MM-DD
-    count = db.Column(db.Integer, default=0)
-
-
-FUNNEL_STAGES = ('visit', 'projects_view', 'project_detail', 'convert')
-TRACKABLE_STAGES = ('projects_view', 'project_detail', 'convert')
-CONVERT_KINDS = ('resume', 'email', 'phone', 'linkedin', 'github', 'blog', 'remember')
-VISIT_EVENT_RETENTION_DAYS = 180
-
-
-class VisitEvent(db.Model):
-    """퍼널 단계별 익명 이벤트. 세션당 하루 1회 (stage, project_id, detail) 조합 1회."""
-    __tablename__ = 'visit_event'
-    id = db.Column(db.Integer, primary_key=True)
-    session_key = db.Column(db.String(16), index=True, nullable=False)
-    stage = db.Column(db.String(24), index=True, nullable=False)
-    project_id = db.Column(db.Integer, default=0, nullable=False)
-    detail = db.Column(db.String(32), default='', nullable=False)
-    date = db.Column(db.String(10), index=True, nullable=False)
-    created_at = db.Column(db.DateTime, default=_utcnow)
-    # 유입 경로. visit 이벤트에만 채운다: ?src= 파라미터 > Referer 호스트 > '' (직접 유입)
-    source = db.Column(db.String(40), default='', nullable=False)
-    __table_args__ = (
-        db.UniqueConstraint('session_key', 'stage', 'project_id', 'detail', 'date',
-                            name='uq_visit_event_session_stage'),
-    )
-
-
-def _session_key():
-    """익명 세션 키. IP·UA는 저장하지 않는다."""
-    key = session.get('sk')
-    if not key:
-        key = secrets.token_hex(8)
-        session['sk'] = key
-    return key
-
-
-SOURCE_MAX_LEN = 40
-_SOURCE_ALLOWED = re.compile(r'[^a-z0-9._-]')
-
-
-def _visit_source():
-    """방문 유입 경로. ?src= 파라미터가 있으면 그것을, 없으면 외부 Referer의 호스트를 쓴다.
-
-    자기 사이트 안에서의 이동(Referer 호스트 == 요청 호스트)은 직접 유입('')으로 본다.
-    """
-    src = _SOURCE_ALLOWED.sub('', (request.args.get('src') or '').strip().lower())
-    if src:
-        return src[:SOURCE_MAX_LEN]
-    try:
-        host = (urlparse(request.referrer or '').hostname or '').lower()
-    except ValueError:
-        host = ''
-    if host.startswith('www.'):
-        host = host[4:]
-    own_host = (request.host or '').split(':')[0].lower()
-    if not host or host == own_host:
-        return ''
-    return _SOURCE_ALLOWED.sub('', host)[:SOURCE_MAX_LEN]
-
-
-def record_event(stage, project_id=0, detail='', source=''):
-    """이벤트 1건 기록. 중복(유니크 제약 위반)과 그 밖의 실패는 조용히 무시한다."""
-    try:
-        db.session.add(VisitEvent(
-            session_key=_session_key(),
-            stage=stage,
-            project_id=int(project_id or 0),
-            detail=detail or '',
-            date=_today_kst(),
-            source=source or '',
-        ))
-        db.session.commit()
-        return True
-    except Exception:
-        db.session.rollback()
-        return False
-
-
-def prune_visit_events(retention_days=VISIT_EVENT_RETENTION_DAYS):
-    """보관 기간이 지난 이벤트를 삭제한다. 하루 1회만 실제로 수행."""
-    try:
-        today = _today_kst()
-        marker = db.session.get(ContentSync, 'visit_event_pruned_on')
-        if marker is not None and marker.value == today:
-            return 0
-
-        cutoff = (datetime.now(KST).date() - timedelta(days=retention_days)).strftime('%Y-%m-%d')
-        removed = VisitEvent.query.filter(VisitEvent.date < cutoff).delete(
-            synchronize_session=False)
-        if marker is None:
-            marker = ContentSync(key='visit_event_pruned_on')
-            db.session.add(marker)
-        marker.value = today
-        marker.applied_at = _utcnow()
-        db.session.commit()
-        return removed
-    except Exception:
-        db.session.rollback()
-        return 0
-
-
-def increment_daily_visit(today):
-    """오늘 방문수를 1 올린다.
-
-    읽고-더해-쓰기 대신 DB에서 count = count + 1 로 올려 동시 요청끼리 값을 잃지 않는다.
-    첫 방문이 동시에 들어와 INSERT가 유니크 제약에 걸리면 이미 생긴 행을 UPDATE로 다시 올린다.
-    """
-    for _ in range(2):
-        try:
-            updated = DailyVisit.query.filter_by(date=today).update(
-                {DailyVisit.count: db.func.coalesce(DailyVisit.count, 0) + 1},
-                synchronize_session=False)
-            if not updated:
-                db.session.add(DailyVisit(date=today, count=1))
-            db.session.commit()
-            return True
-        except IntegrityError:
-            db.session.rollback()
-    return False
-
-
-def track_visit():
-    """공개 페이지 방문 기록. 같은 세션은 하루 1회만 카운트.
-
-    오늘 이미 기록한 세션이면 DB를 전혀 건드리지 않는다. 예전에는 새로고침마다
-    정리 작업 조회 + 중복 INSERT(유니크 제약 위반 후 롤백)가 일어났다.
-    """
-    today = _today_kst()
-    if session.get('visited_on') == today:
-        return
-    # 예전 방식(v_YYYY-MM-DD 키를 날마다 하나씩 추가)으로 쌓인 키를 치워 쿠키가 커지지 않게 한다.
-    # 오늘 키가 있으면 오늘 방문수는 이미 올렸으므로 다시 올리지 않는다.
-    legacy_counted = session.pop(f'v_{today}', None)
-    for stale in [k for k in session if k.startswith('v_')]:
-        session.pop(stale, None)
-    session['visited_on'] = today
-    prune_visit_events()
-    try:
-        record_event('visit', source=_visit_source())
-        if not legacy_counted:
-            increment_daily_visit(today)
-    except Exception:
-        db.session.rollback()
-
-
-class Admin(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False)
-    password_hash = db.Column(db.String(200), nullable=False)
-
-    def set_password(self, pw):
-        self.password_hash = generate_password_hash(pw)
-
-    def check_password(self, pw):
-        return check_password_hash(self.password_hash, pw)
-
-
-class Profile(db.Model):
-    """싱글톤 — 항상 id=1 레코드만 사용"""
-    id = db.Column(db.Integer, primary_key=True)
-    # Hero
-    name = db.Column(db.String(80), default='홍길동')
-    role = db.Column(db.String(120), default='마케팅 & 콘텐츠 기획자')
-    tagline = db.Column(db.Text, default='데이터를 기반으로 콘텐츠 전략을 설계하고,\n브랜드와 소비자를 연결하는 마케터입니다.')
-    # About
-    about_text = db.Column(db.Text, default='')
-    skills = db.Column(db.String(500), default='콘텐츠 기획,마케팅 전략,데이터 분석,Python / Flask,AI 도구 활용,PPT / Word')
-    # Contact
-    email = db.Column(db.String(200), default='')
-    phone = db.Column(db.String(40), default='')
-    linkedin_url = db.Column(db.String(300), default='')
-    github_url = db.Column(db.String(300), default='')
-    remember_url = db.Column(db.String(300), default='')
-    # Experience (자유 텍스트 JSON 대신 간단히 YAML-like 문자열)
-    # 추가 SNS
-    blog_url = db.Column(db.String(300), default='')
-    # 경력 (JSON string: list of {company, period, role, bullets})
-    experience_json = db.Column(db.Text, default='[]')
-    # 학력 [{school, major, degree, period}]
-    education_json = db.Column(db.Text, default='[]')
-    # 수상내역 [{title, org, year}]
-    awards_json = db.Column(db.Text, default='[]')
-    # 핵심 역량 with 레벨 [{name, level}]  level: 상|중|하
-    skills_json = db.Column(db.Text, default='[]')
-    # 스킬/툴 [{name, level}]
-    tools_json = db.Column(db.Text, default='[]')
-    # 이력서 PDF
-    resume_filename = db.Column(db.String(300), default='')
-    # Open Graph 이미지 URL
-    og_image_url = db.Column(db.String(500), default='')
-    # 이직 검토 중 배지
-    open_to_work = db.Column(db.Boolean, default=False)
-    # 프로필 이미지 (3.5:4.5)
-    profile_image_filename = db.Column(db.String(300), default='')
-    # 어학 성적 [{exam, score, date}]
-    language_scores_json = db.Column(db.Text, default='[]')
-    # English
-    name_en = db.Column(db.String(80), default='')
-    role_en = db.Column(db.String(120), default='')
-    tagline_en = db.Column(db.Text, default='')
-    about_text_en = db.Column(db.Text, default='')
-    experience_en_json = db.Column(db.Text, default='[]')
-    education_en_json = db.Column(db.Text, default='[]')
-    awards_en_json = db.Column(db.Text, default='[]')
-    skills_en = db.Column(db.String(500), default='')
-    tools_en_json = db.Column(db.Text, default='[]')
-
-    @property
-    def language_scores(self):
-        return _json_list(self.language_scores_json)
-
-    @property
-    def skill_list(self):
-        return [s.strip() for s in (self.skills or '').split(',') if s.strip()]
-
-    @property
-    def skills_with_level(self):
-        return _json_list(self.skills_json)
-
-    @property
-    def tools(self):
-        return _json_list(self.tools_json)
-
-    @property
-    def tools_en(self):
-        return _json_list(self.tools_en_json)
-
-    @property
-    def experience(self):
-        return _json_list(self.experience_json)
-
-    @property
-    def experience_en(self):
-        return _json_list(self.experience_en_json)
-
-    @property
-    def education(self):
-        return _json_list(self.education_json)
-
-    @property
-    def education_en(self):
-        return _json_list(self.education_en_json)
-
-    @property
-    def awards(self):
-        return _json_list(self.awards_json)
-
-    @property
-    def awards_en(self):
-        return _json_list(self.awards_en_json)
-
-
-
-class ContentSync(db.Model):
-    """기준 문안(JSON) 동기화가 어느 버전까지 적용됐는지 기록. 이후에는 관리자 수정이 최신이다."""
-    __tablename__ = 'content_sync'
-    key = db.Column(db.String(60), primary_key=True)
-    value = db.Column(db.String(120), default='')
-    applied_at = db.Column(db.DateTime, default=_utcnow)
-
-
-def _normalize_copy(value):
-    """Apply narrowly scoped spelling and metric corrections to public copy."""
-    normalized = value or ''
-    for old, new in [
-        ('사이니', '샤이니'),
-        ('버츄얼', '버추얼'),
-        ('런칭', '론칭'),
-        ('컨셉카', '콘셉트카'),
-        ('6782%', '67–82%'),
-        ('67~82%', '67–82%'),
-        ('Contents Planning', 'Content Strategy & Production'),
-        ('Digital Contents', 'Digital Content'),
-        ('Assitant', 'Assistant'),
-        ('Planning & Operations Planning & Operations', 'Planning & Operations'),
-        ('Mountain Village Women', 'City Girls on the Climb'),
-        ('Mountain City Women', 'City Girls on the Climb'),
-        ('City girls on the climb', 'City Girls on the Climb'),
-        ('SHINee Inc. - tvN', 'SHINee Inc. — tvN'),
-        ('빙그레X더현대서울', '빙그레×더현대서울'),
-        ('Social Eye Awards', 'Social i Awards'),
-        # 복수형을 먼저 바꿔야 단수형 규칙이 'Awards'에 s를 하나 더 붙이지 않는다
-        ('Social I Awards', 'Social i Awards'),
-        ('Social I Award', 'Social i Awards'),
-    ]:
-        normalized = normalized.replace(old, new)
-    # 이전 규칙이 만든 'Grand Prize' 중복 표기 복구
-    normalized = normalized.replace('Korea Pop-Up Store Awards Grand Prize – Grand Prize',
-                                    'Korea Pop-Up Store Awards – Grand Prize')
-    normalized = normalized.replace('Grand Prize at the 2025 Korea Pop-Up Store Awards Grand Prize',
-                                    'Grand Prize at the 2025 Korea Pop-Up Store Awards')
-    return normalized
-
-
-_PERIOD_DATE = r'\d{4}\.\s*\d{1,2}(?:\.\s*\d{1,2})?'
-_PERIOD_END = r'현재|진행 중|Present|Ongoing'
-
-
-def _normalize_period(value):
-    """Unify date ranges to 'YYYY.MM – YYYY.MM' with an en dash and no stray spaces."""
-    normalized = value or ''
-    normalized = re.sub(r'(\d{4})\.\s+(\d{1,2})', r'\1.\2', normalized)
-    normalized = re.sub(r'(\d{4}\.\d{1,2})\.\s+(\d{1,2})', r'\1.\2', normalized)
-    normalized = re.sub(
-        r'(%s)\s*[-~–—]\s*(%s|%s)' % (_PERIOD_DATE, _PERIOD_DATE, _PERIOD_END),
-        r'\1 – \2', normalized,
-    )
-    return normalized
-
-
-def _normalize_json_entries(raw):
-    """Normalize copy and periods inside a JSON list of dict entries; leave unparsable input as-is."""
-    try:
-        entries = json.loads(raw or '[]')
-    except (TypeError, ValueError):
-        return raw
-    if not isinstance(entries, list):
-        return raw
-    for entry in entries:
-        if not isinstance(entry, dict):
-            continue
-        for key, val in entry.items():
-            if isinstance(val, list):
-                entry[key] = [_normalize_copy(v) if isinstance(v, str) else v for v in val]
-                continue
-            if not isinstance(val, str):
-                continue
-            val = _normalize_copy(val)
-            if key == 'period':
-                val = _normalize_period(val)
-            if key == 'title' and val.strip() in ('2025 Korea Pop-Up Store Awards', 'Korea Pop-Up Store Awards'):
-                val = val.strip() + ' Grand Prize'
-            entry[key] = val
-    return json.dumps(entries, ensure_ascii=False)
-
-
-def normalize_public_content():
-    """최초 1회 동기화: 히어로 기준 문안 + 프로필/기간 표기 정리 + 프로젝트 기준 문안 적용."""
-    _apply_profile_hero_copy()
-    normalize_profile_and_periods()
-    _apply_project_copy_overrides()
-    db.session.commit()
-
-
-def _load_canonical_application():
-    """data/hyundai_application_2026.json. 파일이 없거나 깨졌으면 빈 dict."""
-    content_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data',
-                                'hyundai_application_2026.json')
-    try:
-        with open(content_path, encoding='utf-8') as content_file:
-            return json.load(content_file)
-    except (OSError, ValueError):
-        return {}
-
-
-def _apply_profile_hero_copy():
-    """히어로 이름·직무·소개 문구를 기준 문안으로 덮어쓴다. 최초 동기화(seed)에서만 호출된다."""
-    canonical = _load_canonical_application()
-    site_copy = canonical.get('site_copy', {})
-    profile = db.session.get(Profile, 1)
-    if not profile:
-        return
-    profile.name_en = canonical.get('identity', {}).get('name_en', 'Jonggeol Park')
-    profile.role = site_copy.get('hero_role_ko', profile.role)
-    profile.role_en = site_copy.get('hero_role_en', profile.role_en)
-    profile.tagline = site_copy.get('hero_tagline_ko', profile.tagline)
-    profile.tagline_en = site_copy.get('hero_tagline_en', profile.tagline_en)
-
-
-def normalize_profile_and_periods():
-    """오탈자·기간 표기·영문 용어만 정리한다 (관리자가 쓴 문안의 내용은 바꾸지 않는다)."""
-    site_copy = _load_canonical_application().get('site_copy', {})
-    profile = db.session.get(Profile, 1)
-    if profile:
-        for attr in (
-            'about_text', 'about_text_en', 'skills', 'skills_en', 'skills_json',
-            'tools_json', 'tools_en_json',
-        ):
-            setattr(profile, attr, _normalize_copy(getattr(profile, attr)))
-        for attr in (
-            'experience_json', 'experience_en_json', 'education_json',
-            'education_en_json', 'awards_json', 'awards_en_json',
-        ):
-            setattr(profile, attr, _normalize_json_entries(getattr(profile, attr)))
-
-    category_map = site_copy.get('categories_en', {
-        '콘텐츠 기획': 'Content Strategy & Production',
-        '디지털 콘텐츠': 'Digital Content',
-        '오프라인 캠페인': 'Brand Experience',
-        '프로듀싱': 'Entertainment Production',
-    })
-    legacy_category_map = {
-        'Contents Planning': 'Content Strategy & Production',
-        'Digital Contents': 'Digital Content',
-        'Offline Campaign': 'Brand Experience',
-        'Producing': 'Entertainment Production',
-    }
-    for project in Project.query.all():
-        for attr in (
-            'title', 'description', 'detail_text', 'kpi', 'my_role', 'category',
-            'title_en', 'description_en', 'detail_text_en', 'kpi_en', 'my_role_en',
-        ):
-            setattr(project, attr, _normalize_copy(getattr(project, attr)))
-
-        project.period = _normalize_period(project.period)
-
-        project.category_en = legacy_category_map.get(
-            project.category_en,
-            category_map.get(project.category, project.category_en),
-        )
-        if '샤이니의 빛돌기획' in project.title:
-            project.title = 'tvN 예능 ‘샤이니의 빛돌기획’ 제작'
-            project.title_en = 'SHINee Inc. — tvN Branded Entertainment'
-
-
-_TIKTOK_SHORT_RE = re.compile(r'https?://(?:vt|vm)\.tiktok\.com/[A-Za-z0-9]+/?|https?://(?:www\.)?tiktok\.com/t/[A-Za-z0-9]+/?')
-_TIKTOK_VIDEO_RE = re.compile(r'https://(?:www\.|m\.)?tiktok\.com/(@[\w.-]+)/video/(\d+)')
-
-
-def _expand_tiktok_short_url(url):
-    """vt.tiktok.com 같은 단축 링크를 tiktok.com/@계정/video/ID로 푼다. 실패하면 원래 값을 돌려준다."""
-    if not url or not _TIKTOK_SHORT_RE.fullmatch(url.strip()):
-        return url
-    import urllib.request as _req
-    try:
-        req = _req.Request(url.strip(), headers={'User-Agent': 'Mozilla/5.0'})
-        with _req.urlopen(req, timeout=6) as resp:
-            final = resp.geturl()
-    except Exception as exc:
-        print(f"[tiktok-expand] {url}: {exc!r}")
-        return url
-    m = _TIKTOK_VIDEO_RE.match(final)
-    return f'https://www.tiktok.com/{m.group(1)}/video/{m.group(2)}' if m else url
-
-
-def _expand_short_links_json(raw):
-    """링크 JSON 목록의 TikTok 단축 링크만 풀어서 돌려준다. 바뀐 게 없으면 입력 그대로."""
-    try:
-        links = json.loads(raw or '[]')
-    except (TypeError, ValueError):
-        return raw
-    if not isinstance(links, list):
-        return raw
-    changed = False
-    for link in links:
-        if isinstance(link, dict) and link.get('url'):
-            expanded = _expand_tiktok_short_url(link['url'])
-            if expanded != link['url']:
-                link['url'] = expanded
-                changed = True
-    return json.dumps(links, ensure_ascii=False) if changed else raw
-
-
-def expand_short_video_links():
-    """저장된 TikTok 단축 링크를 매 시작 시 정식 주소로 바꾼다. 풀린 뒤에는 대상이 남지 않아 반복 실행해도 안전하다."""
-    for project in Project.query.all():
-        for attr in ('links_json', 'links_en_json'):
-            raw = getattr(project, attr)
-            if raw and ('tiktok.com/' in raw):
-                setattr(project, attr, _expand_short_links_json(raw))
-    db.session.commit()
-
-
-def _relabel_links(raw, label_map):
-    """Rename link labels in a links JSON list; leave unparsable input untouched."""
-    if not label_map:
-        return raw
-    try:
-        links = json.loads(raw or '[]')
-    except (TypeError, ValueError):
-        return raw
-    if not isinstance(links, list):
-        return raw
-    for link in links:
-        if isinstance(link, dict) and link.get('label') in label_map:
-            link['label'] = label_map[link['label']]
-    return json.dumps(links, ensure_ascii=False)
-
-
-_COPY_FIELDS = ('description', 'kpi', 'detail_text', 'description_en', 'kpi_en', 'detail_text_en')
-
-
-def _load_copy_entries():
-    """data/site_projects.json의 프로젝트 기준 문안 목록. 파일이 없거나 깨졌으면 빈 목록."""
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'site_projects.json')
-    try:
-        with open(path, encoding='utf-8') as fh:
-            return json.load(fh).get('projects', [])
-    except (OSError, ValueError):
-        return []
-
-
-def _find_copy_entry(title):
-    title = title or ''
-    return next((o for o in _load_copy_entries() if o.get('match') and o['match'] in title), None)
-
-
-def _apply_copy_entry(project, entry):
-    """기준 문안 한 건을 프로젝트에 적용 (요약·성과·상세·링크 라벨·썸네일 교체)."""
-    for field in _COPY_FIELDS:
-        if entry.get(field) is not None:
-            setattr(project, field, entry[field])
-    project.links_json = _relabel_links(project.links_json, entry.get('link_labels'))
-    project.links_en_json = _relabel_links(project.links_en_json, entry.get('link_labels_en'))
-    _swap_in_youtube_thumbnails(project, entry.get('youtube_thumbnails'))
-    _swap_in_official_images(project, entry.get('image_replacements'))
-
-
-def _apply_project_copy_overrides():
-    """모든 프로젝트에 기준 문안을 적용. 최초 동기화와 관리자의 '불러오기' 버튼에서만 호출된다."""
-    entries = _load_copy_entries()
-    for project in Project.query.all():
-        title = project.title or ''
-        entry = next((o for o in entries if o.get('match') and o['match'] in title), None)
-        if entry:
-            _apply_copy_entry(project, entry)
-
-
-def apply_youtube_thumbnail_swaps():
-    """잘린 스크린샷 → 원본 썸네일/공식 이미지 교체.
-
-    매 시작 시 실행해도 안전하다: 지정된 파일명만 찾아 바꾸고, 교체 후에는 대상이 남지 않는다.
-    """
-    entries = [e for e in _load_copy_entries()
-               if e.get('youtube_thumbnails') or e.get('image_replacements')]
-    if not entries:
-        return
-    for project in Project.query.all():
-        title = project.title or ''
-        entry = next((o for o in entries if o.get('match') and o['match'] in title), None)
-        if not entry:
-            continue
-        _swap_in_youtube_thumbnails(project, entry.get('youtube_thumbnails'))
-        _swap_in_official_images(project, entry.get('image_replacements'))
-    db.session.commit()
-
-
-# 기준 문안 동기화는 이 버전당 한 번만 실행된다. 그 뒤로는 관리자 화면에서 저장한 내용이 항상 최신이다.
-# 값을 올리면 다음 시작 때 한 번 더 덮어쓰므로, 관리자 수정 내용을 잃어도 되는 경우에만 올린다.
-CONTENT_SEED_VERSION = 1
-
-
-# 오탈자/기간 표기 정리는 이 버전당 한 번 더 실행된다. 문안 내용은 건드리지 않으므로 관리자 수정과 충돌하지 않는다.
-PROFILE_FIX_VERSION = 2
-
-
-def _marker_version(key):
-    marker = db.session.get(ContentSync, key)
-    return int(marker.value) if marker and (marker.value or '').isdigit() else 0
-
-
-def _set_marker(key, version):
-    marker = db.session.get(ContentSync, key)
-    if marker is None:
-        marker = ContentSync(key=key)
-        db.session.add(marker)
-    marker.value = str(version)
-    marker.applied_at = _utcnow()
-    try:
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
-        return False
-    return True
-
-
-def apply_profile_fixes_once():
-    """normalize_profile_and_periods()를 PROFILE_FIX_VERSION당 한 번 실행."""
-    if _marker_version('profile_fix_version') >= PROFILE_FIX_VERSION:
-        return False
-    normalize_profile_and_periods()
-    db.session.commit()
-    return _set_marker('profile_fix_version', PROFILE_FIX_VERSION)
-
-
-def sync_canonical_content_once():
-    """normalize_public_content()를 CONTENT_SEED_VERSION당 한 번만 실행. 실행했으면 True."""
-    marker = db.session.get(ContentSync, 'seed_version')
-    applied = int(marker.value) if marker and (marker.value or '').isdigit() else 0
-    if applied >= CONTENT_SEED_VERSION:
-        return False
-    normalize_public_content()
-    if marker is None:
-        marker = ContentSync(key='seed_version')
-        db.session.add(marker)
-    marker.value = str(CONTENT_SEED_VERSION)
-    marker.applied_at = _utcnow()
-    try:
-        db.session.commit()
-    except Exception:
-        # 워커 두 개가 동시에 부팅하며 같은 마커를 넣으려 한 경우: 먼저 성공한 쪽을 그대로 둔다
-        db.session.rollback()
-        return False
-    return True
-
-
-_YT_ID_RE = re.compile(r'^[A-Za-z0-9_-]{11}$')
-
-# 외부 이미지는 이 호스트에서만 받는다 (유튜브 썸네일, tvN 공식 프로그램 이미지)
-_ALLOWED_IMAGE_HOSTS = {'img.youtube.com', 'i.ytimg.com', 'poc-cf-image.cjenm.com'}
-_MAX_IMAGE_BYTES = 5 * 1024 * 1024
-
-
-def _is_allowed_image_url(url):
-    parts = urlparse(url or '')
-    return parts.scheme == 'https' and parts.hostname in _ALLOWED_IMAGE_HOSTS
-
-
-class _AllowedHostRedirectHandler(urllib.request.HTTPRedirectHandler):
-    """리다이렉트도 허용 호스트(https)로 가는 것만 따라간다. 처음 URL만 검사하면 리다이렉트로 우회된다."""
-
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        if not _is_allowed_image_url(newurl):
-            raise urllib.error.HTTPError(newurl, code, 'redirect to disallowed host', headers, fp)
-        return super().redirect_request(req, fp, code, msg, headers, newurl)
-
-
-_IMAGE_OPENER = urllib.request.build_opener(_AllowedHostRedirectHandler)
-
-
-def _open_image_url(url, timeout):
-    return _IMAGE_OPENER.open(url, timeout=timeout)
-
-
-def _download_image(url, filename):
-    """허용 호스트의 이미지를 uploads에 저장. 성공 시 filename, 실패 시 None."""
-    if not _is_allowed_image_url(url):
-        return None
-    folder = app.config['UPLOAD_FOLDER']
-    target = os.path.join(folder, filename)
-    if os.path.exists(target) and os.path.getsize(target) > 8000:
-        return filename
-    try:
-        with _open_image_url(url, timeout=10) as resp:
-            if getattr(resp, 'status', 200) != 200:
-                return None
-            raw = resp.read(_MAX_IMAGE_BYTES)
-    except Exception:
-        return None
-    if len(raw) < 8000 or not _looks_like_image(raw[:16]):
-        return None
-    os.makedirs(folder, exist_ok=True)
-    with open(target, 'wb') as fh:
-        fh.write(raw)
-    return filename
-
-
-def _fetch_external_image(url):
-    """공식 이미지 URL을 내려받아 안정적인 파일명으로 저장한다."""
-    import hashlib
-    if not url:
-        return None
-    return _download_image(url, 'ext_' + hashlib.sha1(url.encode()).hexdigest()[:12] + '.jpg')
-
-
-def _fetch_youtube_thumbnail(video_id):
-    """Download a video's original 1280x720 thumbnail into uploads. Returns filename or None."""
-    if not _YT_ID_RE.match(video_id or ''):
-        return None
-    filename = f'yt_{video_id}.jpg'
-    for quality in ('maxresdefault', 'hqdefault'):
-        # maxresdefault가 없으면 유튜브가 120x90 회색 자리표시자를 주므로 크기 검사로 걸러진다
-        got = _download_image(f'https://img.youtube.com/vi/{video_id}/{quality}.jpg', filename)
-        if got:
-            return got
-    return None
-
-
-def _swap_in_official_images(project, mapping):
-    """잘린 캡처를 공식 이미지(프로그램 키아트 등)로 교체."""
-    if not mapping:
-        return
-    images = {img.filename: img for img in ProjectImage.query.filter_by(project_id=project.id)}
-    for old_name, url in mapping.items():
-        target = images.get(old_name)
-        if target is None:
-            continue
-        new_name = _fetch_external_image(url)
-        if new_name and new_name != target.filename:
-            target.filename = new_name
-
-
-def _swap_in_youtube_thumbnails(project, mapping):
-    """Replace cropped screenshots with the original YouTube thumbnails they came from."""
-    if not mapping:
-        return
-    images = {img.filename: img for img in ProjectImage.query.filter_by(project_id=project.id)}
-    for old_name, video_id in mapping.items():
-        target = images.get(old_name)
-        if target is None:
-            continue  # 이미 교체됐거나 다른 환경
-        new_name = _fetch_youtube_thumbnail(video_id)
-        if new_name and new_name != target.filename:
-            target.filename = new_name
-
-
-# ── DB Init ─────────────────────────────────────────────
-
-def init_db(background_network_tasks=True):
-    db.create_all()
-    # 신규 컬럼 마이그레이션 (SQLite는 IF NOT EXISTS 미지원 → try/except)
-    with db.engine.connect() as conn:
-        for sql in [
-            "ALTER TABLE project ADD COLUMN image_filename VARCHAR(300) DEFAULT ''",
-            "ALTER TABLE project ADD COLUMN detail_text TEXT DEFAULT ''",
-            "ALTER TABLE project ADD COLUMN links_json TEXT DEFAULT '[]'",
-            # project_image 테이블은 create_all()이 처리하므로 ALTER 불필요
-            "ALTER TABLE profile ADD COLUMN education_json TEXT DEFAULT '[]'",
-            "ALTER TABLE profile ADD COLUMN awards_json TEXT DEFAULT '[]'",
-            "ALTER TABLE profile ADD COLUMN skills_json TEXT DEFAULT '[]'",
-            "ALTER TABLE profile ADD COLUMN tools_json TEXT DEFAULT '[]'",
-            "ALTER TABLE profile ADD COLUMN resume_filename VARCHAR(300) DEFAULT ''",
-            "ALTER TABLE profile ADD COLUMN og_image_url VARCHAR(500) DEFAULT ''",
-            "ALTER TABLE profile ADD COLUMN open_to_work BOOLEAN DEFAULT FALSE",
-            "ALTER TABLE project ADD COLUMN kpi VARCHAR(300) DEFAULT ''",
-            "ALTER TABLE project ALTER COLUMN kpi TYPE TEXT",  # PostgreSQL only; SQLite ignores
-            "ALTER TABLE project ADD COLUMN my_role VARCHAR(200) DEFAULT ''",
-            "ALTER TABLE project ADD COLUMN category VARCHAR(100) DEFAULT ''",
-            "ALTER TABLE profile ADD COLUMN profile_image_filename VARCHAR(300) DEFAULT ''",
-            "ALTER TABLE profile ADD COLUMN language_scores_json TEXT DEFAULT '[]'",
-            "ALTER TABLE profile ADD COLUMN remember_url VARCHAR(300) DEFAULT ''",
-            "ALTER TABLE profile ADD COLUMN phone VARCHAR(40) DEFAULT ''",
-            # English columns
-            "ALTER TABLE profile ADD COLUMN name_en VARCHAR(80) DEFAULT ''",
-            "ALTER TABLE profile ADD COLUMN role_en VARCHAR(120) DEFAULT ''",
-            "ALTER TABLE profile ADD COLUMN tagline_en TEXT DEFAULT ''",
-            "ALTER TABLE profile ADD COLUMN about_text_en TEXT DEFAULT ''",
-            "ALTER TABLE profile ADD COLUMN experience_en_json TEXT DEFAULT '[]'",
-            "ALTER TABLE profile ADD COLUMN education_en_json TEXT DEFAULT '[]'",
-            "ALTER TABLE profile ADD COLUMN awards_en_json TEXT DEFAULT '[]'",
-            "ALTER TABLE profile ADD COLUMN skills_en VARCHAR(500) DEFAULT ''",
-            "ALTER TABLE profile ADD COLUMN tools_en_json TEXT DEFAULT '[]'",
-            "ALTER TABLE project ADD COLUMN links_en_json TEXT DEFAULT '[]'",
-            "ALTER TABLE project ADD COLUMN title_en VARCHAR(120) DEFAULT ''",
-            "ALTER TABLE project ADD COLUMN description_en TEXT DEFAULT ''",
-            "ALTER TABLE project ADD COLUMN detail_text_en TEXT DEFAULT ''",
-            "ALTER TABLE project ADD COLUMN kpi_en TEXT DEFAULT ''",
-            "ALTER TABLE project ADD COLUMN my_role_en VARCHAR(200) DEFAULT ''",
-            "ALTER TABLE project ADD COLUMN category_en VARCHAR(100) DEFAULT ''",
-            "ALTER TABLE gallery_item ADD COLUMN title_en VARCHAR(200) DEFAULT ''",
-            "ALTER TABLE project ADD COLUMN is_hidden BOOLEAN DEFAULT FALSE",
-            "ALTER TABLE visit_event ADD COLUMN source VARCHAR(40) DEFAULT ''",
-        ]:
-            try:
-                conn.execute(db.text(sql))
-                conn.commit()
-            except Exception:
-                conn.rollback()
-
-        # image_filename → project_image 테이블 마이그레이션
-        old_imgs = conn.execute(db.text(
-            "SELECT id, image_filename FROM project WHERE image_filename IS NOT NULL AND image_filename != ''"
-        )).fetchall()
-        for row in old_imgs:
-            exists = conn.execute(db.text(
-                "SELECT 1 FROM project_image WHERE project_id = :pid LIMIT 1"
-            ), {'pid': row[0]}).fetchone()
-            if not exists:
-                conn.execute(db.text(
-                    "INSERT INTO project_image (project_id, filename, is_main, sort_order) VALUES (:pid, :fn, TRUE, 0)"
-                ), {'pid': row[0], 'fn': row[1]})
-        conn.commit()
-
-        # github_url / demo_url → links_json 자동 마이그레이션
-        import json as _json
-        rows = conn.execute(db.text(
-            "SELECT id, github_url, demo_url, links_json FROM project"
-        )).fetchall()
-        for row in rows:
-            links_val = row[3]
-            if links_val and links_val != '[]':
-                continue  # 이미 마이그레이션됨
-            links = []
-            if row[1]:
-                links.append({'label': 'GitHub', 'url': row[1]})
-            if row[2]:
-                links.append({'label': 'Demo', 'url': row[2]})
-            if links:
-                conn.execute(
-                    db.text("UPDATE project SET links_json = :lj WHERE id = :id"),
-                    {'lj': _json.dumps(links, ensure_ascii=False), 'id': row[0]}
-                )
-
-        # skills → skills_json 마이그레이션
-        p_rows = conn.execute(db.text("SELECT id, skills, skills_json FROM profile")).fetchall()
-        for row in p_rows:
-            if row[2] and row[2] != '[]':
-                continue
-            if row[1]:
-                sj = _json.dumps(
-                    [{'name': s.strip(), 'level': '중'} for s in row[1].split(',') if s.strip()],
-                    ensure_ascii=False
-                )
-                conn.execute(db.text("UPDATE profile SET skills_json = :sj WHERE id = :id"),
-                             {'sj': sj, 'id': row[0]})
-        conn.commit()
-    if not Admin.query.first():
-        _admin_pw = os.environ.get('ADMIN_PASSWORD')
-        if not _admin_pw:
-            if _is_production:
-                import secrets
-                _admin_pw = secrets.token_urlsafe(12)
-                print("=" * 60)
-                print("WARNING: ADMIN_PASSWORD is not set.")
-                print("Generated a random admin password (set ADMIN_PASSWORD to control it):")
-                print("  admin /", _admin_pw)
-                print("=" * 60)
-            else:
-                _admin_pw = 'changeme123!'  # 로컬 개발 전용
-        admin = Admin(username='admin')
-        admin.set_password(_admin_pw)
-        db.session.add(admin)
-        db.session.commit()
-        print("Admin account created (username: admin).")
-
-    if not Profile.query.first():
-        p = Profile(
-            name='홍길동',
-            role='마케팅 & 콘텐츠 기획자',
-            tagline='데이터를 기반으로 콘텐츠 전략을 설계하고,\n브랜드와 소비자를 연결하는 마케터입니다.',
-            about_text='빙그레(BINGGRAE)에서 콘텐츠 기획 및 마케팅 업무를 담당하고 있습니다.\n브랜드 커뮤니케이션, 사내 OJT 멘토링, AI 기반 업무 자동화에 이르기까지 다양한 영역에서 실무 경험을 쌓았습니다.',
-            skills='콘텐츠 기획,마케팅 전략,데이터 분석,Python / Flask,AI 도구 활용,PPT / Word',
-            email='your@email.com',
-            experience_json='[{"company":"빙그레 (BINGGRAE)","period":"2022.03 – 현재","role":"마케팅 / 콘텐츠 기획","bullets":["브랜드 콘텐츠 기획 및 채널별 소재 제작 관리","사내 사보(뉴스레터) 기획·편집 총괄","신입사원 OJT 멘토(지도사원) 운영","AI 기반 업무 자동화 도구 도입 및 운영"]}]'
-        )
-        db.session.add(p)
-        db.session.commit()
-
-    if not Project.query.first():
-        samples = [
-            Project(
-                title='빙그레 사보 자동화 시스템',
-                description='사내 뉴스레터 초안 작성 및 포맷팅을 AI 기반으로 자동화한 내부 도구. 작성 시간 70% 단축.',
-                tech_stack='Python, Flask, OpenAI API, python-docx',
-                period='2024.08 – 2024.10',
-                order=1
-            ),
-            Project(
-                title='마케팅 콘텐츠 대시보드',
-                description='캠페인 성과 지표를 시각화하고 팀원 간 콘텐츠 피드백을 통합 관리하는 내부 플랫폼.',
-                tech_stack='Python, Flask, SQLite, Chart.js',
-                period='2024.03 – 2024.07',
-                order=2
-            ),
-        ]
-        db.session.add_all(samples)
-        db.session.commit()
-
-    try:
-        sync_canonical_content_once()
-    except Exception as exc:  # 문안 동기화 실패가 서버 부팅을 막아서는 안 된다
-        db.session.rollback()
-        print(f"[content-sync] skipped: {exc!r}")
-    try:
-        apply_profile_fixes_once()
-    except Exception as exc:
-        db.session.rollback()
-        print(f"[profile-fix] skipped: {exc!r}")
-    if background_network_tasks:
-        start_boot_network_tasks()
-    else:
-        run_boot_network_tasks()
-
-
-def run_boot_network_tasks():
-    """외부 네트워크가 필요한 시작 작업 (썸네일 내려받기, TikTok 단축링크 풀기). 앱 컨텍스트 안에서 호출."""
-    try:
-        apply_youtube_thumbnail_swaps()
-    except Exception as exc:
-        db.session.rollback()
-        print(f"[thumbnail-swap] skipped: {exc!r}")
-    try:
-        expand_short_video_links()
-    except Exception as exc:
-        db.session.rollback()
-        print(f"[tiktok-expand] skipped: {exc!r}")
-
-
-def start_boot_network_tasks():
-    """run_boot_network_tasks()를 백그라운드 스레드에서 실행한다.
-
-    요청 하나에 최대 6~10초씩 걸리므로 부팅 중에 돌리면 헬스체크(30초)를 넘겨 배포가 실패할 수 있다.
-    """
-    def _worker():
-        with app.app_context():
-            try:
-                run_boot_network_tasks()
-            finally:
-                db.session.remove()
-
-    thread = threading.Thread(target=_worker, name='boot-network-tasks', daemon=True)
-    thread.start()
-    return thread
 
 
 # ── Context Processor ────────────────────────────────────
@@ -1446,7 +309,6 @@ def _form_int(name, default=0):
 
 
 def login_required(f):
-    from functools import wraps
     @wraps(f)
     def decorated(*args, **kwargs):
         if not session.get('logged_in'):
@@ -1514,6 +376,39 @@ def admin_dashboard():
                            funnel_meta=funnel_meta)
 
 
+# 프로필 폼의 반복 행: 입력칸 이름은 '<접두사>_<필드>'이고, 첫 필드가 비어 있는 행은 버린다.
+EXPERIENCE_FIELDS = ('company', 'period', 'role', 'bullets')
+EDUCATION_FIELDS = ('school', 'major', 'degree', 'period')
+AWARD_FIELDS = ('title', 'org', 'year')
+TOOL_FIELDS = ('name', 'level')
+LANGUAGE_SCORE_FIELDS = ('exam', 'score', 'date')
+
+
+def _form_rows(prefix, fields):
+    """같은 이름으로 여러 번 오는 입력칸들을 행(dict) 목록으로 묶는다.
+
+    뒤쪽 필드 값이 모자란 행은 ''로 채운다. 'bullets'는 줄마다 항목 하나인 목록으로 바꾼다.
+    """
+    columns = {f: request.form.getlist(f'{prefix}_{f}') for f in fields}
+    rows = []
+    for i, key in enumerate(columns[fields[0]]):
+        if not key.strip():
+            continue
+        row = {}
+        for f in fields:
+            value = columns[f][i] if i < len(columns[f]) else ''
+            if f == 'bullets':
+                row[f] = [line.strip() for line in value.split('\n') if line.strip()]
+            else:
+                row[f] = value.strip()
+        rows.append(row)
+    return rows
+
+
+def _form_rows_json(prefix, fields):
+    return json.dumps(_form_rows(prefix, fields), ensure_ascii=False)
+
+
 @app.route('/admin/profile', methods=['GET', 'POST'])
 @login_required
 def profile_edit():
@@ -1570,45 +465,10 @@ def profile_edit():
         profile.tagline_en = request.form.get('tagline_en', '')
         profile.about_text_en = request.form.get('about_text_en', '')
         profile.skills_en = request.form.get('skills_en', '')
-        # EN experience
-        en_companies = request.form.getlist('en_exp_company')
-        en_periods   = request.form.getlist('en_exp_period')
-        en_roles     = request.form.getlist('en_exp_role')
-        en_bullets   = request.form.getlist('en_exp_bullets')
-        experience_en = []
-        for i, c in enumerate(en_companies):
-            if c.strip():
-                experience_en.append({'company': c.strip(),
-                    'period': en_periods[i].strip() if i < len(en_periods) else '',
-                    'role': en_roles[i].strip() if i < len(en_roles) else '',
-                    'bullets': [b.strip() for b in en_bullets[i].split('\n') if b.strip()] if i < len(en_bullets) else []})
-        profile.experience_en_json = json.dumps(experience_en, ensure_ascii=False)
-        # EN education
-        en_edu_schools  = request.form.getlist('en_edu_school')
-        en_edu_majors   = request.form.getlist('en_edu_major')
-        en_edu_degrees  = request.form.getlist('en_edu_degree')
-        en_edu_periods  = request.form.getlist('en_edu_period')
-        education_en = [{'school': s.strip(),
-            'major': en_edu_majors[i].strip() if i < len(en_edu_majors) else '',
-            'degree': en_edu_degrees[i].strip() if i < len(en_edu_degrees) else '',
-            'period': en_edu_periods[i].strip() if i < len(en_edu_periods) else ''}
-            for i, s in enumerate(en_edu_schools) if s.strip()]
-        profile.education_en_json = json.dumps(education_en, ensure_ascii=False)
-        # EN awards
-        en_award_titles = request.form.getlist('en_award_title')
-        en_award_orgs   = request.form.getlist('en_award_org')
-        en_award_years  = request.form.getlist('en_award_year')
-        awards_en = [{'title': t.strip(),
-            'org': en_award_orgs[i].strip() if i < len(en_award_orgs) else '',
-            'year': en_award_years[i].strip() if i < len(en_award_years) else ''}
-            for i, t in enumerate(en_award_titles) if t.strip()]
-        profile.awards_en_json = json.dumps(awards_en, ensure_ascii=False)
-        # EN tools
-        en_tool_names  = request.form.getlist('en_tool_name')
-        en_tool_levels = request.form.getlist('en_tool_level')
-        tools_en = [{'name': n.strip(), 'level': l}
-            for n, l in zip(en_tool_names, en_tool_levels) if n.strip()]
-        profile.tools_en_json = json.dumps(tools_en, ensure_ascii=False)
+        profile.experience_en_json = _form_rows_json('en_exp', EXPERIENCE_FIELDS)
+        profile.education_en_json = _form_rows_json('en_edu', EDUCATION_FIELDS)
+        profile.awards_en_json = _form_rows_json('en_award', AWARD_FIELDS)
+        profile.tools_en_json = _form_rows_json('en_tool', TOOL_FIELDS)
 
         # 이력서 PDF 업로드
         resume_file = request.files.get('resume_file')
@@ -1620,62 +480,12 @@ def profile_edit():
             else:
                 resume_rejected = True
 
-        # 어학 성적
-        lang_exams  = request.form.getlist('lang_exam')
-        lang_scores = request.form.getlist('lang_score')
-        lang_dates  = request.form.getlist('lang_date')
-        language_scores = [
-            {'exam': e.strip(), 'score': lang_scores[i].strip() if i < len(lang_scores) else '',
-             'date': lang_dates[i].strip() if i < len(lang_dates) else ''}
-            for i, e in enumerate(lang_exams) if e.strip()
-        ]
-        profile.language_scores_json = json.dumps(language_scores, ensure_ascii=False)
-
-        # 핵심 역량 (단순 목록)
-        profile.skills = request.form.get('skills', '')
-
-        # 스킬/툴 (with level)
-        tool_names  = request.form.getlist('tool_name')
-        tool_levels = request.form.getlist('tool_level')
-        tools = [{'name': n.strip(), 'level': l}
-                 for n, l in zip(tool_names, tool_levels) if n.strip()]
-        profile.tools_json = json.dumps(tools, ensure_ascii=False)
-
-        # 학력
-        edu_schools  = request.form.getlist('edu_school')
-        edu_majors   = request.form.getlist('edu_major')
-        edu_degrees  = request.form.getlist('edu_degree')
-        edu_periods  = request.form.getlist('edu_period')
-        education = [{'school': s.strip(), 'major': edu_majors[i].strip() if i < len(edu_majors) else '',
-                      'degree': edu_degrees[i].strip() if i < len(edu_degrees) else '',
-                      'period': edu_periods[i].strip() if i < len(edu_periods) else ''}
-                     for i, s in enumerate(edu_schools) if s.strip()]
-        profile.education_json = json.dumps(education, ensure_ascii=False)
-
-        # 수상내역
-        award_titles = request.form.getlist('award_title')
-        award_orgs   = request.form.getlist('award_org')
-        award_years  = request.form.getlist('award_year')
-        awards = [{'title': t.strip(), 'org': award_orgs[i].strip() if i < len(award_orgs) else '',
-                   'year': award_years[i].strip() if i < len(award_years) else ''}
-                  for i, t in enumerate(award_titles) if t.strip()]
-        profile.awards_json = json.dumps(awards, ensure_ascii=False)
-
-        # 경력 파싱: 폼에서 배열로 받기
-        companies = request.form.getlist('exp_company')
-        periods   = request.form.getlist('exp_period')
-        roles     = request.form.getlist('exp_role')
-        bullets   = request.form.getlist('exp_bullets')  # 각 항목은 줄바꿈으로 구분
-        experience = []
-        for i, company in enumerate(companies):
-            if company.strip():
-                experience.append({
-                    'company': company.strip(),
-                    'period': periods[i].strip() if i < len(periods) else '',
-                    'role': roles[i].strip() if i < len(roles) else '',
-                    'bullets': [b.strip() for b in bullets[i].split('\n') if b.strip()] if i < len(bullets) else [],
-                })
-        profile.experience_json = json.dumps(experience, ensure_ascii=False)
+        profile.skills = request.form.get('skills', '')  # 핵심 역량 (쉼표로 구분한 단순 목록)
+        profile.language_scores_json = _form_rows_json('lang', LANGUAGE_SCORE_FIELDS)
+        profile.tools_json = _form_rows_json('tool', TOOL_FIELDS)
+        profile.education_json = _form_rows_json('edu', EDUCATION_FIELDS)
+        profile.awards_json = _form_rows_json('award', AWARD_FIELDS)
+        profile.experience_json = _form_rows_json('exp', EXPERIENCE_FIELDS)
 
         db.session.commit()
         for filename in old_files:
@@ -1691,7 +501,6 @@ def profile_edit():
 @login_required
 def project_new():
     if request.method == 'POST':
-        import json as _json
         labels = request.form.getlist('link_label')
         urls   = request.form.getlist('link_url')
         links  = [{'label': l.strip(), 'url': _expand_tiktok_short_url(u.strip())}
@@ -1713,8 +522,8 @@ def project_new():
             order=_form_int('order'),
             detail_text=request.form.get('detail_text', ''),
             image_filename=img or '',
-            links_json=_json.dumps(links, ensure_ascii=False),
-            links_en_json=_json.dumps(links_en, ensure_ascii=False),
+            links_json=json.dumps(links, ensure_ascii=False),
+            links_en_json=json.dumps(links_en, ensure_ascii=False),
             kpi=kpi,
             my_role=request.form.get('my_role', ''),
             category=request.form.get('category', ''),
@@ -1737,7 +546,6 @@ def project_new():
 def project_edit(pid):
     p = Project.query.get_or_404(pid)
     if request.method == 'POST':
-        import json as _json
         labels = request.form.getlist('link_label')
         urls   = request.form.getlist('link_url')
         links  = [{'label': l.strip(), 'url': _expand_tiktok_short_url(u.strip())}
@@ -1748,9 +556,9 @@ def project_edit(pid):
         p.period = request.form.get('period', '')
         p.order = _form_int('order')
         p.detail_text = request.form.get('detail_text', '')
-        p.links_json = _json.dumps(links, ensure_ascii=False)
+        p.links_json = json.dumps(links, ensure_ascii=False)
         en_labels = request.form.getlist('link_label_en')
-        p.links_en_json = _json.dumps(
+        p.links_en_json = json.dumps(
             [{'label': en_labels[i].strip() if i < len(en_labels) else '', 'url': lk['url']}
              for i, lk in enumerate(links)],
             ensure_ascii=False)
@@ -1859,7 +667,6 @@ def _save_gallery_image(request):
 @app.route('/admin/gallery/new', methods=['GET', 'POST'])
 @login_required
 def gallery_new():
-    import json as _j
     if request.method == 'POST':
         filename = _save_gallery_image(request)
         if not filename:
@@ -1882,7 +689,6 @@ def gallery_new():
 @app.route('/admin/gallery/<int:gid>/edit', methods=['GET', 'POST'])
 @login_required
 def gallery_edit(gid):
-    import json as _j
     item = GalleryItem.query.get_or_404(gid)
     if request.method == 'POST':
         item.title = request.form['title']
@@ -1922,33 +728,28 @@ def project_image_upload(pid):
     if not filename:
         filename = save_uploaded_image(request.files.get('image'), f"proj{pid}")
     if not filename:
-        return json.dumps({'error': 'invalid file'}), 400, {'Content-Type': 'application/json'}
+        return jsonify({'error': 'invalid file'}), 400
     has_any = ProjectImage.query.filter_by(project_id=pid).first() is not None
     img = ProjectImage(project_id=pid, filename=filename, is_main=not has_any)
     db.session.add(img)
     db.session.commit()
-    return app.response_class(
-        response=json.dumps({'id': img.id, 'is_main': img.is_main,
-                             'url': url_for('static', filename='uploads/' + filename)}),
-        mimetype='application/json'
-    )
+    return jsonify({'id': img.id, 'is_main': img.is_main,
+                    'url': url_for('static', filename='uploads/' + filename)})
 
 
 @app.route('/admin/project/images/<int:img_id>/set-main', methods=['POST'])
 @login_required
 def project_image_set_main(img_id):
-    import json as _json
     img = ProjectImage.query.get_or_404(img_id)
     ProjectImage.query.filter_by(project_id=img.project_id).update({'is_main': False})
     img.is_main = True
     db.session.commit()
-    return app.response_class(response=_json.dumps({'ok': True}), mimetype='application/json')
+    return jsonify({'ok': True})
 
 
 @app.route('/admin/project/images/<int:img_id>/delete', methods=['POST'])
 @login_required
 def project_image_delete(img_id):
-    import json as _json
     img = ProjectImage.query.get_or_404(img_id)
     was_main, pid, filename = img.is_main, img.project_id, img.filename
     db.session.delete(img)
@@ -1959,7 +760,7 @@ def project_image_delete(img_id):
         if nxt:
             nxt.is_main = True
             db.session.commit()
-    return app.response_class(response=_json.dumps({'ok': True}), mimetype='application/json')
+    return jsonify({'ok': True})
 
 
 # ── Reorder ─────────────────────────────────────────────
@@ -1985,13 +786,13 @@ def _reorder_ids():
 def projects_reorder():
     ids = _reorder_ids()
     if ids is None:
-        return _json_response({'error': 'ids must be a list of integers'}, 400)
+        return jsonify({'error': 'ids must be a list of integers'}), 400
     for i, pid in enumerate(ids):
         p = db.session.get(Project, pid)
         if p:
             p.order = i
     db.session.commit()
-    return _json_response({'ok': True})
+    return jsonify({'ok': True})
 
 
 @app.route('/admin/gallery/reorder', methods=['POST'])
@@ -1999,13 +800,13 @@ def projects_reorder():
 def gallery_reorder():
     ids = _reorder_ids()
     if ids is None:
-        return _json_response({'error': 'ids must be a list of integers'}, 400)
+        return jsonify({'error': 'ids must be a list of integers'}), 400
     for i, gid in enumerate(ids):
         g = db.session.get(GalleryItem, gid)
         if g:
             g.sort_order = i
     db.session.commit()
-    return _json_response({'ok': True})
+    return jsonify({'ok': True})
 
 
 # ── Public Funnel Tracking ────────────────────────────────────
@@ -2038,158 +839,6 @@ def api_track():
 
     record_event(stage, project_id, detail)
     return ('', 204)
-
-
-# ── YouTube API Proxy ────────────────────────────────────
-
-# 조회수·제목은 몇 분 늦어도 괜찮으므로 응답을 잠시 캐시해 API 쿼터(하루 10,000)를 아낀다.
-# 방문자가 같은 프로젝트 모달을 열 때마다 YouTube를 다시 부르지 않는다.
-_YT_CACHE_TTL = 30 * 60
-_YT_CACHE_MAX = 500
-_YT_CACHE_LOCK = threading.Lock()
-_YT_CACHE = {}  # key -> (expires_at, status, body)
-
-
-def _json_response(body, status=200):
-    return app.response_class(response=json.dumps(body), status=status,
-                              mimetype='application/json')
-
-
-def _yt_cache_get(key):
-    now = time.time()
-    with _YT_CACHE_LOCK:
-        hit = _YT_CACHE.get(key)
-        if hit and hit[0] > now:
-            return hit[1], hit[2]
-        _YT_CACHE.pop(key, None)
-    return None
-
-
-def _yt_cache_put(key, status, body):
-    """정상 응답과 '없음(404)'만 캐시한다. 일시적인 오류는 다음 요청에서 다시 시도한다."""
-    if status not in (200, 404):
-        return
-    now = time.time()
-    with _YT_CACHE_LOCK:
-        if len(_YT_CACHE) >= _YT_CACHE_MAX:
-            for k in [k for k, v in _YT_CACHE.items() if v[0] <= now]:
-                _YT_CACHE.pop(k, None)
-            if len(_YT_CACHE) >= _YT_CACHE_MAX:
-                _YT_CACHE.pop(min(_YT_CACHE, key=lambda k: _YT_CACHE[k][0]), None)
-        _YT_CACHE[key] = (now + _YT_CACHE_TTL, status, body)
-
-
-def _yt_get_json(url, timeout):
-    import urllib.request as _req
-    with _req.urlopen(url, timeout=timeout) as resp:
-        return json.loads(resp.read())
-
-
-def _yt_thumbnail(snippet):
-    thumbs = snippet.get('thumbnails', {})
-    return (thumbs.get('high') or thumbs.get('medium') or {}).get('url', '')
-
-
-def _yt_proxy(cache_key, fetch):
-    """캐시 → 레이트리밋 → API 키 확인 → fetch(api_key) 순으로 처리한다. fetch는 (status, body)를 돌려준다."""
-    import urllib.error as _err
-    cached = _yt_cache_get(cache_key)
-    if cached:
-        return _json_response(cached[1], cached[0])
-    if _rate_limited(f"yt:{_client_ip()}"):
-        return _json_response({'error': 'rate limited'}, 429)
-    api_key = os.environ.get('YOUTUBE_API_KEY', '')
-    if not api_key:
-        return _json_response({'error': 'YOUTUBE_API_KEY not set'}, 503)
-    try:
-        status, body = fetch(api_key)
-    except _err.HTTPError as e:
-        status, body = 502, {'error': f'youtube api {e.code}'}
-    except Exception as e:
-        print(f"[youtube] {cache_key}: {e!r}")
-        status, body = 500, {'error': 'youtube fetch failed'}
-    _yt_cache_put(cache_key, status, body)
-    return _json_response(body, status)
-
-
-def _parse_iso_duration(d):
-    m = re.match(r'PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?', d or '')
-    if not m:
-        return 0
-    h, mn, s = (int(x or 0) for x in m.groups())
-    return h * 3600 + mn * 60 + s
-
-
-@app.route('/api/youtube')
-def youtube_info():
-    video_id = request.args.get('v', '').strip()
-    if not video_id:
-        return _json_response({'error': 'no video id'}, 400)
-    if not re.fullmatch(r'[A-Za-z0-9_-]{11}', video_id):
-        return _json_response({'error': 'invalid video id'}, 400)
-
-    def fetch(api_key):
-        data = _yt_get_json(
-            'https://www.googleapis.com/youtube/v3/videos'
-            f'?part=snippet,statistics&id={video_id}&key={api_key}', timeout=6)
-        items = data.get('items', [])
-        if not items:
-            return 404, {'error': 'not found'}
-        snippet = items[0].get('snippet', {})
-        stats = items[0].get('statistics', {})
-        return 200, {
-            'title':        snippet.get('title', ''),
-            'thumbnail':    _yt_thumbnail(snippet),
-            'viewCount':    stats.get('viewCount', '0'),
-            'likeCount':    stats.get('likeCount', '0'),
-            'commentCount': stats.get('commentCount', '0'),
-        }
-
-    return _yt_proxy(f'v:{video_id}', fetch)
-
-
-@app.route('/api/youtube/playlist')
-def youtube_playlist_info():
-    playlist_id = request.args.get('list', '').strip()
-    if not playlist_id:
-        return _json_response({'error': 'no playlist id'}, 400)
-    if not re.fullmatch(r'[A-Za-z0-9_-]{10,64}', playlist_id):
-        return _json_response({'error': 'invalid playlist id'}, 400)
-
-    def fetch(api_key):
-        items_data = _yt_get_json(
-            'https://www.googleapis.com/youtube/v3/playlistItems'
-            f'?part=contentDetails&maxResults=50&playlistId={playlist_id}&key={api_key}', timeout=8)
-        video_ids = [it['contentDetails']['videoId'] for it in items_data.get('items', [])]
-        if not video_ids:
-            return 404, {'error': 'empty playlist'}
-        vdata = _yt_get_json(
-            'https://www.googleapis.com/youtube/v3/videos'
-            f'?part=snippet,statistics,contentDetails&id={",".join(video_ids)}&key={api_key}', timeout=8)
-        videos = []
-        for v in vdata.get('items', []):
-            dur = _parse_iso_duration(v.get('contentDetails', {}).get('duration', ''))
-            views = int(v.get('statistics', {}).get('viewCount', 0) or 0)
-            videos.append((dur, views, v))
-        if not videos:
-            return 404, {'error': 'empty playlist'}
-        long_form = [x for x in videos if x[0] > 180]
-        pool = long_form or videos
-        pool.sort(key=lambda x: x[1], reverse=True)
-        best = pool[0][2]
-        snippet = best.get('snippet', {})
-        stats = best.get('statistics', {})
-        return 200, {
-            'videoUrl':     f"https://www.youtube.com/watch?v={best['id']}",
-            'videoId':      best['id'],
-            'title':        snippet.get('title', ''),
-            'thumbnail':    _yt_thumbnail(snippet),
-            'viewCount':    stats.get('viewCount', '0'),
-            'likeCount':    stats.get('likeCount', '0'),
-            'commentCount': stats.get('commentCount', '0'),
-        }
-
-    return _yt_proxy(f'list:{playlist_id}', fetch)
 
 
 # ── Entry ────────────────────────────────────────────────

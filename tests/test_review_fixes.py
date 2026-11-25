@@ -5,6 +5,8 @@ from types import SimpleNamespace
 import pytest
 
 import app as app_module
+import ratelimit as ratelimit_mod
+import uploads as uploads_mod
 from app import Admin, DailyVisit, GalleryItem, Profile, Project, ProjectImage, db
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
@@ -13,9 +15,9 @@ PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
 @pytest.fixture(autouse=True)
 def isolated_uploads(tmp_path, monkeypatch):
     monkeypatch.setitem(app_module.app.config, "UPLOAD_FOLDER", str(tmp_path))
-    app_module._RATE_HITS.clear()
+    ratelimit_mod._RATE_HITS.clear()
     yield tmp_path
-    app_module._RATE_HITS.clear()
+    ratelimit_mod._RATE_HITS.clear()
 
 
 def _login(client):
@@ -28,7 +30,7 @@ def _login(client):
 def test_images_uploaded_in_the_same_second_get_distinct_files(client, portfolio_app, isolated_uploads, monkeypatch):
     _login(client)
     # app 모듈이 보는 시계만 멈춘다 (전역 time.time을 바꾸면 세션 쿠키까지 영향을 받는다)
-    monkeypatch.setattr(app_module, "time", SimpleNamespace(time=lambda: 1_700_000_000))
+    monkeypatch.setattr(uploads_mod, "time", SimpleNamespace(time=lambda: 1_700_000_000))
     with portfolio_app.app_context():
         pid = Project.query.first().id
 
@@ -101,7 +103,7 @@ def test_deleting_a_gallery_item_removes_its_unshared_file(client, portfolio_app
 # ── 문안 정리 ───────────────────────────────────────────
 
 def test_social_i_awards_normalization_does_not_double_the_plural():
-    from app import _normalize_copy
+    from content_sync import _normalize_copy
 
     assert _normalize_copy("Social I Awards") == "Social i Awards"
     assert _normalize_copy("Social I Award") == "Social i Awards"
@@ -110,7 +112,8 @@ def test_social_i_awards_normalization_does_not_double_the_plural():
 
 
 def test_profile_fix_rerun_keeps_admin_edited_hero_copy(portfolio_app):
-    from app import ContentSync, apply_profile_fixes_once, sync_canonical_content_once
+    from models import ContentSync
+    from content_sync import apply_profile_fixes_once, sync_canonical_content_once
 
     with portfolio_app.app_context():
         sync_canonical_content_once()
@@ -130,7 +133,7 @@ def test_profile_fix_rerun_keeps_admin_edited_hero_copy(portfolio_app):
 
 
 def test_initial_seed_still_applies_canonical_hero_copy(portfolio_app):
-    from app import _load_canonical_application, sync_canonical_content_once
+    from content_sync import _load_canonical_application, sync_canonical_content_once
 
     site_copy = _load_canonical_application()["site_copy"]
     with portfolio_app.app_context():
@@ -178,7 +181,7 @@ def test_login_starts_a_fresh_session(client, portfolio_app):
 # ── 방문수 ──────────────────────────────────────────────
 
 def test_daily_visit_increments_in_the_database(portfolio_app):
-    from app import increment_daily_visit
+    from tracking import increment_daily_visit
 
     with portfolio_app.app_context():
         assert increment_daily_visit("2026-10-27") is True
@@ -193,7 +196,7 @@ def test_daily_visit_increments_in_the_database(portfolio_app):
 
 def test_daily_visit_increment_survives_a_concurrent_first_insert(portfolio_app, monkeypatch):
     """다른 요청이 같은 날짜 행을 먼저 넣어 INSERT가 실패해도 그 행을 올려 1을 잃지 않는다."""
-    from app import increment_daily_visit
+    from tracking import increment_daily_visit
 
     with portfolio_app.app_context():
         real_update = app_module.DailyVisit.query.filter_by(date="2026-10-29").update.__func__

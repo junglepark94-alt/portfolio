@@ -4,14 +4,18 @@ import urllib.error
 import pytest
 
 import app as app_module
+import models as models_mod
+import ratelimit as ratelimit_mod
+import tracking as tracking_mod
+import uploads as uploads_mod
 from app import DailyVisit, GalleryItem, Project, VisitEvent, db
 
 
 @pytest.fixture(autouse=True)
 def clean_rate_limits():
-    app_module._RATE_HITS.clear()
+    ratelimit_mod._RATE_HITS.clear()
     yield
-    app_module._RATE_HITS.clear()
+    ratelimit_mod._RATE_HITS.clear()
 
 
 def _login(client):
@@ -86,7 +90,7 @@ def test_reorder_accepts_numeric_strings(client, portfolio_app):
 # ── 이미지 다운로드 리다이렉트 제한 ───────────────────────
 
 def _redirect(newurl):
-    handler = app_module._AllowedHostRedirectHandler()
+    handler = uploads_mod._AllowedHostRedirectHandler()
     req = urllib.request.Request("https://img.youtube.com/vi/abcdefghijk/maxresdefault.jpg")
     return handler.redirect_request(req, io.BytesIO(), 302, "Found", {}, newurl)
 
@@ -105,14 +109,14 @@ def test_image_redirect_to_other_host_is_blocked(newurl):
         _redirect(newurl)
 
 
-def test_download_returns_none_when_redirect_is_blocked(tmp_path, monkeypatch):
+def test_download_returns_none_when_redirect_is_blocked(portfolio_app, tmp_path, monkeypatch):
     monkeypatch.setitem(app_module.app.config, "UPLOAD_FOLDER", str(tmp_path))
 
     def blocked(url, timeout):
         raise urllib.error.HTTPError(url, 302, "redirect to disallowed host", {}, None)
 
-    monkeypatch.setattr(app_module, "_open_image_url", blocked)
-    assert app_module._download_image("https://img.youtube.com/vi/x/hqdefault.jpg", "yt_x.jpg") is None
+    monkeypatch.setattr(uploads_mod, "_open_image_url", blocked)
+    assert uploads_mod._download_image("https://img.youtube.com/vi/x/hqdefault.jpg", "yt_x.jpg") is None
     assert not (tmp_path / "yt_x.jpg").exists()
 
 
@@ -121,8 +125,8 @@ def test_download_returns_none_when_redirect_is_blocked(tmp_path, monkeypatch):
 def test_repeat_visit_skips_database_work(client, portfolio_app, monkeypatch):
     calls = []
     real_record = app_module.record_event
-    monkeypatch.setattr(app_module, "record_event", lambda *a, **k: calls.append("record") or real_record(*a, **k))
-    monkeypatch.setattr(app_module, "prune_visit_events", lambda *a, **k: calls.append("prune") or 0)
+    monkeypatch.setattr(tracking_mod, "record_event", lambda *a, **k: calls.append("record") or real_record(*a, **k))
+    monkeypatch.setattr(tracking_mod, "prune_visit_events", lambda *a, **k: calls.append("prune") or 0)
 
     for _ in range(3):
         assert client.get("/").status_code == 200
@@ -133,7 +137,7 @@ def test_repeat_visit_skips_database_work(client, portfolio_app, monkeypatch):
 
 
 def test_legacy_session_key_is_migrated_without_double_counting(client, portfolio_app):
-    today = app_module._today_kst()
+    today = models_mod._today_kst()
     with client.session_transaction() as sess:
         sess[f"v_{today}"] = True          # 예전 코드가 이미 오늘 방문수를 올린 세션
         sess["v_2026-01-01"] = True        # 예전에 쌓인 키
@@ -147,7 +151,7 @@ def test_legacy_session_key_is_migrated_without_double_counting(client, portfoli
 
 def test_new_day_counts_again(client, portfolio_app, monkeypatch):
     client.get("/")
-    monkeypatch.setattr(app_module, "_today_kst", lambda: "2099-01-01")
+    monkeypatch.setattr(tracking_mod, "_today_kst", lambda: "2099-01-01")
     client.get("/")
     with portfolio_app.app_context():
         assert {r.date for r in DailyVisit.query.all()} >= {"2099-01-01"}

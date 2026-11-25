@@ -1,4 +1,7 @@
-from app import Profile, Project, db, display_period, normalize_public_content
+import content_sync as content_sync_mod
+import uploads as uploads_mod
+from app import Profile, Project, db, display_period
+from content_sync import normalize_public_content
 
 
 def test_display_period_localizes_ongoing_label():
@@ -113,7 +116,7 @@ def test_tiktok_short_links_expand_to_canonical_video_urls(monkeypatch):
     assert requested == ["https://vt.tiktok.com/ZSgaLJYtH/"]
 
     raw = json.dumps([{"label": "a", "url": "https://vt.tiktok.com/ZSgaLJYtH/"}, {"label": "b", "url": "https://naver.com"}])
-    out = json.loads(app_module._expand_short_links_json(raw))
+    out = json.loads(content_sync_mod._expand_short_links_json(raw))
     assert out[0]["url"].endswith("/video/7620980666527763726") and out[1]["url"] == "https://naver.com"
 
 
@@ -155,7 +158,7 @@ def test_public_content_normalization_is_targeted_and_idempotent(portfolio_app):
 
 
 def test_period_normalization_unifies_dashes_and_stray_spaces():
-    from app import _normalize_period
+    from content_sync import _normalize_period
 
     assert _normalize_period("2022.08 - 2023.12") == "2022.08 – 2023.12"
     assert _normalize_period("2013.03~2019.08") == "2013.03 – 2019.08"
@@ -253,7 +256,7 @@ def test_youtube_thumbnail_swap_replaces_only_mapped_images(portfolio_app, monke
         calls.append(video_id)
         return f"yt_{video_id}.jpg"
 
-    monkeypatch.setattr(app_module, "_fetch_youtube_thumbnail", fake_fetch)
+    monkeypatch.setattr(content_sync_mod, "_fetch_youtube_thumbnail", fake_fetch)
 
     with portfolio_app.app_context():
         project = Project.query.first()
@@ -273,7 +276,7 @@ def test_youtube_thumbnail_swap_replaces_only_mapped_images(portfolio_app, monke
         assert calls == ["F3AqCokSrTw"]
 
 
-def test_youtube_thumbnail_fetch_rejects_placeholder_and_non_images(tmp_path, monkeypatch):
+def test_youtube_thumbnail_fetch_rejects_placeholder_and_non_images(portfolio_app, tmp_path, monkeypatch):
     import app as app_module
 
     class FakeResponse:
@@ -294,20 +297,21 @@ def test_youtube_thumbnail_fetch_rejects_placeholder_and_non_images(tmp_path, mo
     payloads = {"maxresdefault": b"\xff\xd8\xff" + b"x" * 200, "hqdefault": b"\xff\xd8\xff" + b"y" * 20000}
     import urllib.request
 
-    monkeypatch.setattr(app_module, "_open_image_url",
+    monkeypatch.setattr(uploads_mod, "_open_image_url",
                         lambda url, timeout=0: FakeResponse(
                             payloads["maxresdefault"] if "maxresdefault" in url else payloads["hqdefault"]))
 
     # maxresdefault가 작은 자리표시자면 건너뛰고 hqdefault를 저장한다
-    assert app_module._fetch_youtube_thumbnail("F3AqCokSrTw") == "yt_F3AqCokSrTw.jpg"
+    assert uploads_mod._fetch_youtube_thumbnail("F3AqCokSrTw") == "yt_F3AqCokSrTw.jpg"
     assert (tmp_path / "yt_F3AqCokSrTw.jpg").read_bytes() == payloads["hqdefault"]
     # 잘못된 형식의 영상 id는 네트워크 요청 없이 거부한다
-    assert app_module._fetch_youtube_thumbnail("../../etc/passwd") is None
-    assert app_module._fetch_youtube_thumbnail("") is None
+    assert uploads_mod._fetch_youtube_thumbnail("../../etc/passwd") is None
+    assert uploads_mod._fetch_youtube_thumbnail("") is None
 
 
 def test_canonical_sync_runs_once_and_keeps_admin_edits_afterwards(portfolio_app):
-    from app import ContentSync, sync_canonical_content_once
+    from models import ContentSync
+    from content_sync import sync_canonical_content_once
 
     with portfolio_app.app_context():
         project = Project.query.first()
@@ -345,9 +349,10 @@ def test_admin_can_reimport_canonical_copy_for_one_project(portfolio_app):
 
 def test_thumbnail_swaps_still_run_after_seed_marker_is_set(portfolio_app, monkeypatch):
     import app as app_module
-    from app import ProjectImage, apply_youtube_thumbnail_swaps, sync_canonical_content_once
+    from app import ProjectImage
+    from content_sync import apply_youtube_thumbnail_swaps, sync_canonical_content_once
 
-    monkeypatch.setattr(app_module, "_fetch_youtube_thumbnail", lambda vid: f"yt_{vid}.jpg")
+    monkeypatch.setattr(content_sync_mod, "_fetch_youtube_thumbnail", lambda vid: f"yt_{vid}.jpg")
 
     with portfolio_app.app_context():
         assert sync_canonical_content_once() is True      # 기준 문안은 이미 적용된 상태
@@ -362,7 +367,7 @@ def test_thumbnail_swaps_still_run_after_seed_marker_is_set(portfolio_app, monke
         assert img.filename == "yt_U_kFCUJy_wM.jpg"
 
 
-def test_external_image_fetch_enforces_https_and_host_allowlist(tmp_path, monkeypatch):
+def test_external_image_fetch_enforces_https_and_host_allowlist(portfolio_app, tmp_path, monkeypatch):
     import app as app_module
     import urllib.request
 
@@ -385,26 +390,27 @@ def test_external_image_fetch_enforces_https_and_host_allowlist(tmp_path, monkey
         requested.append(url)
         return FakeResponse()
 
-    monkeypatch.setattr(app_module, "_open_image_url", fake_urlopen)
+    monkeypatch.setattr(uploads_mod, "_open_image_url", fake_urlopen)
 
     allowed = "https://poc-cf-image.cjenm.com/crop/1120x630/public/share/x.jpg"
-    name = app_module._fetch_external_image(allowed)
+    name = uploads_mod._fetch_external_image(allowed)
     assert name and name.startswith("ext_") and (tmp_path / name).exists()
-    assert app_module._fetch_external_image(allowed) == name      # 두 번째는 캐시된 파일 재사용
+    assert uploads_mod._fetch_external_image(allowed) == name      # 두 번째는 캐시된 파일 재사용
     assert requested == [allowed]
 
     # 허용 목록 밖 호스트와 평문 http는 네트워크 요청조차 하지 않는다
-    assert app_module._fetch_external_image("https://evil.example.com/a.jpg") is None
-    assert app_module._fetch_external_image("http://poc-cf-image.cjenm.com/a.jpg") is None
-    assert app_module._fetch_external_image("https://169.254.169.254/latest/meta-data") is None
+    assert uploads_mod._fetch_external_image("https://evil.example.com/a.jpg") is None
+    assert uploads_mod._fetch_external_image("http://poc-cf-image.cjenm.com/a.jpg") is None
+    assert uploads_mod._fetch_external_image("https://169.254.169.254/latest/meta-data") is None
     assert requested == [allowed]
 
 
 def test_official_image_replacement_swaps_mapped_files_only(portfolio_app, monkeypatch):
     import app as app_module
-    from app import ProjectImage, apply_youtube_thumbnail_swaps
+    from app import ProjectImage
+    from content_sync import apply_youtube_thumbnail_swaps
 
-    monkeypatch.setattr(app_module, "_fetch_external_image", lambda url: "ext_official.jpg")
+    monkeypatch.setattr(content_sync_mod, "_fetch_external_image", lambda url: "ext_official.jpg")
 
     with portfolio_app.app_context():
         project = Project.query.first()
@@ -423,7 +429,7 @@ def test_official_image_replacement_swaps_mapped_files_only(portfolio_app, monke
 
 def test_profile_fixes_normalize_list_values_and_run_once_per_version(portfolio_app):
     import json
-    from app import apply_profile_fixes_once, sync_canonical_content_once
+    from content_sync import apply_profile_fixes_once, sync_canonical_content_once
 
     with portfolio_app.app_context():
         sync_canonical_content_once()
