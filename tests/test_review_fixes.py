@@ -232,7 +232,7 @@ def test_reorder_with_a_malformed_body_does_not_500(client):
     _login(client)
     resp = client.post("/admin/projects/reorder", data="not json",
                        content_type="application/json")
-    assert resp.status_code == 200
+    assert resp.status_code == 400  # 서버 오류(500)가 아니라 잘못된 요청으로 거부한다
 
 
 def test_upload_queue_continues_after_a_non_json_error():

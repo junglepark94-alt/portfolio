@@ -5,7 +5,10 @@
 
   <div class="admin-topbar">
     <h2>관리자 대시보드</h2>
-    <a href="{{ url_for('logout') }}" class="btn btn-ghost btn-sm-text">로그아웃</a>
+    <form method="post" action="{{ url_for('logout') }}" style="margin:0;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      <button type="submit" class="btn btn-ghost btn-sm-text">로그아웃</button>
+    </form>
   </div>
 
   {% if db_info.warning %}

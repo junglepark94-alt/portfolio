@@ -294,7 +294,7 @@ def test_youtube_thumbnail_fetch_rejects_placeholder_and_non_images(tmp_path, mo
     payloads = {"maxresdefault": b"\xff\xd8\xff" + b"x" * 200, "hqdefault": b"\xff\xd8\xff" + b"y" * 20000}
     import urllib.request
 
-    monkeypatch.setattr(urllib.request, "urlopen",
+    monkeypatch.setattr(app_module, "_open_image_url",
                         lambda url, timeout=0: FakeResponse(
                             payloads["maxresdefault"] if "maxresdefault" in url else payloads["hqdefault"]))
 
@@ -385,7 +385,7 @@ def test_external_image_fetch_enforces_https_and_host_allowlist(tmp_path, monkey
         requested.append(url)
         return FakeResponse()
 
-    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(app_module, "_open_image_url", fake_urlopen)
 
     allowed = "https://poc-cf-image.cjenm.com/crop/1120x630/public/share/x.jpg"
     name = app_module._fetch_external_image(allowed)

@@ -11,6 +11,8 @@ import re
 import json
 import base64
 import threading
+import urllib.error
+import urllib.request
 from analytics import build_funnel_stats, build_source_stats
 import secrets
 from urllib.parse import urlparse
@@ -510,16 +512,25 @@ def increment_daily_visit(today):
 
 
 def track_visit():
-    """공개 페이지 방문 기록. 같은 세션은 하루 1회만 카운트."""
+    """공개 페이지 방문 기록. 같은 세션은 하루 1회만 카운트.
+
+    오늘 이미 기록한 세션이면 DB를 전혀 건드리지 않는다. 예전에는 새로고침마다
+    정리 작업 조회 + 중복 INSERT(유니크 제약 위반 후 롤백)가 일어났다.
+    """
+    today = _today_kst()
+    if session.get('visited_on') == today:
+        return
+    # 예전 방식(v_YYYY-MM-DD 키를 날마다 하나씩 추가)으로 쌓인 키를 치워 쿠키가 커지지 않게 한다.
+    # 오늘 키가 있으면 오늘 방문수는 이미 올렸으므로 다시 올리지 않는다.
+    legacy_counted = session.pop(f'v_{today}', None)
+    for stale in [k for k in session if k.startswith('v_')]:
+        session.pop(stale, None)
+    session['visited_on'] = today
     prune_visit_events()
     try:
         record_event('visit', source=_visit_source())
-        today = _today_kst()
-        key = f'v_{today}'
-        if session.get(key):
-            return
-        session[key] = True
-        increment_daily_visit(today)
+        if not legacy_counted:
+            increment_daily_visit(today)
     except Exception:
         db.session.rollback()
 
@@ -982,19 +993,37 @@ _ALLOWED_IMAGE_HOSTS = {'img.youtube.com', 'i.ytimg.com', 'poc-cf-image.cjenm.co
 _MAX_IMAGE_BYTES = 5 * 1024 * 1024
 
 
+def _is_allowed_image_url(url):
+    parts = urlparse(url or '')
+    return parts.scheme == 'https' and parts.hostname in _ALLOWED_IMAGE_HOSTS
+
+
+class _AllowedHostRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """리다이렉트도 허용 호스트(https)로 가는 것만 따라간다. 처음 URL만 검사하면 리다이렉트로 우회된다."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if not _is_allowed_image_url(newurl):
+            raise urllib.error.HTTPError(newurl, code, 'redirect to disallowed host', headers, fp)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_IMAGE_OPENER = urllib.request.build_opener(_AllowedHostRedirectHandler)
+
+
+def _open_image_url(url, timeout):
+    return _IMAGE_OPENER.open(url, timeout=timeout)
+
+
 def _download_image(url, filename):
     """허용 호스트의 이미지를 uploads에 저장. 성공 시 filename, 실패 시 None."""
-    import urllib.parse as _parse
-    import urllib.request as _req
-    parts = _parse.urlparse(url)
-    if parts.scheme != 'https' or parts.hostname not in _ALLOWED_IMAGE_HOSTS:
+    if not _is_allowed_image_url(url):
         return None
     folder = app.config['UPLOAD_FOLDER']
     target = os.path.join(folder, filename)
     if os.path.exists(target) and os.path.getsize(target) > 8000:
         return filename
     try:
-        with _req.urlopen(url, timeout=10) as resp:
+        with _open_image_url(url, timeout=10) as resp:
             if getattr(resp, 'status', 200) != 200:
                 return None
             raw = resp.read(_MAX_IMAGE_BYTES)
@@ -1401,8 +1430,9 @@ def login():
     return render_template('login.html')
 
 
-@app.route('/admin/logout')
+@app.route('/admin/logout', methods=['POST'])
 def logout():
+    # POST + CSRF 토큰으로만 받는다. GET이면 다른 사이트의 <img src>만으로 강제 로그아웃시킬 수 있다.
     session.pop('logged_in', None)
     return redirect(url_for('index'))
 
@@ -1934,30 +1964,48 @@ def project_image_delete(img_id):
 
 # ── Reorder ─────────────────────────────────────────────
 
+def _reorder_ids():
+    """재정렬 요청의 ids 목록을 정수 목록으로. 형식이 틀리면 None (전부 거부하고 아무것도 바꾸지 않는다)."""
+    data = request.get_json(silent=True)
+    ids = data.get('ids') if isinstance(data, dict) else None
+    if not isinstance(ids, list):
+        return None
+    parsed = []
+    for value in ids:
+        if isinstance(value, bool):
+            return None
+        try:
+            parsed.append(int(value))
+        except (TypeError, ValueError):
+            return None
+    return parsed
+
 @app.route('/admin/projects/reorder', methods=['POST'])
 @login_required
 def projects_reorder():
-    import json as _json
-    ids = (request.get_json(silent=True) or {}).get('ids', [])
+    ids = _reorder_ids()
+    if ids is None:
+        return _json_response({'error': 'ids must be a list of integers'}, 400)
     for i, pid in enumerate(ids):
-        p = db.session.get(Project, int(pid))
+        p = db.session.get(Project, pid)
         if p:
             p.order = i
     db.session.commit()
-    return app.response_class(response=_json.dumps({'ok': True}), mimetype='application/json')
+    return _json_response({'ok': True})
 
 
 @app.route('/admin/gallery/reorder', methods=['POST'])
 @login_required
 def gallery_reorder():
-    import json as _json
-    ids = (request.get_json(silent=True) or {}).get('ids', [])
+    ids = _reorder_ids()
+    if ids is None:
+        return _json_response({'error': 'ids must be a list of integers'}, 400)
     for i, gid in enumerate(ids):
-        g = db.session.get(GalleryItem, int(gid))
+        g = db.session.get(GalleryItem, gid)
         if g:
             g.sort_order = i
     db.session.commit()
-    return app.response_class(response=_json.dumps({'ok': True}), mimetype='application/json')
+    return _json_response({'ok': True})
 
 
 # ── Public Funnel Tracking ────────────────────────────────────
